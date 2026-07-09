@@ -10,6 +10,11 @@ ARCH=${2:?usage: build.sh <config> <arch>}
 
 require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
 
+# Catch an empty/missing working tree early with a clear message
+[[ -f "$KERNEL_TREE/Makefile" ]] || \
+    die "Kernel Makefile not found in '$KERNEL_TREE' — run 'make fetch' first, " \
+        "or restore the tree with: git -C $KERNEL_TREE checkout HEAD -- ."
+
 OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
 LOG_FILE="$OUT_DIR/build.log"
 STATUS_FILE="$OUT_DIR/build.status"
