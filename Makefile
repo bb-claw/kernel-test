@@ -15,8 +15,12 @@ NO_FETCH    ?= 0
 BUILD_DIR := build
 CACHE_DIR := cache
 
-# allmodconfig produces a kernel too large for the minimal initramfs; build only
-BUILD_ONLY_CONFIGS := allmodconfig
+# Configs that are built but not booted:
+#   allmodconfig — kernel too large for the minimal initramfs
+#   tinyconfig   — disables PRINTK, TTY, SERIAL, BLK_DEV_INITRD; boots silently forever
+#   allnoconfig  — even more stripped than tinyconfig; same problem
+# To boot a minimal kernel add a fragment: make CONFIGS=tinyboot (see configs/)
+BUILD_ONLY_CONFIGS := allmodconfig tinyconfig allnoconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it

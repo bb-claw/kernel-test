@@ -30,6 +30,15 @@ mkdir -p "$CCACHE_DIR"
 # Validate ccache is available
 command -v ccache &>/dev/null || die "ccache not found in PATH"
 
+# If configs/<config>.config exists, apply it as a Kconfig fragment via
+# KCONFIG_ALLCONFIG so the named options are forced on top of the base config.
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+FRAGMENT="$SCRIPT_DIR/configs/${CONFIG}.config"
+if [[ -f $FRAGMENT ]]; then
+    info "Applying config fragment: $FRAGMENT"
+    export KCONFIG_ALLCONFIG="$FRAGMENT"
+fi
+
 # Kernel make wrapper — respects V for verbosity
 kmake() {
     local make_args=(
