@@ -14,28 +14,44 @@ if ! git -C "$KERNEL_TREE" diff --quiet 2>/dev/null; then
     warn "Kernel tree has uncommitted changes"
 fi
 
-info "Fetching tags from origin in $KERNEL_TREE ..."
-git -C "$KERNEL_TREE" fetch --tags origin
+# Disable git's low-speed timeout — kernel.org can be legitimately slow.
+# The default (1000 bytes/sec for 20 s) is too aggressive for large repos.
+GIT=( git -C "$KERNEL_TREE" -c http.lowSpeedLimit=0 -c http.lowSpeedTime=0 )
 
-# Pick the most recent -rc tag by version order
+# ── Tag fetch with local fallback ─────────────────────────────────────────────
+
+info "Fetching tags from origin in $KERNEL_TREE ..."
+FETCH_OK=1
+"${GIT[@]}" fetch --tags origin || FETCH_OK=0
+
+if [[ $FETCH_OK -eq 0 ]]; then
+    warn "Remote tag fetch failed — checking for existing local -rc tags ..."
+fi
+
 LATEST_RC=$(git -C "$KERNEL_TREE" tag -l 'v*-rc*' \
     --sort=-version:refname | head -1)
 
-[[ -n $LATEST_RC ]] || die "No -rc tags found in $KERNEL_TREE"
-info "Latest -rc tag: $LATEST_RC"
+if [[ -z $LATEST_RC ]]; then
+    die "No -rc tags found locally or remotely. " \
+        "Ensure the kernel tree was cloned from Linus's tree and has network access."
+fi
+
+[[ $FETCH_OK -eq 1 ]] && info "Latest -rc tag: $LATEST_RC" \
+                       || warn "Using best available local tag: $LATEST_RC"
+
+# ── Checkout ──────────────────────────────────────────────────────────────────
 
 # For shallow clones the tagged commit may not be in the local object store.
-# Fetch it explicitly with depth=1 before checking out.
+# Fetch it with depth=1 before checking out.
 if ! git -C "$KERNEL_TREE" cat-file -e "${LATEST_RC}^{commit}" 2>/dev/null; then
     info "Tag commit not in local history — fetching $LATEST_RC ..."
-    git -C "$KERNEL_TREE" fetch --depth=1 origin "tag $LATEST_RC"
+    "${GIT[@]}" fetch --depth=1 origin "tag $LATEST_RC"
 fi
 
 # Record HEAD so we can restore the working tree if checkout goes wrong
 PREV_HEAD=$(git -C "$KERNEL_TREE" rev-parse --verify HEAD 2>/dev/null || true)
 
 if ! git -C "$KERNEL_TREE" checkout "$LATEST_RC"; then
-    # Checkout may have wiped the working tree before failing — restore it
     if [[ -n $PREV_HEAD ]]; then
         warn "Checkout failed — restoring previous working tree ..."
         git -C "$KERNEL_TREE" checkout "$PREV_HEAD" -- . 2>/dev/null || true

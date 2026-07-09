@@ -9,6 +9,7 @@ CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig
 TIMEOUT     ?= 60
 REPORT_DIR  ?= reports
 V           ?= 0
+NO_FETCH    ?= 0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -24,7 +25,7 @@ RUN_STAMP ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT REPORT_DIR V RUN_STAMP
+export TIMEOUT REPORT_DIR V RUN_STAMP NO_FETCH
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -57,8 +58,12 @@ all:
 # ── Pipeline stages ───────────────────────────────────────────────────────────
 
 fetch:
+ifeq ($(NO_FETCH),1)
+	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local tag"
+else
 	@echo "[fetch] Fetching latest -rc tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
+endif
 
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
 # allmodconfig is included here (build only, not booted).
@@ -134,6 +139,7 @@ Variables (current values):
   TIMEOUT      = $(TIMEOUT)s
   REPORT_DIR   = $(REPORT_DIR)
   V            = $(V)  (set to 1 for verbose output)
+  NO_FETCH     = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
 
 Examples:
   make KERNEL_TREE=../linux
