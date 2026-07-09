@@ -1,0 +1,19 @@
+# Build artifacts — kernel out-of-tree builds and initramfs staging/output
+build/
+
+# Compiler cache
+cache/
+
+# Test reports — generated on each run; share manually via summary.txt
+reports/
+
+# Claude Code local settings (contains user-specific paths and permissions)
+.claude/
+
+# Editor temporaries
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+.idea/
