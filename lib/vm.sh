@@ -75,14 +75,23 @@ timeout "$TIMEOUT" "$QEMU" \
 BOOT_OK=0
 PANIC=0
 OOPS=0
+PASS_COUNT=0
+FAIL_COUNT=0
+TESTS_TOTAL=0
 
-grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1  || true
-grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1    || true
-grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1     || true
+if [[ -s $DMESG_FILE ]]; then
+    grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1 || true
+    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1   || true
+    grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1    || true
 
-PASS_COUNT=$(grep -c "^PASS:" "$DMESG_FILE" 2>/dev/null || echo 0)
-FAIL_COUNT=$(grep -c "^FAIL:" "$DMESG_FILE" 2>/dev/null || echo 0)
-TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
+    # grep -c exits 1 on zero matches but still prints "0" — do NOT use "|| echo 0"
+    # because that produces "0\n0" in $(), breaking arithmetic. Use "|| true" instead.
+    PASS_COUNT=$(grep -c "^PASS:" "$DMESG_FILE" 2>/dev/null || true)
+    FAIL_COUNT=$(grep -c "^FAIL:" "$DMESG_FILE" 2>/dev/null || true)
+    PASS_COUNT=${PASS_COUNT:-0}
+    FAIL_COUNT=${FAIL_COUNT:-0}
+    TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
+fi
 
 # ── Determine overall result ──────────────────────────────────────────────────
 
