@@ -151,13 +151,12 @@ for cmd in "${REQUIRED[@]}"; do
     fi
 done
 
-# Optional but strongly recommended
-OPTIONAL=(pahole dwarves)
-for cmd in "${OPTIONAL[@]}"; do
-    command -v "$cmd" &>/dev/null && \
-        printf '  %-26s %s  (optional)\n' "$cmd" "$(command -v "$cmd")" || \
-        printf '  %-26s missing (optional — needed for BTF/debug info in recent kernels)\n' "$cmd"
-done
+# pahole is optional but strongly recommended — provides BTF/debug info for recent kernels.
+# It is the binary name on all distros (package is called 'pahole' on Arch, 'dwarves' on Debian).
+cmd=pahole
+command -v "$cmd" &>/dev/null && \
+    printf '  %-26s %s  (optional)\n' "$cmd" "$(command -v "$cmd")" || \
+    printf '  %-26s missing (optional — needed for BTF/debug info in recent kernels)\n' "$cmd"
 
 echo ""
 
