@@ -37,7 +37,12 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report clean distclean help
+.PHONY: all fetch build initramfs test report clean distclean bootstrap help
+
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+bootstrap:
+	$(Q)lib/bootstrap.sh
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -111,6 +116,7 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
+  bootstrap    Install all build and test dependencies (distro-aware, needs sudo)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch        Fetch and checkout the latest -rc tag
   build        Build kernels for all CONFIGS × ARCHS
