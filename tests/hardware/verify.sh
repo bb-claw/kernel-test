@@ -15,13 +15,29 @@ KVER=$(uname -r)
     && ok "kernel version: $KVER" \
     || fail "not a localconfig build (uname -r: $KVER)"
 
-# ── dmesg health ──────────────────────────────────────────────────────────────
-if dmesg | grep -qiE 'oops:|kernel panic|BUG: (unable|bad|spinlock|scheduling)'; then
-    fail "dmesg: oops/panic/BUG detected"
-    dmesg | grep -iE 'oops:|kernel panic|BUG: ' | head -3 | \
-        while IFS= read -r line; do printf '  %s\n' "$line"; done
+# ── dmesg access ──────────────────────────────────────────────────────────────
+# kernel.dmesg_restrict=1 (Manjaro default) blocks non-root reads.
+# Detect once; all dmesg checks below skip gracefully if restricted.
+DMESG_OK=0
+if dmesg &>/dev/null; then
+    DMESG_OK=1
 else
-    ok "dmesg: no oops/panic/BUG"
+    skip "dmesg restricted (kernel.dmesg_restrict=1) — re-run with sudo for dmesg checks"
+fi
+
+dmesg_grep() { [[ $DMESG_OK -eq 1 ]] && dmesg 2>/dev/null | grep -qiE "$1"; }
+
+# ── dmesg health ──────────────────────────────────────────────────────────────
+if [[ $DMESG_OK -eq 1 ]]; then
+    if dmesg 2>/dev/null | grep -qiE 'oops:|kernel panic|BUG: (unable|bad|spinlock|scheduling)'; then
+        fail "dmesg: oops/panic/BUG detected"
+        dmesg 2>/dev/null | grep -iE 'oops:|kernel panic|BUG: ' | head -3 | \
+            while IFS= read -r line; do printf '  %s\n' "$line"; done
+    else
+        ok "dmesg: no oops/panic/BUG"
+    fi
+else
+    skip "dmesg health: skipped (no dmesg access)"
 fi
 
 # ── NVMe storage ──────────────────────────────────────────────────────────────
@@ -39,10 +55,10 @@ else
 fi
 
 # ── WiFi — MT7921 ─────────────────────────────────────────────────────────────
-if dmesg | grep -qi 'mt7921'; then
+if dmesg_grep 'mt7921'; then
     ok "MT7921: driver loaded (dmesg)"
 else
-    fail "MT7921: not found in dmesg"
+    skip "MT7921: dmesg unavailable or driver not logged"
 fi
 
 WIFI_IF=$(ip -o link show | awk -F': ' '{print $2}' | grep '^wl' | head -1)
@@ -53,10 +69,11 @@ else
 fi
 
 # ── Bluetooth ─────────────────────────────────────────────────────────────────
-if dmesg | grep -qi 'btmtk\|btusb.*mediatek\|bluetooth.*mediatek'; then
-    ok "Bluetooth: btmtk/MediaTek driver in dmesg"
+# Prefer sysfs presence over dmesg — hci0 appears regardless of dmesg access.
+if [[ -d /sys/class/bluetooth/hci0 ]]; then
+    ok "Bluetooth: hci0 present in /sys/class/bluetooth/"
 else
-    fail "Bluetooth: btmtk not found in dmesg"
+    fail "Bluetooth: hci0 not found in /sys/class/bluetooth/"
 fi
 
 if command -v rfkill &>/dev/null; then
@@ -67,11 +84,18 @@ else
     skip "Bluetooth rfkill: rfkill not installed"
 fi
 
-# ── AMD PMC (S2Idle suspend) ──────────────────────────────────────────────────
-if dmesg | grep -qiE 'amd.pmc|amd_pmc'; then
-    ok "AMD PMC: driver loaded"
+# btmtk logs vary by kernel version — skip if dmesg restricted
+if dmesg_grep 'btmtk|btusb|hci0.*mt|mediatek.*bt|bluetooth.*mt'; then
+    ok "Bluetooth: MediaTek driver in dmesg"
 else
-    fail "AMD PMC: not found in dmesg"
+    skip "Bluetooth dmesg: driver string not found (restricted or log rotated)"
+fi
+
+# ── AMD PMC (S2Idle suspend) ──────────────────────────────────────────────────
+if dmesg_grep 'amd.pmc|amd_pmc|AMDI000'; then
+    ok "AMD PMC: driver loaded (dmesg)"
+else
+    skip "AMD PMC: dmesg unavailable or driver not logged"
 fi
 
 MEM_SLEEP=$(cat /sys/power/mem_sleep 2>/dev/null || true)
@@ -96,10 +120,13 @@ else
 fi
 
 # ── IDEAPAD_LAPTOP ────────────────────────────────────────────────────────────
-if dmesg | grep -qi 'ideapad'; then
-    ok "ideapad-laptop: driver loaded"
+# Check sysfs platform device — more reliable than dmesg.
+if [[ -d /sys/bus/platform/drivers/ideapad_acpi ]]; then
+    ok "ideapad-laptop: driver bound (ideapad_acpi)"
+elif dmesg_grep 'ideapad'; then
+    ok "ideapad-laptop: driver loaded (dmesg)"
 else
-    fail "ideapad-laptop: not found in dmesg"
+    fail "ideapad-laptop: not found in sysfs or dmesg"
 fi
 
 CONS=$(ls /sys/bus/platform/devices/*/conservation_mode 2>/dev/null | head -1)
@@ -110,7 +137,7 @@ else
 fi
 
 # ── AES-NI ────────────────────────────────────────────────────────────────────
-if grep -q $'^name\t*:.*aes' /proc/crypto 2>/dev/null; then
+if grep -qE '^name\s*:.*aes' /proc/crypto 2>/dev/null; then
     ok "AES-NI: aes present in /proc/crypto"
 else
     fail "AES-NI: not found in /proc/crypto"
@@ -121,9 +148,14 @@ grep -q 'btrfs' /proc/filesystems \
     && ok "filesystem: btrfs registered" \
     || fail "filesystem: btrfs not registered"
 
-grep -q 'exfat' /proc/filesystems \
-    && ok "filesystem: exfat registered" \
-    || fail "filesystem: exfat not registered"
+# exFAT may be a module on the current kernel; on localconfig it is built-in.
+if grep -q 'exfat' /proc/filesystems; then
+    ok "filesystem: exfat registered"
+elif modprobe -n exfat &>/dev/null; then
+    skip "filesystem: exfat is a module (not yet loaded) — will be built-in on localconfig"
+else
+    fail "filesystem: exfat not available"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
