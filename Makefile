@@ -68,7 +68,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report clean distclean bootstrap hooks info checkout help
+.PHONY: all fetch build initramfs test report install clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -198,6 +198,18 @@ report:
 	@echo "[report] Writing to $(REPORT_DIR)/"
 	$(Q)lib/report.sh
 
+# Install built kernel(s) to /boot and update mkinitcpio + GRUB.
+# Designed for daily-driver use with CONFIGS=localconfig ARCHS=x86_64.
+# Builds modules (fast — reuses ccache), then needs sudo for /boot writes.
+install:
+	@echo "[install] Config: $(CONFIGS) | Arch: $(ARCHS)"
+	$(Q)for config in $(CONFIGS); do \
+		for arch in $(ARCHS); do \
+			printf '[install] %-16s %s\n' "$$config" "$$arch"; \
+			lib/install.sh "$$config" "$$arch"; \
+		done; \
+	done
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -224,6 +236,7 @@ Targets:
   initramfs    Assemble BusyBox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
   report       Generate HTML and plain-text report from last test run
+  install      Install built kernel to /boot; update mkinitcpio + GRUB (needs sudo, x86_64 only)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -235,7 +248,8 @@ Variables (current values):
   TAG                 = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
   ARCHS               = $(ARCHS)
   CONFIGS             = $(CONFIGS)
-  TIMEOUT             = $(TIMEOUT)s
+  TIMEOUT             = $(TIMEOUT)s    (VM boot timeout per config)
+  BUILD_TIMEOUT       = $(BUILD_TIMEOUT)s  (per-kernel build timeout; 0 = no limit — use for localconfig)
   REPORT_DIR          = $(REPORT_DIR)
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
@@ -261,6 +275,11 @@ Common workflows:
 
   # Quick single-arch test (report always written even on failure)
   make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
+
+  # Build and install daily-driver kernel (Manjaro base config + laptop hardware fragment)
+  # BUILD_TIMEOUT=0 disables the 600s limit — localconfig is larger than defconfig
+  make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
+  make install            CONFIGS=localconfig ARCHS=x86_64
 
   # Verbose output for debugging
   make V=1 KERNEL_TREE=~/git/linux-stable

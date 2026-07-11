@@ -100,6 +100,17 @@ elif [[ $CONFIG == randdefconfig ]]; then
     grep '^CONFIG_[A-Z0-9_]*=[ym]$' "$PWD/$OUT_DIR/.config" | shuf -n 300 \
         | sed 's/=[ym]$/=n/' \
         | tee "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
+elif [[ $CONFIG == localconfig ]]; then
+    # localconfig: running kernel's config as base — for daily-driver builds.
+    # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz).
+    [[ -r /proc/config.gz ]] || \
+        die "localconfig requires /proc/config.gz — enable CONFIG_IKCONFIG_PROC in your running kernel"
+    zcat /proc/config.gz > "$PWD/$OUT_DIR/.config"
+    if ! kmake olddefconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
 elif [[ $CONFIG == laptopconfig ]]; then
     # laptopconfig: defconfig base + hardware-specific fragment (applied in step 1b).
     # 'laptopconfig' is not a kernel make target — use defconfig as the base.
