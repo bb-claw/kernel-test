@@ -24,7 +24,13 @@ BUILD_ONLY_CONFIGS := allmodconfig tinyconfig allnoconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
-RUN_STAMP ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+# ?= with $(shell) creates a lazy recursive variable — the shell command would
+# re-run on every export, giving each sub-process a different timestamp.
+# Use ifndef + := so the time is captured once at parse time; sub-makes
+# inherit the already-set value from the environment and skip re-evaluation.
+ifndef RUN_STAMP
+  RUN_STAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR

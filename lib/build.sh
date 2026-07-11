@@ -57,10 +57,14 @@ kmake() {
     fi
 }
 
+BUILD_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILD_START_EPOCH=$(date -u +%s)
+
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
 if ! kmake "$CONFIG"; then
-    printf 'FAIL\n' > "$STATUS_FILE"
+    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
@@ -69,9 +73,11 @@ fi
 # core kernel. Module compilation is a future improvement (takes much longer).
 info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
 if ! kmake -j"$NPROC" bzImage; then
-    printf 'FAIL\n' > "$STATUS_FILE"
+    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-printf 'PASS\n' > "$STATUS_FILE"
+printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\n' \
+    "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
 info "Build OK: $CONFIG / $ARCH"

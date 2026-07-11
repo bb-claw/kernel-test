@@ -56,6 +56,9 @@ fi
 
 info "Booting $CONFIG / $ARCH (timeout: ${TIMEOUT}s)"
 
+VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+VM_START_EPOCH=$(date -u +%s)
+
 QEMU_EXIT=0
 timeout "$TIMEOUT" "$QEMU" \
     "${KVM_FLAGS[@]}" \
@@ -118,6 +121,8 @@ fi
     printf 'TESTS_TOTAL=%d\n' "$TESTS_TOTAL"
     printf 'TESTS_PASS=%d\n'  "$PASS_COUNT"
     printf 'TESTS_FAIL=%d\n'  "$FAIL_COUNT"
+    printf 'START_TIME=%s\n'  "$VM_START_TIME"
+    printf 'DURATION=%d\n'    "$(( $(date -u +%s) - VM_START_EPOCH ))"
     [[ -n $FAIL_REASON ]] && printf 'FAIL_REASON=%s\n' "$FAIL_REASON"
 } > "$STATUS_FILE"
 
