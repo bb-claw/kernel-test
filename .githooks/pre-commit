@@ -1,0 +1,66 @@
+#!/bin/bash
+# Pre-commit hook: fast checks on staged files only.
+# Complements pre-push (which sweeps all tracked files).
+# Installed by: make bootstrap  (git config core.hooksPath .githooks)
+set -euo pipefail
+
+rc=0
+ok()   { printf '[pre-commit] ok:   %s\n' "$*"; }
+fail() { printf '[pre-commit] FAIL: %s\n' "$*"; rc=1; }
+skip() { printf '[pre-commit] skip: %s\n' "$*"; }
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Staged files (added/copied/modified — not deleted)
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACM)
+
+# Subsets — guard against empty STAGED to avoid printf with no args
+mapfile -t SH_STAGED   < <([[ ${#STAGED[@]} -gt 0 ]] && printf '%s\n' "${STAGED[@]}" | grep '\.sh$'          || true)
+mapfile -t TEST_STAGED < <([[ ${#STAGED[@]} -gt 0 ]] && printf '%s\n' "${STAGED[@]}" | grep '^tests/.*\.sh$' || true)
+
+# ── 1. Guard against staged build artifacts ───────────────────────────────────
+for f in "${STAGED[@]}"; do
+    case $f in
+        build/*|cache/*|reports/*)
+            fail "build artifact staged: $f  (did you use git add -f?)" ;;
+    esac
+done
+
+# ── 2. shellcheck on staged .sh files ────────────────────────────────────────
+if [[ ${#SH_STAGED[@]} -eq 0 ]]; then
+    skip "shellcheck: no .sh files staged"
+elif ! command -v shellcheck &>/dev/null; then
+    skip "shellcheck not installed — run: make bootstrap"
+else
+    abs_sh=("${SH_STAGED[@]/#/$REPO_ROOT/}")
+    if shellcheck --severity=warning "${abs_sh[@]}"; then
+        ok "shellcheck (${#SH_STAGED[@]} staged files)"
+    else
+        fail "shellcheck found issues — fix before committing"
+    fi
+fi
+
+# ── 3. Executable bit on staged test scripts ──────────────────────────────────
+if [[ ${#TEST_STAGED[@]} -eq 0 ]]; then
+    skip "executable bit: no test scripts staged"
+else
+    missing_x=()
+    for f in "${TEST_STAGED[@]}"; do
+        [[ -x "$REPO_ROOT/$f" ]] || missing_x+=("$f")
+    done
+    if [[ ${#missing_x[@]} -eq 0 ]]; then
+        ok "executable bit (${#TEST_STAGED[@]} staged test scripts)"
+    else
+        for f in "${missing_x[@]}"; do
+            fail "not executable: $f  (fix: chmod +x $f)"
+        done
+    fi
+fi
+
+# ── Result ────────────────────────────────────────────────────────────────────
+if [[ $rc -eq 0 ]]; then
+    printf '[pre-commit] all checks passed\n'
+else
+    printf '[pre-commit] commit blocked — fix the issues above\n'
+fi
+exit $rc

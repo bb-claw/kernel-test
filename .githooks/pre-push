@@ -1,5 +1,6 @@
 #!/bin/bash
-# Pre-push hook: shellcheck + executable-bit check on all shell scripts.
+# Pre-push hook: full-repo sweep on all tracked files.
+# Complements pre-commit (which checks staged files only).
 # Installed by: make bootstrap  (git config core.hooksPath .githooks)
 set -euo pipefail
 

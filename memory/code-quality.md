@@ -4,19 +4,20 @@ Adapted from homelab `code-quality.md` for this Bash-only project.
 
 ---
 
-## Git Hook (automatic — activate once)
+## Git Hooks (automatic — activate once)
 
 ```sh
 make hooks        # or: make bootstrap (also installs packages)
 ```
 
-Sets `git config core.hooksPath .githooks`. The hook lives at `.githooks/pre-push`.
+Sets `git config core.hooksPath .githooks`.
 
-| Hook | Trigger | Checks |
-|---|---|---|
-| `pre-push` | every push | shellcheck `--severity=warning` on all tracked `.sh` files; executable bit on all `tests/*.sh` and `tests/custom/*.sh` |
+| Hook | Trigger | Scope | Checks |
+|---|---|---|---|
+| `pre-commit` | every commit | staged files only | shellcheck on staged `.sh` files; executable bit on staged `tests/**/*.sh`; guard against staged `build/` `cache/` `reports/` |
+| `pre-push` | every push | all tracked files | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh` |
 
-Skip in emergencies only: `git push --no-verify`
+Skip in emergencies only: `git commit --no-verify` / `git push --no-verify`
 
 ---
 
