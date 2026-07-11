@@ -55,3 +55,19 @@ mkdir -p "$BUILD_DIR"
 printf '%s\n' "$VERSION" > "$BUILD_DIR/.kernel-version"
 info "Checked out: $VERSION  ($(git -C "$KERNEL_TREE" rev-parse --short HEAD))"
 info "Version recorded in $BUILD_DIR/.kernel-version"
+
+# ── Verify kernel Makefile agrees with the checked-out version ────────────────
+
+KMV_TAG=''; KMV_FULL=''
+# Call without $() so the variables it sets are visible in this shell.
+if read_kernel_makefile_version >/dev/null; then
+    info "Kernel Makefile: $KMV_FULL"
+    # Only compare when REF looks like a tag (starts with v); commit hashes won't match.
+    if [[ $REF == v* && $KMV_TAG != "$REF" ]]; then
+        warn "Version mismatch: requested '$REF' but kernel Makefile says '$KMV_TAG'"
+    else
+        info "Makefile version matches: $KMV_TAG"
+    fi
+else
+    warn "Could not read version from $KERNEL_TREE/Makefile"
+fi

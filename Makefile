@@ -84,9 +84,23 @@ info:
 	@printf 'HEAD commit:  %s\n' \
 	    "$$(git -C "$(KERNEL_TREE)" rev-parse HEAD 2>/dev/null || echo '(git error — is KERNEL_TREE set?)')"
 	@tag=$$(git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null) \
-	    && printf 'Tag:          %s\n' "$$tag" \
-	    || printf 'Tag:          (not a tagged commit — nearest: %s)\n' \
+	    && printf 'Tag (git):    %s\n' "$$tag" \
+	    || printf 'Tag (git):    (not a tagged commit — nearest: %s)\n' \
 	        "$$(git -C "$(KERNEL_TREE)" describe HEAD 2>/dev/null || echo '?')"
+	@mf="$(KERNEL_TREE)/Makefile"; \
+	if [[ -f $$mf ]]; then \
+	    _ver=$$(grep -m1 '^VERSION[[:space:]]*='      "$$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]'); \
+	    _pl=$$(grep  -m1 '^PATCHLEVEL[[:space:]]*='   "$$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]'); \
+	    _sl=$$(grep  -m1 '^SUBLEVEL[[:space:]]*='     "$$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]'); \
+	    _ev=$$(grep  -m1 '^EXTRAVERSION[[:space:]]*=' "$$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]'); \
+	    [[ $${_sl:-0} -eq 0 && $$_ev == -rc* ]] \
+	        && kmv="v$${_ver}.$${_pl}$${_ev}" \
+	        || kmv="v$${_ver}.$${_pl}.$${_sl}$${_ev}"; \
+	    printf 'Tag (Makefile): %s  (VERSION=%s PATCHLEVEL=%s SUBLEVEL=%s EXTRAVERSION=%s)\n' \
+	        "$$kmv" "$$_ver" "$$_pl" "$$_sl" "$$_ev"; \
+	else \
+	    printf 'Tag (Makefile): (Makefile not found)\n'; \
+	fi
 	@[[ -f $(BUILD_DIR)/.kernel-version ]] \
 	    && printf 'Version file: %s\n' "$$(cat $(BUILD_DIR)/.kernel-version)" \
 	    || printf 'Version file: (not set — run: make fetch  or  make checkout TAG=v7.2-rc2)\n'
