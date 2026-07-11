@@ -25,11 +25,11 @@ fi
 # 20 sequential fork/exec cycles — stresses pid allocation and scheduler.
 # Fixed word list avoids $(( )) arithmetic expansion: Toybox sh 0.8.9 has a
 # buffer pre-allocation bug in $((expr)) that causes OOM inside while loops.
-_fork_ok=1
-for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    true || { fail "fork/exec failed at iteration $_i"; _fork_ok=0; break; }
+fork_ok=1
+for seq_i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    true || { fail "fork/exec failed at iteration $seq_i"; fork_ok=0; break; }
 done
-if [ "$_fork_ok" -eq 1 ]; then
+if [ "$fork_ok" -eq 1 ]; then
     ok "20 sequential fork/exec cycles"
 fi
 

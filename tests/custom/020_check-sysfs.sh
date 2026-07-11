@@ -24,11 +24,13 @@ done
 # /sys/kernel/osrelease — kernel version string
 if [ -r /sys/kernel/osrelease ]; then
     ver=$(cat /sys/kernel/osrelease)
-    # Must start with a digit and contain a dot
-    case "$ver" in
-        [0-9]*.*) ok "/sys/kernel/osrelease=$ver" ;;
-        *)        fail "/sys/kernel/osrelease malformed: $ver" ;;
-    esac
+    # Must start with a digit and contain a dot.
+    # Avoid case [0-9] — Toybox sh 0.8.9 character class bug (see 050_check-kernel).
+    if printf '%s\n' "$ver" | grep -qE '^[0-9]+\.'; then
+        ok "/sys/kernel/osrelease=$ver"
+    else
+        fail "/sys/kernel/osrelease malformed: $ver"
+    fi
 else
     skip "/sys/kernel/osrelease not readable"
 fi
