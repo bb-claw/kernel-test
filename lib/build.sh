@@ -111,14 +111,6 @@ elif [[ $CONFIG == localconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
-elif [[ $CONFIG == laptopconfig ]]; then
-    # laptopconfig: defconfig base + hardware-specific fragment (applied in step 1b).
-    # 'laptopconfig' is not a kernel make target — use defconfig as the base.
-    if ! kmake defconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
-        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
-    fi
 elif ! kmake "$CONFIG"; then
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
