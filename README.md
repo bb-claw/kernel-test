@@ -215,7 +215,7 @@ Override on the command line:
 | `TAG` | _(none)_ | Exact tag or commit for `make checkout` |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
-| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles (`laptopconfig` not in default list — hardware-specific) |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `BUILD_TIMEOUT` | `600` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT` |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
@@ -230,6 +230,7 @@ Override on the command line:
 | `allnoconfig` | yes | Everything disabled — tests absolute minimum boot path |
 | `rand500config` | yes | `tinyconfig` base + 500 random `=y` options sampled from a constrained randconfig; fast, varied, reproducibly bootable |
 | `randdefconfig` | yes | `defconfig` base with 300 randomly disabled options; heavy subsystems forced off to stay under 5 min |
+| `laptopconfig` | yes | `defconfig` base + hardware fragment for Lenovo AMD Ryzen 7 5800H + MediaTek MT7921 WiFi; not in the default CONFIGS list |
 | `allmodconfig` | no (build only) | All options as modules — catches build-time regressions |
 | `randconfig` | no (build only) | Fully random config — catches compile-time regressions; constrained to stay under `BUILD_TIMEOUT` |
 

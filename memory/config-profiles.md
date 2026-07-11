@@ -9,6 +9,7 @@
 | `allnoconfig` | yes | all-no | `configs/allnoconfig.config` | Absolute minimum boot path |
 | `rand500config` | yes | tinyconfig | `configs/rand500config.config` | 500 random =y lines sampled from constrained randconfig |
 | `randdefconfig` | yes | defconfig | `configs/randdefconfig.config` | 300 random options disabled; heavy subsystems forced off |
+| `laptopconfig` | yes | defconfig | `configs/laptopconfig.config` | Hardware-specific: Lenovo AMD Ryzen 7 5800H + MT7921 WiFi |
 | `allmodconfig` | no | all-modules | none | Build-only: image too large for minimal initramfs |
 | `randconfig` | no | random | `configs/randconfig.config` | Build-only: unpredictable boot; value is compile coverage |
 
@@ -17,6 +18,11 @@ Makefile variables:
 CONFIGS          = tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig
 BUILD_ONLY_CONFIGS = allmodconfig randconfig
 BOOT_CONFIGS       = (CONFIGS minus BUILD_ONLY_CONFIGS)
+```
+
+Note: `laptopconfig` is not in the default `CONFIGS` list (hardware-specific); run explicitly:
+```sh
+make all NO_FETCH=1 CONFIGS=laptopconfig ARCHS=x86_64
 ```
 
 ---
@@ -91,6 +97,30 @@ CONFIG_TMPFS=y
 ```
 
 `randdefconfig.config` adds the heavy subsystem disables on top of this.
+
+---
+
+## laptopconfig (special handling in build.sh)
+
+Hardware: Lenovo IdeaPad — AMD Ryzen 7 5800H + MediaTek MT7921 WiFi (PCIe)
+
+1. `make defconfig` — broad coherent baseline
+2. Apply `configs/laptopconfig.config` fragment (step 1b standard path)
+3. `make olddefconfig`
+
+Fragment adds (not in x86_64 defconfig):
+- `CONFIG_BLK_DEV_NVME=y CONFIG_NVME_CORE=y` — SK Hynix / Samsung NVMe SSDs
+- `CONFIG_MT7921E=y` — MediaTek MT7921 802.11ax PCIe WiFi
+- `CONFIG_BT=y CONFIG_BTUSB=y CONFIG_BT_MTK=y` — Bluetooth (btmtk)
+- `CONFIG_AMD_PMC=y` — S2Idle suspend for Ryzen 5000
+- `CONFIG_SENSORS_K10TEMP=y` — AMD die temperature via hwmon
+- `CONFIG_IDEAPAD_LAPTOP=y` — fn-keys, battery conservation, camera toggle
+- `CONFIG_CRYPTO_AES_NI_INTEL=y` — AES-NI hardware acceleration
+- `CONFIG_BTRFS_FS=y CONFIG_EXFAT_FS=y` — Btrfs and exFAT
+
+Already in defconfig (no need to add): r8169 Ethernet, DRM, SOUND, AHCI, xhci, ext4, vfat, acpi_battery, amd_iommu, amd_pstate.
+
+`laptopconfig` is not a kernel make target — `build.sh` special-cases it to use `defconfig` as the base (same pattern as `randdefconfig`).
 
 ---
 

@@ -15,11 +15,12 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** BusyBox static binary packed into a cpio initramfs
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386`
-- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`
-  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `rand500config`, `randdefconfig`
+- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus hardware-specific `laptopconfig` (not in default `CONFIGS`)
+  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `rand500config`, `randdefconfig`, `laptopconfig`
   - Build-only (no VM boot): `allmodconfig` (image too large), `randconfig` (unpredictable boot)
   - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
   - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes
+  - `laptopconfig` — uses `defconfig` as base, applies `configs/laptopconfig.config` (NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT); not a kernel make target, special-cased in `build.sh`; x86_64 only
   - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems) and subject to `BUILD_TIMEOUT` (default 600 s); exits with `STATUS=TIMEOUT` if exceeded
   - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT) that stripped configs disable
 
@@ -54,6 +55,7 @@ The goal is systematic community verification of each -rc kernel.
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
 | `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off) |
+| `configs/laptopconfig.config` | Hardware fragment for Lenovo AMD Ryzen 7 5800H (NVMe, MT7921 WiFi, BT, AMD_PMC, AES-NI, BTRFS) |
 
 ## Conventions
 

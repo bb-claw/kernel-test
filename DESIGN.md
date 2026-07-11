@@ -194,6 +194,15 @@ when their prerequisites are absent in the tinyconfig base.
 Saves `randdef-disabled.config` (the 300 disabled lines) in `build/randdefconfig-<arch>/`.
 Heavy subsystem force-off keeps build time reliably under 5 minutes on a 16-core machine.
 
+**laptopconfig:** handled specially in `build.sh` (not a kernel make target):
+1. `make defconfig` — broad, coherent baseline
+2. Apply `configs/laptopconfig.config` via the standard step 1b fragment path; run `olddefconfig`
+
+Hardware target: Lenovo IdeaPad with AMD Ryzen 7 5800H + MediaTek MT7921 WiFi. Fragment adds
+NVMe (SK Hynix/Samsung), MT7921E WiFi, Bluetooth (btmtk), AMD_PMC (S2Idle), K10TEMP, IDEAPAD_LAPTOP,
+AES-NI, BTRFS, and exFAT — all absent from x86_64 defconfig. Not in the default `CONFIGS` list;
+run explicitly with `make all NO_FETCH=1 CONFIGS=laptopconfig ARCHS=x86_64`.
+
 **BUILD_TIMEOUT:** applies only to the `bzImage` build step via GNU `timeout(1)`. If exceeded,
 `build.sh` exits 124 and writes `STATUS=TIMEOUT` to `build.status` (distinct from `STATUS=FAIL`).
 
