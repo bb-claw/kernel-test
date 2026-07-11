@@ -134,7 +134,7 @@ kernel-test/
 │   ├── initramfs.sh      # Build BusyBox cpio initramfs + inject tests
 │   ├── vm.sh             # QEMU/KVM launch and serial console capture
 │   ├── report.sh         # Aggregate results into HTML/text report
-│   ├── install.sh        # Install kernel to /boot (Arch/Manjaro): modules, mkinitcpio, GRUB
+│   ├── install.sh        # Install kernel to /boot (Arch/Manjaro): modules, dkms autoinstall, mkinitcpio, GRUB
 │   └── bootstrap.sh      # Install build/test dependencies (distro-aware)
 ├── tests/
 │   ├── 001_smoke.sh      # Boot smoke test (reaches init, no oops/panic)
@@ -326,10 +326,23 @@ an artifact to inspect after a run.
 ## Community Contribution
 
 Test reports can be sent to the Linux kernel mailing list (LKML) or relevant subsystem
-lists. Use `summary.txt` as the body. The standard subject format is:
+lists. Use `summary.txt` as the body — it is generated ready to paste into an email.
+
+The preamble format:
 
 ```
-[REPORT] Linux <version> boot test: <PASS|FAIL> on x86_64/i386
+Subject: [REPORT] Linux <version> boot test: <PASS|FAIL> on x86_64/i386
+build and booted: PASS
+Repository:       <kernel remote URL>
+Commit:           <HEAD SHA>
+Host:             x86_64  |  AMD Ryzen 7 5800H  |  15729 MiB
+Tested ARCH:      x86_64  i386
+
+Tested-by: Your Name <your@email>
+
+---
+
+<full results table>
 ```
 
 See [Reporting Bugs](https://www.kernel.org/doc/html/latest/admin-guide/reporting-issues.html)

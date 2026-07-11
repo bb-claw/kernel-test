@@ -35,7 +35,7 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write |
 | `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686}` to `cache/` |
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
-| `lib/report.sh` | Collate results; write `summary.html` and `summary.txt` |
+| `lib/report.sh` | Collate results; write `summary.html` and `summary.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
 | `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
 | `tests/custom/010_check-proc.sh` | `/proc` content: cpuinfo, meminfo, uptime, cmdline, filesystems |
@@ -54,7 +54,7 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
-| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, grub-mkconfig |
+| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |

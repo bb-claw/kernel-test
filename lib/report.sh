@@ -159,6 +159,12 @@ TXT="$RUN_DIR/summary.txt"
 {
     # LKML-ready header — paste into email Subject: / body as-is
     printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
+    printf 'build and booted: %s\n' "$OVERALL"
+    printf 'Repository:       %s\n' "$REPO_URL"
+    printf 'Commit:           %s\n' "$COMMIT_SHA"
+    printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Tested ARCH:      %s\n' "$ARCHS"
+    printf '\n'
     [[ -n $TESTED_BY ]] && printf 'Tested-by: %s\n' "$TESTED_BY"
     printf '\n---\n\n'
 
