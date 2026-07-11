@@ -2,7 +2,7 @@
 # Install a built kernel to /boot for Arch/Manjaro (mkinitcpio + GRUB).
 # Usage: install.sh <config> <arch>
 # Called by: make install CONFIGS=<config> ARCHS=<arch>
-# Requires: sudo, mkinitcpio, grub-mkconfig
+# Requires: sudo, mkinitcpio, grub-mkconfig; dkms (optional, for out-of-tree modules)
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
@@ -66,9 +66,8 @@ sudo cp "$OUT_DIR/System.map"            "/boot/System.map-$BOOT_SUFFIX"
 
 # ── Step 4: create mkinitcpio conf and preset (Manjaro style) ────────────────
 # Write a per-kernel mkinitcpio conf derived from the system default but with
-# MODULES cleared — DKMS modules like nvidia are not built from the kernel
-# source tree and would not exist under /lib/modules/<kver>/.
-# The autodetect hook selects the correct in-tree modules automatically.
+# MODULES cleared — the autodetect hook selects in-tree modules automatically;
+# DKMS out-of-tree modules (nvidia, vbox, …) are installed in step 5.
 CONF_FILE="/etc/mkinitcpio.d/$CONFIG.conf"
 info "Writing $CONF_FILE (sudo)..."
 sudo bash -c "sed 's/^MODULES=.*/MODULES=()/' /etc/mkinitcpio.conf > '$CONF_FILE'"
@@ -97,15 +96,26 @@ sudo tee /etc/sysctl.d/99-sysrq.conf > /dev/null <<'SYSCTL'
 kernel.sysrq = 1
 SYSCTL
 
-# ── Step 5: generate initramfs ────────────────────────────────────────────────
+# ── Step 5: build DKMS modules ───────────────────────────────────────────────
+# Must run after modules_install and before mkinitcpio so out-of-tree modules
+# (nvidia, virtualbox, …) land in /lib/modules/$KVER/ before the initramfs is
+# generated.
+if command -v dkms &>/dev/null; then
+    info "Building DKMS modules for $KVER (sudo dkms autoinstall)..."
+    sudo dkms autoinstall -k "$KVER" || warn "dkms autoinstall had failures — X11/GPU drivers may not work"
+else
+    warn "dkms not found — skipping DKMS build (nvidia etc. will not be available)"
+fi
+
+# ── Step 6: generate initramfs ────────────────────────────────────────────────
 info "Generating initramfs (sudo mkinitcpio -p $CONFIG)..."
 sudo mkinitcpio -p "$CONFIG"
 
-# ── Step 6: update GRUB ───────────────────────────────────────────────────────
+# ── Step 7: update GRUB ───────────────────────────────────────────────────────
 info "Updating GRUB (sudo grub-mkconfig)..."
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-# ── Step 7: sanity checks ────────────────────────────────────────────────────
+# ── Step 8: sanity checks ────────────────────────────────────────────────────
 SANITY_FAIL=0
 
 if [[ -f "/boot/initramfs-$BOOT_SUFFIX.img" ]]; then
@@ -145,6 +155,7 @@ info ""
 info "Reboot and select '$BOOT_SUFFIX' from the GRUB menu to test."
 info ""
 info "To remove this kernel later:"
+info "  sudo dkms remove --all -k $KVER   # remove DKMS modules first"
 info "  sudo rm /boot/vmlinuz-$BOOT_SUFFIX /boot/initramfs-$BOOT_SUFFIX.img \\"
 info "          /boot/System.map-$BOOT_SUFFIX \\"
 info "          /etc/mkinitcpio.d/$CONFIG.preset /etc/mkinitcpio.d/$CONFIG.conf \\"
