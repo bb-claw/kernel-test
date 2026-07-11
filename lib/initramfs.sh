@@ -57,7 +57,7 @@ int main(void) {
     write(1, "BOOT_OK: kernel reached init\n", 29);
     write(1, "TEST_DONE\n", 10);
     sync();
-    reboot(RB_POWER_OFF);
+    reboot(RB_AUTOBOOT);
     return 0;
 }
 CSRC
@@ -101,7 +101,7 @@ for t in /tests/*.sh; do
 done
 
 echo "TEST_DONE"
-poweroff -f
+reboot -f
 EOF
     chmod +x "$STAGE/init"
 
