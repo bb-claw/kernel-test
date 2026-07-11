@@ -2,7 +2,6 @@
 # Build a minimal Toybox cpio initramfs for one architecture.
 # Usage: initramfs.sh <arch>
 # Output: build/initramfs-<arch>.cpio.gz
-set -x
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
@@ -41,11 +40,11 @@ chmod +x "$STAGE/bin/toybox"
 
 # Symlinks for all Toybox applets.
 # --list may emit space-separated or newline-separated output depending on version;
-# tr normalises to one-per-line before the symlink loop.
+# tr normalises to one-per-line; grep strips blanks and the "toybox" entry so the
+# loop body is a plain ln — avoids [[ ]] && continue triggering set -e on mismatch.
 "$STAGE/bin/toybox" --list 2>/dev/null \
-    | tr ' ' '\n' | grep -v '^$' \
+    | tr ' ' '\n' | grep -v '^$' | grep -vxF 'toybox' \
     | while read -r applet; do
-        [[ $applet == toybox ]] && continue
         ln -sf toybox "$STAGE/bin/$applet"
     done
 
