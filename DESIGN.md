@@ -18,7 +18,7 @@ a structured test report to the community.
 
 **In scope:**
 - Fetching the latest upstream -rc tag automatically
-- Building the kernel for x86_64 and i386 under seven config profiles
+- Building the kernel for x86_64 and i386 under eight config profiles
 - Booting each build in QEMU/KVM with a minimal initramfs
 - Running a boot smoke test and functional kernel-path tests inside the VM (network, RNG, tmpfs stress, fork/exec, sysctl)
 - Writing a pass/fail report as local HTML and plain text
@@ -76,16 +76,18 @@ Makefile  (make all / make fetch / make checkout / make info / make build / ...)
     │                     pack with cpio + gzip → initramfs-<arch>.cpio.gz
     │
     ├── make test    → lib/vm.sh           (for each config × arch)
+    │                     skip config if build.status != STATUS=PASS (prints SKIP (build TIMEOUT/FAIL))
     │                     qemu-system-<arch> -kernel bzImage -initrd initramfs.cpio.gz
     │                     capture serial → dmesg-<config>-<arch>.txt
     │                     detect: "BOOT_OK:" line = booted
     │                     detect: "Kernel panic" / "Oops:" = failure
     │                     count: "^< TEST PASS:" / "^< TEST FAIL:" lines
+    │                     count: KUnit KTAP ok/not ok lines (indented 4+ spaces after timestamp)
     │                     timeout: $TIMEOUT seconds (default 60)
     │
     └── make report  → lib/report.sh       (always runs — even after build/test failure)
                           aggregate build.status + vm.status for all (config, arch)
-                          OVERALL=FAIL if any build!=PASS, boot!=PASS, or TESTS_FAIL>0
+                          OVERALL=FAIL if any build!=PASS, boot!=PASS, TESTS_FAIL>0, or KUNIT_FAIL>0
                           copy kconfig-*, dmesg-*, rand-sampled-*, randdef-disabled-* into report dir
                           write reports/<date>_<time>_<version>/summary.html + summary.txt
 ```
@@ -139,6 +141,8 @@ build/
   tinyconfig-i386/
   allnoconfig-x86_64/
   allnoconfig-i386/
+  kunitconfig-x86_64/       # boot+test; vm.status includes KUNIT_PASS/KUNIT_FAIL
+  kunitconfig-i386/
   rand500config-x86_64/     # also: rand-source.config, rand-sampled.config
   rand500config-i386/
   randdefconfig-x86_64/     # also: randdef-disabled.config
@@ -194,6 +198,18 @@ when their prerequisites are absent in the tinyconfig base.
 Saves `randdef-disabled.config` (the 300 disabled lines) in `build/randdefconfig-<arch>/`.
 Heavy subsystem force-off keeps build time reliably under 5 minutes on a 16-core machine.
 
+**kunitconfig:** handled specially in `build.sh` (not a kernel make target):
+1. `make defconfig` — broad, coherent baseline with networking and common drivers
+2. Apply `configs/kunitconfig.config`: enable `CONFIG_KUNIT=y` + core test suites (lib/ data structures, mm/ SLUB)
+3. `make olddefconfig` — resolve dependencies
+
+KUnit tests run automatically during boot via `do_initcalls` (before `/init`), emit KTAP output to
+the serial console, and are parsed by `vm.sh`: indented `ok`/`not ok` lines (4+ spaces after the
+timestamp) are individual test results; non-indented suite summaries are excluded to avoid
+double-counting. Results stored as `KUNIT_PASS`/`KUNIT_FAIL` in `vm.status`. Shell tests from the
+initramfs also run as normal. Report shows `kunit:N/N` (and `sh:N/N` if shell tests also ran).
+x86_64 defconfig+KUnit build takes ~10–12 min; set `BUILD_TIMEOUT=1200` (the default) or higher.
+
 **localconfig:** handled specially in `build.sh` (not a kernel make target):
 1. Decompress `/proc/config.gz` (running Manjaro kernel config) into `$OUT_DIR/.config`
 2. `make olddefconfig` — adapts the config to the new kernel version
@@ -203,10 +219,12 @@ Requires `CONFIG_IKCONFIG_PROC=y` in the running kernel (standard on Manjaro). T
 provides a full distro config; the fragment pins hardware-specific options (NVMe, MT7921E WiFi,
 Bluetooth/btmtk, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT) and sets
 `CONFIG_LOCALVERSION="-localconfig"`. Not in the default `CONFIGS` list. Build with
-`BUILD_TIMEOUT=0` (larger than defconfig; exceeds the 600s default). Install with `make install`.
+`BUILD_TIMEOUT=0` (larger than defconfig; can exceed the 1200s default). Install with `make install`.
 
-**BUILD_TIMEOUT:** applies only to the `bzImage` build step via GNU `timeout(1)`. If exceeded,
-`build.sh` exits 124 and writes `STATUS=TIMEOUT` to `build.status` (distinct from `STATUS=FAIL`).
+**BUILD_TIMEOUT:** applies only to the `bzImage` build step via GNU `timeout(1)`. Default is 1200 s
+(20 min), which covers defconfig and kunitconfig on x86_64 (~10–12 min). If exceeded, `build.sh`
+exits 124 and writes `STATUS=TIMEOUT` to `build.status` (distinct from `STATUS=FAIL`). The `make test`
+loop skips any config with a non-PASS build status and reports `SKIP (build TIMEOUT)` or `SKIP (build FAIL)`.
 
 ### 4.3 Initramfs
 
@@ -297,6 +315,7 @@ always runs — even when build or test steps failed — so there is always an a
 - `OVERALL=FAIL` if any `build.status` has `STATUS != PASS`
 - `OVERALL=FAIL` if any `vm.status` has `BOOT != PASS` (and config is not build-only)
 - `OVERALL=FAIL` if any `vm.status` has `TESTS_FAIL > 0`
+- `OVERALL=FAIL` if any `vm.status` has `KUNIT_FAIL > 0`
 
 **`summary.txt`** (plain text, suitable for mailing list):
 ```
@@ -308,15 +327,16 @@ Started:    2026-07-11T12:44:28Z
 Duration:   1m16s
 Result:     PASS
 
-Config           Arch     Build    Boot         Tests    Started   Dur      Notes
-------           ----     -----    ----         -----    -------   ---      -----
-defconfig        x86_64   PASS     PASS         15/15    10:30:01  12s
-tinyconfig       x86_64   PASS     PASS         10/15    10:30:21  10s
-allnoconfig      x86_64   PASS     PASS         10/15    10:30:40  10s
-rand500config    x86_64   PASS     PASS         13/15    10:30:58  53s
-randdefconfig    x86_64   PASS     PASS         14/15    10:31:51  4m01s
-allmodconfig     x86_64   PASS     build-only   —        10:35:52  4m12s
-randconfig       x86_64   PASS     build-only   —        10:40:04  3m20s
+Config           Arch     Build    Boot         Tests           Started   Dur      Notes
+------           ----     -----    ----         -----           -------   ---      -----
+defconfig        x86_64   PASS     PASS         15/15           10:30:01  12s
+tinyconfig       x86_64   PASS     PASS         10/15           10:30:21  10s
+allnoconfig      x86_64   PASS     PASS         10/15           10:30:40  10s
+kunitconfig      x86_64   PASS     PASS         kunit:42/42     10:30:58  11m23s
+rand500config    x86_64   PASS     PASS         13/15           10:42:21  53s
+randdefconfig    x86_64   PASS     PASS         14/15           10:43:14  4m01s
+allmodconfig     x86_64   PASS     build-only   —               10:47:15  4m12s
+randconfig       x86_64   PASS     build-only   —               10:51:27  3m20s
 
 Report dir: reports/<run>/
 ```
@@ -349,7 +369,10 @@ reports/
     kconfig-randconfig-x86_64.config
     rand-sampled-rand500config-x86_64.config      # the 500 randomly sampled lines
     randdef-disabled-randdefconfig-x86_64.config  # the 300 randomly disabled lines
-    build-allmodconfig-x86_64.log       # build log (build-only configs only)
+    build-defconfig-x86_64.log          # build log for every config (warnings on PASS builds matter)
+    build-tinyconfig-x86_64.log
+    build-kunitconfig-x86_64.log
+    build-allmodconfig-x86_64.log
     build-randconfig-x86_64.log
 ```
 
@@ -371,7 +394,7 @@ Reports directory is gitignored. Users choose what to share publicly.
 | `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
 | `make report` | Aggregate results into HTML and plain-text report |
-| `make install` | Install built kernel to `/boot`; modules, mkinitcpio preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
+| `make install` | Install built kernel to `/boot`; modules, custom mkinitcpio conf + preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
 | `make hooks` | Activate git hooks only (`git config core.hooksPath .githooks`) |
 | `make clean` | Remove `build/` and `cache/` |
@@ -409,9 +432,9 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 | `TAG` | _(none)_ | Tag or commit for `make checkout`; ignored by all other targets |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
-| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated config profiles |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
-| `BUILD_TIMEOUT` | `600` | bzImage build timeout in seconds; exit 124 → `STATUS=TIMEOUT` |
+| `BUILD_TIMEOUT` | `1200` | bzImage build timeout in seconds; exit 124 → `STATUS=TIMEOUT`; set to `0` for localconfig |
 | `REPORT_DIR` | `reports` | Directory for output reports |
 | `V` | `0` | Set to `1` for verbose build and VM output |
 

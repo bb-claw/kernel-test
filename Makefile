@@ -18,9 +18,10 @@ endif
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
 ARCHS       ?= x86_64 i386
-CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig
+CONFIGS     ?= tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
-BUILD_TIMEOUT ?= 600
+BUILD_TIMEOUT ?= 1200
+GCC           ?= gcc
 REPORT_DIR  ?= reports
 V           ?= 0
 NO_FETCH    ?= 0
@@ -54,7 +55,7 @@ endif
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT BUILD_TIMEOUT REPORT_DIR V RUN_STAMP NO_FETCH
+export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH
 export STABLE_RELEASE STABLE_KERNEL_TREE
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
@@ -188,6 +189,12 @@ test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.sta
 	$(Q)rc=0; \
 	for config in $(BOOT_CONFIGS); do \
 		for arch in $(ARCHS); do \
+			bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
+			if [[ $$bstatus != PASS ]]; then \
+				printf '[test] %-16s %s  SKIP (build %s)\n' "$$config" "$$arch" "$${bstatus:-missing}"; \
+				rc=1; \
+				continue; \
+			fi; \
 			printf '[test] %-16s %s\n' "$$config" "$$arch"; \
 			lib/vm.sh "$$config" "$$arch" || rc=1; \
 		done; \
@@ -241,6 +248,17 @@ Targets:
   distclean    Remove build/, cache/, and reports/
   help         Show this message
 
+Config profiles (CONFIGS=):
+  defconfig      Boot+test  Architecture default — broad baseline coverage
+  tinyconfig     Boot+test  Minimal kernel — tests lower bound of functionality
+  allnoconfig    Boot+test  Everything disabled — absolute minimum boot path
+  kunitconfig    Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
+  rand500config  Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
+  randdefconfig  Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
+  localconfig    Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
+  allmodconfig   Build only All options as modules — catches build-time regressions
+  randconfig     Build only Fully random config — catches compile-time regressions (BUILD_TIMEOUT capped)
+
 Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)
   STABLE_KERNEL_TREE  = $(STABLE_KERNEL_TREE)  (used when STABLE_RELEASE is set)
@@ -249,10 +267,16 @@ Variables (current values):
   ARCHS               = $(ARCHS)
   CONFIGS             = $(CONFIGS)
   TIMEOUT             = $(TIMEOUT)s    (VM boot timeout per config)
-  BUILD_TIMEOUT       = $(BUILD_TIMEOUT)s  (per-kernel build timeout; 0 = no limit — use for localconfig)
+  BUILD_TIMEOUT       = $(BUILD_TIMEOUT)s  (per-kernel build timeout; 0 = no limit — use for localconfig; defconfig/kunitconfig x86_64 needs ~10–12 min)
+  GCC                 = $(GCC)  (compiler binary; e.g. GCC=gcc-15 for stable kernels that predate GCC 16)
   REPORT_DIR          = $(REPORT_DIR)
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
+
+Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
+  individually — chaining stops at the first failure, so tests and the report
+  are skipped when any build fails. 'make all' continues through all stages and
+  always writes a report; the test loop automatically skips configs that did not build.
 
 Common workflows:
 

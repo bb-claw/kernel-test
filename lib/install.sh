@@ -10,6 +10,7 @@ CONFIG=${1:?usage: install.sh <config> <arch>}
 ARCH=${2:?usage: install.sh <config> <arch>}
 
 require_env KERNEL_TREE BUILD_DIR
+GCC=${GCC:-gcc}
 
 [[ $ARCH == x86_64 ]] || die "install only supports x86_64 (host architecture)"
 
@@ -32,6 +33,7 @@ export CCACHE_DIR="$PWD/$CACHE_DIR"
 info "Kernel version : $KVER"
 info "vmlinuz        : /boot/vmlinuz-$BOOT_SUFFIX"
 info "Modules        : /lib/modules/$KVER/"
+info "mkinitcpio conf: /etc/mkinitcpio.d/$CONFIG.conf  (system conf, MODULES cleared)"
 info "Preset         : /etc/mkinitcpio.d/$CONFIG.preset"
 info "Initramfs      : /boot/initramfs-$BOOT_SUFFIX.img"
 
@@ -40,8 +42,8 @@ info "Building modules ($NPROC jobs)..."
 make -C "$KERNEL_TREE" \
     O="$PWD/$OUT_DIR" \
     ARCH="$ARCH" \
-    CC="ccache gcc" \
-    HOSTCC="ccache gcc" \
+    CC="ccache $GCC" \
+    HOSTCC="ccache $GCC" \
     -j"$NPROC" \
     modules
 
@@ -57,13 +59,22 @@ info "Copying kernel to /boot/vmlinuz-$BOOT_SUFFIX (sudo)..."
 sudo cp "$OUT_DIR/arch/x86/boot/bzImage" "/boot/vmlinuz-$BOOT_SUFFIX"
 sudo cp "$OUT_DIR/System.map"            "/boot/System.map-$BOOT_SUFFIX"
 
-# ── Step 4: create mkinitcpio preset (Manjaro style) ─────────────────────────
+# ── Step 4: create mkinitcpio conf and preset (Manjaro style) ────────────────
+# Write a per-kernel mkinitcpio conf derived from the system default but with
+# MODULES cleared — DKMS modules like nvidia are not built from the kernel
+# source tree and would not exist under /lib/modules/<kver>/.
+# The autodetect hook selects the correct in-tree modules automatically.
+CONF_FILE="/etc/mkinitcpio.d/$CONFIG.conf"
+info "Writing $CONF_FILE (sudo)..."
+sudo bash -c "sed 's/^MODULES=.*/MODULES=()/' /etc/mkinitcpio.conf > '$CONF_FILE'"
+
 info "Writing /etc/mkinitcpio.d/$CONFIG.preset (sudo)..."
 sudo tee "/etc/mkinitcpio.d/$CONFIG.preset" > /dev/null <<EOF
 # mkinitcpio preset for kernel-test '$CONFIG' profile
 # Kernel version: $KVER
 
 ALL_kver="/boot/vmlinuz-$BOOT_SUFFIX"
+ALL_config="$CONF_FILE"
 
 PRESETS=('default')
 
@@ -81,13 +92,19 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 # ── Summary ───────────────────────────────────────────────────────────────────
 info "Install complete: $CONFIG / $ARCH  ($KVER)"
 info ""
-info "GRUB saved default (unchanged — existing kernel stays default):"
+info "GRUB grubenv (saved_entry — this is what boots next):"
 sudo grub-editenv list 2>/dev/null || true
 info ""
-info "Reboot and select 'localconfig-x86_64' from the GRUB menu to test."
+info "NOTE: if 'vmlinuz-$BOOT_SUFFIX' sorts before your distro kernel, it becomes"
+info "      the simple 'Manjaro Linux' entry and will boot by default."
+info "      To pin your previous kernel as default:"
+info "        sudo grub-set-default '<Advanced submenu entry ID>'"
+info ""
+info "Reboot and select '$BOOT_SUFFIX' from the GRUB menu to test."
 info ""
 info "To remove this kernel later:"
 info "  sudo rm /boot/vmlinuz-$BOOT_SUFFIX /boot/initramfs-$BOOT_SUFFIX.img \\"
-info "          /boot/System.map-$BOOT_SUFFIX /etc/mkinitcpio.d/$CONFIG.preset"
+info "          /boot/System.map-$BOOT_SUFFIX \\"
+info "          /etc/mkinitcpio.d/$CONFIG.preset /etc/mkinitcpio.d/$CONFIG.conf"
 info "  sudo rm -rf /lib/modules/$KVER/"
 info "  sudo grub-mkconfig -o /boot/grub/grub.cfg"

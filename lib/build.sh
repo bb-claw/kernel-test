@@ -10,6 +10,7 @@ ARCH=${2:?usage: build.sh <config> <arch>}
 
 require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
+GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
 
 # Catch an empty/missing working tree early with a clear message
 [[ -f "$KERNEL_TREE/Makefile" ]] || \
@@ -46,8 +47,8 @@ kmake() {
         -C "$KERNEL_TREE"
         O="$PWD/$OUT_DIR"
         ARCH="$ARCH"
-        CC="ccache gcc"
-        HOSTCC="ccache gcc"
+        CC="ccache $GCC"
+        HOSTCC="ccache $GCC"
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP"
         "$@"
     )
@@ -100,6 +101,14 @@ elif [[ $CONFIG == randdefconfig ]]; then
     grep '^CONFIG_[A-Z0-9_]*=[ym]$' "$PWD/$OUT_DIR/.config" | shuf -n 300 \
         | sed 's/=[ym]$/=n/' \
         | tee "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
+elif [[ $CONFIG == kunitconfig ]]; then
+    # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
+    # 'kunitconfig' is not a kernel make target — use defconfig as the base.
+    if ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
 elif [[ $CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz).

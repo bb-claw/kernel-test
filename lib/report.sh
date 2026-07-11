@@ -70,7 +70,7 @@ for config in $CONFIGS; do
         if is_build_only "$config"; then
             boot='build-only'
             tests_pass='-'; tests_total='-'
-            fail_reason=''
+            kunit_pass='0'; kunit_fail='0'; fail_reason=''
             started=$(fmt_time "$build_start")
             duration=$(fmt_dur  "$build_dur")
         elif [[ -f "$out/vm.status" ]]; then
@@ -78,24 +78,28 @@ for config in $CONFIGS; do
             tests_pass=$(read_status  "$out/vm.status" TESTS_PASS)
             tests_fail=$(read_status  "$out/vm.status" TESTS_FAIL)
             tests_total=$(read_status "$out/vm.status" TESTS_TOTAL)
+            kunit_pass=$(read_status  "$out/vm.status" KUNIT_PASS)
+            kunit_fail=$(read_status  "$out/vm.status" KUNIT_FAIL)
             fail_reason=$(read_status "$out/vm.status" FAIL_REASON)
             vm_start=$(read_status    "$out/vm.status" START_TIME)
             vm_dur=$(read_status      "$out/vm.status" DURATION)
             started=$(fmt_time "$vm_start")
             duration=$(fmt_dur  "$vm_dur")
         else
-            boot='?'; tests_pass='?'; tests_fail='0'; tests_total='?'; fail_reason=''
+            boot='?'; tests_pass='?'; tests_fail='0'; tests_total='?'
+            kunit_pass='0'; kunit_fail='0'; fail_reason=''
             started='?'; duration='?'
         fi
 
         [[ $build_status == PASS ]] || OVERALL=FAIL
         [[ $boot == PASS || $boot == build-only || $boot == '?' ]] || OVERALL=FAIL
         [[ ${tests_fail:-0} -eq 0 ]] || OVERALL=FAIL
+        [[ ${kunit_fail:-0} -eq 0 ]] || OVERALL=FAIL
 
         # Copy artifacts into the report dir
         [[ -f "$out/dmesg.txt" ]] && \
             cp "$out/dmesg.txt" "$RUN_DIR/dmesg-${config}-${arch}.txt"
-        is_build_only "$config" && [[ -f "$out/build.log" ]] && \
+        [[ -f "$out/build.log" ]] && \
             cp "$out/build.log" "$RUN_DIR/build-${config}-${arch}.log"
         [[ -f "$out/.config" ]] && \
             cp "$out/.config" "$RUN_DIR/kconfig-${config}-${arch}.config"
@@ -114,7 +118,7 @@ for config in $CONFIGS; do
         fi
         CONFIG_ROWS+=("$config|$arch|${config_sha256:-unknown}|$config_file|$config_verify")
 
-        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|$started|$duration|$fail_reason")
+        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason")
     done
 done
 
@@ -148,15 +152,25 @@ TXT="$RUN_DIR/summary.txt"
     printf 'Duration:   %s\n' "$OVERALL_DURATION"
     printf 'Result:     %s\n\n' "$OVERALL"
 
-    printf '%-16s %-8s %-8s %-12s %-8s %-9s %-8s %s\n' \
+    printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
         Config Arch Build Boot Tests Started Dur Notes
-    printf '%-16s %-8s %-8s %-12s %-8s %-9s %-8s %s\n' \
+    printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
         ------ ---- ----- ---- ----- ------- --- -----
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt ts dur fr <<< "$row"
-        [[ $tp == '-' ]] && tests_col='—' || tests_col="${tp}/${tt}"
-        printf '%-16s %-8s %-8s %-12s %-8s %-9s %-8s %s\n' \
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
+        if [[ $tp == '-' ]]; then
+            tests_col='—'
+        else
+            kunit_total=$(( ${kp:-0} + ${kf:-0} ))
+            if [[ $kunit_total -gt 0 ]]; then
+                tests_col="kunit:${kp}/${kunit_total}"
+                [[ ${tt:-0} -gt 0 ]] && tests_col="${tests_col} sh:${tp}/${tt}"
+            else
+                tests_col="${tp}/${tt}"
+            fi
+        fi
+        printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
             "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$fr"
     done
 
@@ -207,11 +221,22 @@ HTML="$RUN_DIR/summary.html"
 HTMLHEAD
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt ts dur fr <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
 
         bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
         bt_cls=$(  [[ $bt  == PASS ]] && echo pass || { [[ $bt  == FAIL ]] && echo fail || { [[ $bt == build-only ]] && echo skip || echo unk; }; } )
-        [[ $tp == '-' ]] && tests_cell='<td>—</td>' || tests_cell="<td>${tp}/${tt}</td>"
+        if [[ $tp == '-' ]]; then
+            tests_cell='<td>—</td>'
+        else
+            kunit_total=$(( ${kp:-0} + ${kf:-0} ))
+            if [[ $kunit_total -gt 0 ]]; then
+                tests_label="kunit:${kp}/${kunit_total}"
+                [[ ${tt:-0} -gt 0 ]] && tests_label="${tests_label} sh:${tp}/${tt}"
+            else
+                tests_label="${tp}/${tt}"
+            fi
+            tests_cell="<td>${tests_label}</td>"
+        fi
 
         printf '<tr><td>%s</td><td>%s</td><td class="%s">%s</td><td class="%s">%s</td>%s<td>%s</td><td>%s</td><td>%s</td></tr>\n' \
             "$cfg" "$arc" "$bld_cls" "$bld" "$bt_cls" "$bt" "$tests_cell" "$ts" "$dur" "$fr"

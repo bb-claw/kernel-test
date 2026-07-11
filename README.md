@@ -72,6 +72,8 @@ make info KERNEL_TREE=~/git/linux-stable
 
 > **Note:** Always use `make all NO_FETCH=1` rather than chaining `build initramfs test report`
 > individually — `all` guarantees the report is written even when a build or test step fails.
+> When a build fails or times out, `make test` automatically skips that config and tests
+> the ones that did build successfully.
 
 ### Test a specific stable release
 
@@ -223,9 +225,9 @@ Override on the command line:
 | `TAG` | _(none)_ | Exact tag or commit for `make checkout` |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
-| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles (`localconfig` not in default list — requires `/proc/config.gz`) |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles (`localconfig` not in default list — requires `/proc/config.gz`) |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
-| `BUILD_TIMEOUT` | `600` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT` |
+| `BUILD_TIMEOUT` | `1200` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT`; set to `0` for localconfig |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
 | `V` | `0` | Set to `1` for verbose output |
 
@@ -236,6 +238,7 @@ Override on the command line:
 | `defconfig` | yes | Architecture default — broad baseline coverage |
 | `tinyconfig` | yes | Minimal kernel — tests lower bound of functionality |
 | `allnoconfig` | yes | Everything disabled — tests absolute minimum boot path |
+| `kunitconfig` | yes | `defconfig` base + KUnit framework + core test suites; KTAP output parsed and reported as `kunit:N/N` |
 | `rand500config` | yes | `tinyconfig` base + 500 random `=y` options sampled from a constrained randconfig; fast, varied, reproducibly bootable |
 | `randdefconfig` | yes | `defconfig` base with 300 randomly disabled options; heavy subsystems forced off to stay under 5 min |
 | `localconfig` | yes | `/proc/config.gz` base (running distro kernel) + hardware fragment; daily-driver builds; install with `make install`; not in the default CONFIGS list |
@@ -296,7 +299,7 @@ After each run, `reports/<date>_<time>_<kernel>/` contains:
 - `kconfig-<config>-<arch>.config` — exact `.config` used for that build
 - `rand-sampled-<config>-<arch>.config` — the 500 sampled lines (rand500config only)
 - `randdef-disabled-<config>-<arch>.config` — the 300 randomly disabled options (randdefconfig only)
-- `build-<config>-<arch>.log` — build log (build-only configs only)
+- `build-<config>-<arch>.log` — build log (all configs; useful for spotting warnings on passing builds)
 
 The report is always written — even when build or test steps fail — so there is always
 an artifact to inspect after a run.

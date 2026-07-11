@@ -15,13 +15,14 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** BusyBox static binary packed into a cpio initramfs
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386`
-- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
-  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `rand500config`, `randdefconfig`, `localconfig`
+- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
+  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `rand500config`, `randdefconfig`, `localconfig`
   - Build-only (no VM boot): `allmodconfig` (image too large), `randconfig` (unpredictable boot)
+  - `kunitconfig` — uses `defconfig` as base + `configs/kunitconfig.config` fragment (CONFIG_KUNIT + core test suites); not a kernel make target, special-cased in `build.sh`; KUnit emits KTAP to serial console; `vm.sh` parses `ok`/`not ok` lines (indented 4+ spaces) and records KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
   - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
   - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes
   - `localconfig` — uses `/proc/config.gz` (running Manjaro kernel) as base + `configs/localconfig.config` fragment; for daily-driver builds; `make install` deploys to `/boot` via mkinitcpio + GRUB; x86_64 only
-  - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems) and subject to `BUILD_TIMEOUT` (default 600 s); exits with `STATUS=TIMEOUT` if exceeded
+  - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems) and subject to `BUILD_TIMEOUT` (default 1200 s); exits with `STATUS=TIMEOUT` if exceeded
   - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT) that stripped configs disable
 
 ## Key files
@@ -53,8 +54,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
-| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): modules, vmlinuz, mkinitcpio preset, grub-mkconfig |
+| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
+| `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
 | `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off) |
@@ -67,14 +69,16 @@ The goal is systematic community verification of each -rc kernel.
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
 - Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `REPORT_DIR`, `V`) are the public API
-- `BUILD_TIMEOUT` (default 600 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`
-- `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually
+- `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
+- `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually (chaining stops at the first failure)
+- `make test` skips any config whose `build.status` is not `STATUS=PASS` (prints `SKIP (build TIMEOUT/FAIL)`) so partial build failures don't block testing of the configs that did build
 - `KERNEL_TREE` is normalized at parse time: leading `~` is expanded and the path is made absolute via `$(abspath ...)`; pass `~/git/linux` or `../linux` freely
 - When `STABLE_RELEASE` is set, `KERNEL_TREE` is overridden to `STABLE_KERNEL_TREE` (default: `~/git/linux-stable`) before normalization — all downstream scripts (build, test, report) automatically use the stable tree
 - Lib scripts are invoked as subprocesses by the Makefile (not sourced), so they must not rely on shell state from each other
 - VM serial output is captured live to `build/<config>-<arch>/dmesg.txt` and copied to `reports/<date>_<time>_<version>/dmesg-<config>-<arch>.txt` by the report step
 - Test output protocol inside the VM: `/init` emits `> TEST RUN: <name>` before each script and `< TEST PASS: <name>` / `< TEST FAIL: <name>` after; `vm.sh` counts those markers for TESTS_PASS/TESTS_FAIL
-- Report `OVERALL` is `FAIL` when any build status is non-PASS, any boot fails, or any test fails (`TESTS_FAIL > 0`)
+- Report `OVERALL` is `FAIL` when any build status is non-PASS, any boot fails, any shell test fails (`TESTS_FAIL > 0`), or any KUnit test fails (`KUNIT_FAIL > 0`)
+- KUnit KTAP output: `vm.sh` detects `KTAP version` or `# Subtest:` in dmesg, then counts indented `ok`/`not ok` lines (`{4,}` spaces after timestamp); non-indented suite summaries are excluded to avoid double-counting; results stored as KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
 - Never write to the kernel source tree; all build artifacts go under `build/`
 

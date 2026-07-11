@@ -21,6 +21,7 @@ override it internally, silently discarding the fragment.
 |---|---|---|
 | `tinyconfig.config` | `tinyconfig` | Re-enable minimum bootability options stripped by tinyconfig |
 | `allnoconfig.config` | `allnoconfig` | Re-enable minimum bootability options stripped by allnoconfig |
+| `kunitconfig.config` | `kunitconfig` | Enable KUnit framework + core lib/ and mm/ test suites (applied on defconfig base) |
 | `rand500config.config` | `rand500config` | Same bootability options for the tinyconfig+random base |
 | `randdefconfig.config` | `randdefconfig` | Force heavy subsystems off (DRM/SOUND/STAGING) + bootability options |
 | `randconfig.config` | `randconfig` | Exclude modules and heavy subsystems to stay within BUILD_TIMEOUT |

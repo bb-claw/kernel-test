@@ -81,6 +81,8 @@ OOPS=0
 PASS_COUNT=0
 FAIL_COUNT=0
 TESTS_TOTAL=0
+KUNIT_PASS=0
+KUNIT_FAIL=0
 
 if [[ -s $DMESG_FILE ]]; then
     grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1 || true
@@ -94,6 +96,17 @@ if [[ -s $DMESG_FILE ]]; then
     PASS_COUNT=${PASS_COUNT:-0}
     FAIL_COUNT=${FAIL_COUNT:-0}
     TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
+
+    # Count KUnit KTAP results.
+    # Individual test lines are indented (4+ spaces after the timestamp);
+    # top-level suite summary lines have no indent — excluded to avoid double-counting.
+    # Only attempt parsing when KTAP output is present.
+    if grep -qE 'KTAP version|# Subtest:' "$DMESG_FILE" 2>/dev/null; then
+        KUNIT_PASS=$(grep -cE '^\[[ 0-9.]+\] {4,}ok [0-9]+'     "$DMESG_FILE" 2>/dev/null || true)
+        KUNIT_FAIL=$(grep -cE '^\[[ 0-9.]+\] {4,}not ok [0-9]+' "$DMESG_FILE" 2>/dev/null || true)
+        KUNIT_PASS=${KUNIT_PASS:-0}
+        KUNIT_FAIL=${KUNIT_FAIL:-0}
+    fi
 fi
 
 # ── Determine overall result ──────────────────────────────────────────────────
@@ -121,6 +134,8 @@ fi
     printf 'TESTS_TOTAL=%d\n' "$TESTS_TOTAL"
     printf 'TESTS_PASS=%d\n'  "$PASS_COUNT"
     printf 'TESTS_FAIL=%d\n'  "$FAIL_COUNT"
+    printf 'KUNIT_PASS=%d\n'  "$KUNIT_PASS"
+    printf 'KUNIT_FAIL=%d\n'  "$KUNIT_FAIL"
     printf 'START_TIME=%s\n'  "$VM_START_TIME"
     printf 'DURATION=%d\n'    "$(( $(date -u +%s) - VM_START_EPOCH ))"
     [[ -n $FAIL_REASON ]] && printf 'FAIL_REASON=%s\n' "$FAIL_REASON"
@@ -128,11 +143,24 @@ fi
 
 # ── Report result ─────────────────────────────────────────────────────────────
 
+KUNIT_TOTAL=$(( KUNIT_PASS + KUNIT_FAIL ))
+TOTAL_FAIL=$(( FAIL_COUNT + KUNIT_FAIL ))
+
 if [[ $BOOT_STATUS == PASS ]]; then
-    if [[ $FAIL_COUNT -eq 0 ]]; then
-        info "PASS  $CONFIG / $ARCH — boot OK, tests ${PASS_COUNT}/${TESTS_TOTAL}"
+    if [[ $TOTAL_FAIL -eq 0 ]]; then
+        if [[ $KUNIT_TOTAL -gt 0 ]]; then
+            info "PASS  $CONFIG / $ARCH — boot OK, tests ${PASS_COUNT}/${TESTS_TOTAL}, kunit ${KUNIT_PASS}/${KUNIT_TOTAL}"
+        else
+            info "PASS  $CONFIG / $ARCH — boot OK, tests ${PASS_COUNT}/${TESTS_TOTAL}"
+        fi
     else
-        warn "PARTIAL  $CONFIG / $ARCH — booted, but ${FAIL_COUNT} test(s) failed"
+        if [[ $FAIL_COUNT -gt 0 && $KUNIT_FAIL -gt 0 ]]; then
+            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${FAIL_COUNT} test(s) and ${KUNIT_FAIL} kunit test(s) failed"
+        elif [[ $FAIL_COUNT -gt 0 ]]; then
+            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${FAIL_COUNT} test(s) failed"
+        else
+            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${KUNIT_FAIL} kunit test(s) failed"
+        fi
         exit 1
     fi
 else
