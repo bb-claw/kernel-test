@@ -42,7 +42,19 @@ info "mkinitcpio conf: /etc/mkinitcpio.d/$CONFIG.conf  (system conf, MODULES cle
 info "Preset         : /etc/mkinitcpio.d/$CONFIG.preset"
 info "Initramfs      : /boot/initramfs-$BOOT_SUFFIX.img"
 
-# ── Step 1: build modules ─────────────────────────────────────────────────────
+# ── Step 1: resolve any config drift silently ─────────────────────────────────
+# When the kernel version changes, .config may have invalid symbols or new
+# options without defaults. olddefconfig accepts new defaults non-interactively
+# so 'make modules' does not fall into interactive oldconfig.
+info "Resolving config (olddefconfig)..."
+make -C "$KERNEL_TREE" \
+    O="$PWD/$OUT_DIR" \
+    ARCH="$ARCH" \
+    CC="ccache $GCC" \
+    HOSTCC="ccache $GCC" \
+    olddefconfig
+
+# ── Step 2: build modules ─────────────────────────────────────────────────────
 info "Building modules ($NPROC jobs)..."
 make -C "$KERNEL_TREE" \
     O="$PWD/$OUT_DIR" \
@@ -52,19 +64,19 @@ make -C "$KERNEL_TREE" \
     -j"$NPROC" \
     modules
 
-# ── Step 2: install modules ───────────────────────────────────────────────────
+# ── Step 3: install modules ───────────────────────────────────────────────────
 info "Installing modules to /lib/modules/$KVER/ (sudo)..."
 sudo make -C "$KERNEL_TREE" \
     O="$PWD/$OUT_DIR" \
     ARCH="$ARCH" \
     modules_install
 
-# ── Step 3: copy kernel image and System.map ──────────────────────────────────
+# ── Step 4: copy kernel image and System.map ──────────────────────────────────
 info "Copying kernel to /boot/vmlinuz-$BOOT_SUFFIX (sudo)..."
 sudo cp "$OUT_DIR/arch/x86/boot/bzImage" "/boot/vmlinuz-$BOOT_SUFFIX"
 sudo cp "$OUT_DIR/System.map"            "/boot/System.map-$BOOT_SUFFIX"
 
-# ── Step 4: create mkinitcpio conf and preset (Manjaro style) ────────────────
+# ── Step 5: create mkinitcpio conf and preset (Manjaro style) ────────────────
 # Write a per-kernel mkinitcpio conf derived from the system default but with
 # MODULES cleared — the autodetect hook selects in-tree modules automatically;
 # DKMS out-of-tree modules (nvidia, vbox, …) are installed in step 5.
@@ -85,7 +97,7 @@ PRESETS=('default')
 default_image="/boot/initramfs-$BOOT_SUFFIX.img"
 EOF
 
-# ── Step 4b: sysrq override ──────────────────────────────────────────────────
+# ── Step 5b: sysrq override ──────────────────────────────────────────────────
 # systemd's /usr/lib/sysctl.d/50-default.conf sets kernel.sysrq=16 (sync only)
 # at boot, overriding the kernel compile-time default of 1.
 # Write a higher-priority override so REISUB works for emergency recovery.
@@ -96,7 +108,7 @@ sudo tee /etc/sysctl.d/99-sysrq.conf > /dev/null <<'SYSCTL'
 kernel.sysrq = 1
 SYSCTL
 
-# ── Step 5: build DKMS modules ───────────────────────────────────────────────
+# ── Step 6: build DKMS modules ───────────────────────────────────────────────
 # Must run after modules_install and before mkinitcpio so out-of-tree modules
 # (nvidia, virtualbox, …) land in /lib/modules/$KVER/ before the initramfs is
 # generated.
@@ -107,15 +119,15 @@ else
     warn "dkms not found — skipping DKMS build (nvidia etc. will not be available)"
 fi
 
-# ── Step 6: generate initramfs ────────────────────────────────────────────────
+# ── Step 7: generate initramfs ────────────────────────────────────────────────
 info "Generating initramfs (sudo mkinitcpio -p $CONFIG)..."
 sudo mkinitcpio -p "$CONFIG"
 
-# ── Step 7: update GRUB ───────────────────────────────────────────────────────
+# ── Step 8: update GRUB ───────────────────────────────────────────────────────
 info "Updating GRUB (sudo grub-mkconfig)..."
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-# ── Step 8: sanity checks ────────────────────────────────────────────────────
+# ── Step 9: sanity checks ────────────────────────────────────────────────────
 SANITY_FAIL=0
 
 if [[ -f "/boot/initramfs-$BOOT_SUFFIX.img" ]]; then
