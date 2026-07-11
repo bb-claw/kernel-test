@@ -274,13 +274,17 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
   **Fix:** Added to `configs/localconfig.config`:
   ```
+  CONFIG_DEBUG_INFO_NONE=y
   CONFIG_DEBUG_INFO_BTF=n
   CONFIG_DEBUG_INFO_BTF_MODULES=n
   ```
-  This disables BTF generation entirely. BPF CO-RE (Compile Once, Run Everywhere) is
-  unavailable on this kernel, but the kernel is otherwise fully functional. bpftrace and
-  libbpf-based tools that use CO-RE will fall back or fail gracefully. Kernel-internal BPF
-  (used by systemd, network tools) is unaffected — BTF is only needed for CO-RE portability.
+  `DEBUG_INFO_NONE` disables DWARF debug symbol generation entirely — the most expensive
+  part of a kernel build. With no debug info, pahole has nothing to process and the BTF
+  validation error cannot occur. BPF CO-RE (Compile Once, Run Everywhere) is unavailable
+  on this kernel, but the kernel is otherwise fully functional. Kernel-internal BPF (used
+  by systemd, network tools) is unaffected — BTF is only needed for CO-RE portability.
+  Removing DWARF5 also cuts build time significantly (debug info compilation is the
+  second-most expensive step after compiling the C source itself).
 
   **Emergency mode root cause:** Unknown without `journalctl -b -p err`. The `snd` BTF
   failure alone should not trigger emergency mode — a kernel module failing to load doesn't
