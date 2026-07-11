@@ -51,7 +51,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/120_rng.sh` | `/dev/urandom` read at 512 B and 4096 B (CRNG output path) |
 | `tests/custom/130_fork-exec.sh` | fork/exec, exit-code propagation, 20 sequential forks, SIGCHLD |
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
-| `.githooks/pre-push` | Pre-push hook: shellcheck on all `.sh` files + executable-bit check on test scripts |
+| `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
+| `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
+| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): modules, vmlinuz, mkinitcpio preset, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
@@ -60,7 +62,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## Conventions
 
-- Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); the pre-push hook runs shellcheck and checks test script executable bits
+- Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); `pre-commit` checks staged files (shellcheck, executable bit, artifact guard); `pre-push` sweeps all tracked files
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts

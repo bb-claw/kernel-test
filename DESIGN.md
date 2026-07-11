@@ -371,8 +371,9 @@ Reports directory is gitignored. Users choose what to share publicly.
 | `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
 | `make report` | Aggregate results into HTML and plain-text report |
+| `make install` | Install built kernel to `/boot`; modules, mkinitcpio preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
-| `make hooks` | Activate git pre-push hook only (`git config core.hooksPath .githooks`) |
+| `make hooks` | Activate git hooks only (`git config core.hooksPath .githooks`) |
 | `make clean` | Remove `build/` and `cache/` |
 | `make distclean` | Remove `build/`, `cache/`, and `reports/` |
 | `make help` | Print available targets and variables |

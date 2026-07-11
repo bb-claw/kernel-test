@@ -107,33 +107,38 @@ make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable V=1
 kernel-test/
 ├── Makefile              # Main entry point — all commands go through make
 ├── lib/
+│   ├── common.sh         # Shared helpers: log/info/warn/die, require_env
 │   ├── fetch.sh          # Fetch latest -rc tag from upstream
-│   ├── build.sh          # Kernel build logic (ccache, out-of-tree O=)
+│   ├── checkout.sh       # Fetch and checkout a specific tag or commit
+│   ├── build.sh          # Kernel build (ccache, out-of-tree O=)
 │   ├── initramfs.sh      # Build BusyBox cpio initramfs + inject tests
 │   ├── vm.sh             # QEMU/KVM launch and serial console capture
-│   └── report.sh         # Aggregate results into HTML/text report
+│   ├── report.sh         # Aggregate results into HTML/text report
+│   ├── install.sh        # Install kernel to /boot (Arch/Manjaro): modules, mkinitcpio, GRUB
+│   └── bootstrap.sh      # Install build/test dependencies (distro-aware)
 ├── tests/
 │   ├── 001_smoke.sh      # Boot smoke test (reaches init, no oops/panic)
-│   └── custom/           # Functional kernel-path tests (run in NNN_ order)
-│       ├── 010_check-proc.sh         # /proc content
-│       ├── 020_check-sysfs.sh        # /sys hierarchy
-│       ├── 030_check-dmesg.sh        # dmesg: version string, no early panic
-│       ├── 040_check-devnodes.sh     # /dev nodes
-│       ├── 050_check-kernel.sh       # kernel version, UTS fields
-│       ├── 060_check-tmpfs.sh        # tmpfs write/read
-│       ├── 070_check-proc-interrupts.sh
-│       ├── 080_check-slabinfo.sh
-│       ├── 090_check-clocksource.sh  # active clocksource in dmesg
-│       ├── 100_network-loopback.sh   # ping 127.0.0.1 (CONFIG_NET + INET)
-│       ├── 110_tmpfs-stress.sh       # 1 MiB write/read + 20-file inode alloc
-│       ├── 120_rng.sh                # /dev/urandom read (CRNG)
-│       ├── 130_fork-exec.sh          # fork/exec, exit codes, SIGCHLD
-│       └── 140_sysctl.sh             # /proc/sys read + write/restore
+│   ├── custom/           # Functional kernel-path tests (run in NNN_ order)
+│   │   ├── 010_check-proc.sh
+│   │   ├── 020_check-sysfs.sh
+│   │   ├── 030_check-dmesg.sh
+│   │   ├── 040_check-devnodes.sh
+│   │   ├── 050_check-kernel.sh
+│   │   ├── 060_check-tmpfs.sh
+│   │   ├── 070_check-proc-interrupts.sh
+│   │   ├── 080_check-slabinfo.sh
+│   │   ├── 090_check-clocksource.sh
+│   │   ├── 100_network-loopback.sh
+│   │   ├── 110_tmpfs-stress.sh
+│   │   ├── 120_rng.sh
+│   │   ├── 130_fork-exec.sh
+│   │   └── 140_sysctl.sh
+│   └── hardware/
+│       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/
-│   └── pre-push          # shellcheck + executable-bit check (activate: make hooks)
+│   ├── pre-commit        # shellcheck + executable bit on staged files; artifact guard
+│   └── pre-push          # shellcheck + executable bit on all tracked files
 ├── configs/              # Config fragments applied after kernel config targets
-├── tests/hardware/
-│   └── verify.sh         # Real-hardware verification for localconfig (run on the booted laptop)
 ├── reports/              # Output directory for test reports
 └── cache/                # ccache directory (gitignored)
 ```
@@ -150,8 +155,9 @@ kernel-test/
 | `make initramfs` | Assemble the BusyBox cpio initramfs |
 | `make test` | Boot VMs and run tests |
 | `make report` | Generate the HTML/text report from last test results |
+| `make install` | Install built kernel to `/boot`; update mkinitcpio + GRUB (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
-| `make hooks` | Activate git pre-push hook only (no package install) |
+| `make hooks` | Activate git hooks only (no package install) |
 | `make clean` | Remove `build/` and `cache/` |
 | `make distclean` | Remove `build/`, `cache/`, and `reports/` |
 | `make help` | List all targets with descriptions |
