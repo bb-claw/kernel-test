@@ -25,11 +25,13 @@ The goal is systematic community verification of each -rc kernel.
 | File | Role |
 |---|---|
 | `Makefile` | Main entry point; defines all targets and variables; calls lib scripts |
-| `lib/fetch.sh` | `git fetch` + checkout of latest `-rc` tag |
+| `lib/fetch.sh` | `git fetch` + auto-checkout of latest `-rc` tag |
+| `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/` |
 | `lib/initramfs.sh` | Assemble BusyBox cpio initramfs; inject test scripts |
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
 | `lib/report.sh` | Collate results; write `summary.html` and `summary.txt` |
+| `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
 | `tests/smoke.sh` | Minimal boot smoke: did we reach init without a panic or oops? |
 | `tests/custom/*.sh` | User-provided test scripts (copy-in, run inside VM, check exit code) |
 
@@ -38,7 +40,8 @@ The goal is systematic community verification of each -rc kernel.
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
-- Makefile variables (`KERNEL_TREE`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `REPORT_DIR`, `V`) are the public API
+- Makefile variables (`KERNEL_TREE`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `REPORT_DIR`, `V`, `TAG`) are the public API
+- `KERNEL_TREE` is normalized at parse time: leading `~` is expanded and the path is made absolute via `$(abspath ...)`; pass `~/git/linux` or `../linux` freely
 - Lib scripts are invoked as subprocesses by the Makefile (not sourced), so they must not rely on shell state from each other
 - VM serial output is captured live to `build/<config>-<arch>/dmesg.txt` and copied to `reports/<date>_<time>_<version>/dmesg-<config>-<arch>.txt` by the report step
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
@@ -68,14 +71,20 @@ the kernel config target's output is used as-is.
 ## Running locally
 
 ```sh
+# Show what is currently checked out in the kernel tree
+make info KERNEL_TREE=~/git/linux
+
+# Check out a specific tag or commit (fetches from origin if not local)
+make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux
+
 # Full pipeline
-make KERNEL_TREE=/path/to/linux
+make KERNEL_TREE=~/git/linux
 
 # Partial run (build only, specific config and arch)
-make build KERNEL_TREE=/path/to/linux CONFIGS=defconfig ARCHS=x86_64
+make build KERNEL_TREE=~/git/linux CONFIGS=defconfig ARCHS=x86_64
 
 # Verbose mode
-make V=1 KERNEL_TREE=/path/to/linux
+make V=1 KERNEL_TREE=~/git/linux
 ```
 
 All output goes to stdout; the final report path is printed by the `report` target.

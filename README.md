@@ -85,7 +85,9 @@ kernel-test/
 | Target | Description |
 |---|---|
 | `make` / `make all` | Full pipeline: fetch → build → initramfs → test → report |
-| `make fetch` | Fetch and checkout the latest -rc tag |
+| `make fetch` | Fetch and checkout the latest -rc tag automatically |
+| `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit |
+| `make info` | Show current tag/commit and kernel Makefile version |
 | `make build` | Build kernels for all configs × archs |
 | `make initramfs` | Assemble the BusyBox cpio initramfs |
 | `make test` | Boot VMs and run tests |
@@ -100,7 +102,8 @@ Override on the command line:
 
 | Variable | Default | Description |
 |---|---|---|
-| `KERNEL_TREE` | `../linux` | Path to a cloned linux.git working tree |
+| `KERNEL_TREE` | `../linux` | Path to a cloned linux.git working tree (`~/...` and relative paths are accepted) |
+| `TAG` | _(none)_ | Tag or commit to check out; required by `make checkout` |
 | `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
 | `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated list of config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |

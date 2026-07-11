@@ -39,12 +39,25 @@ All user-facing commands go through `make`. The Makefile exports variables into 
 environment and invokes lib scripts as subprocesses for each pipeline stage.
 
 ```
-Makefile  (make all / make fetch / make build / ...)
+Makefile  (make all / make fetch / make checkout / make info / make build / ...)
     │
-    │   exports: KERNEL_TREE, ARCHS, CONFIGS, TIMEOUT, REPORT_DIR, V
+    │   exports: KERNEL_TREE (tilde-expanded, absolutified), ARCHS, CONFIGS,
+    │            TIMEOUT, REPORT_DIR, V, TAG
     │
-    ├── make fetch   → lib/fetch.sh
-    │                     git fetch + checkout latest -rc tag
+    ├── make fetch      → lib/fetch.sh
+    │                         git fetch + auto-checkout latest -rc tag
+    │
+    ├── make checkout   → lib/checkout.sh  (TAG=<tag-or-commit> required)
+    │                         fetch ref if not local
+    │                         git checkout TAG
+    │                         verify: parse VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION
+    │                                 from KERNEL_TREE/Makefile; warn on mismatch
+    │                         touch KERNEL_TREE/Makefile (invalidates build artifacts)
+    │                         write build/.kernel-version
+    │
+    ├── make info       (inline recipe)
+    │                         show HEAD commit, git tag, kernel Makefile version,
+    │                         and build/.kernel-version
     │
     ├── make build   → lib/build.sh        (for each config × arch)
     │                     make <config>        # generate .config
@@ -65,8 +78,8 @@ Makefile  (make all / make fetch / make build / ...)
     │
     └── make report  → lib/report.sh
                           aggregate all results
-                          write reports/<date>_<version>/summary.html
-                          write reports/<date>_<version>/summary.txt
+                          write reports/<date>_<time>_<version>/summary.html
+                          write reports/<date>_<time>_<version>/summary.txt
 ```
 
 ---
@@ -252,7 +265,9 @@ Reports directory is gitignored. Users choose what to share publicly.
 | Target | Description |
 |---|---|
 | `make` / `make all` | Full pipeline: fetch → build → initramfs → test → report |
-| `make fetch` | Fetch and checkout the latest -rc tag |
+| `make fetch` | Fetch and auto-checkout the latest -rc tag |
+| `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit; verifies Makefile version |
+| `make info` | Show HEAD commit, git tag, kernel Makefile version, and version file |
 | `make build` | Build kernels for all `CONFIGS` × `ARCHS` |
 | `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
@@ -266,17 +281,20 @@ Reports directory is gitignored. Users choose what to share publicly.
 All variables have defaults and can be overridden on the command line:
 
 ```
-make KERNEL_TREE=/path/to/linux                          # required for most targets
-make KERNEL_TREE=../linux ARCHS=x86_64                   # single arch
-make KERNEL_TREE=../linux CONFIGS=defconfig              # single config
-make build initramfs test report KERNEL_TREE=../linux    # skip fetch
-make KERNEL_TREE=../linux TIMEOUT=120                    # longer VM timeout
-make KERNEL_TREE=../linux V=1                            # verbose output
+make info KERNEL_TREE=~/git/linux                        # show current version
+make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux       # pin a specific version
+make KERNEL_TREE=~/git/linux                             # full pipeline
+make KERNEL_TREE=~/git/linux ARCHS=x86_64               # single arch
+make KERNEL_TREE=~/git/linux CONFIGS=defconfig           # single config
+make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux
+make KERNEL_TREE=~/git/linux TIMEOUT=120                 # longer VM timeout
+make KERNEL_TREE=~/git/linux V=1                         # verbose output
 ```
 
 | Variable | Default | Description |
 |---|---|---|
-| `KERNEL_TREE` | `../linux` | Path to linux.git working tree |
+| `KERNEL_TREE` | `../linux` | Path to linux.git working tree; `~/...` and relative paths are accepted — expanded to absolute at parse time |
+| `TAG` | _(none)_ | Tag or commit for `make checkout`; ignored by all other targets |
 | `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
 | `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
