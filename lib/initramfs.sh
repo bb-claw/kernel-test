@@ -31,8 +31,9 @@ mkdir -p "$STAGE"/{bin,dev,proc,sys,tmp,tests}
 cp "$BUSYBOX" "$STAGE/bin/busybox"
 chmod +x "$STAGE/bin/busybox"
 
-# Symlinks for all BusyBox applets
+# Symlinks for all BusyBox applets (skip 'busybox' itself — would overwrite the binary)
 "$BUSYBOX" --list | while read -r applet; do
+    [[ $applet == busybox ]] && continue
     ln -sf busybox "$STAGE/bin/$applet"
 done
 

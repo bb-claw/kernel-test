@@ -61,7 +61,7 @@ timeout "$TIMEOUT" "$QEMU" \
     "${KVM_FLAGS[@]}" \
     -M "$QEMU_MACHINE" \
     -m 512M \
-    -nographic \
+    -display none \
     -no-reboot \
     -kernel "$BZIMAGE" \
     -initrd "$INITRAMFS" \
