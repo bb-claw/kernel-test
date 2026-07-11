@@ -42,7 +42,7 @@ chmod +x "$STAGE/bin/toybox"
 # --list may emit space-separated or newline-separated output depending on version;
 # tr normalises to one-per-line; grep strips blanks and the "toybox" entry so the
 # loop body is a plain ln — avoids [[ ]] && continue triggering set -e on mismatch.
-"$STAGE/bin/toybox" --list 2>/dev/null \
+"$STAGE/bin/toybox" 2>/dev/null \
     | tr ' ' '\n' | grep -v '^$' | grep -vxF 'toybox' \
     | while read -r applet; do
         ln -sf toybox "$STAGE/bin/$applet"
@@ -63,7 +63,7 @@ mount -t devtmpfs none /dev       2>/dev/null || {
 
 echo "BOOT_OK: kernel reached init"
 
-for t in /tests/*.sh; do
+for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] || continue
     name=$(basename "$t" .sh)
     echo "> TEST RUN: $name"

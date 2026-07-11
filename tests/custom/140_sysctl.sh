@@ -15,9 +15,11 @@ fi
 # kernel.pid_max — must be > 0
 if [ -r /proc/sys/kernel/pid_max ]; then
     val=$(cat /proc/sys/kernel/pid_max)
-    [ "${val:-0}" -gt 0 ] \
-        && ok "kernel.pid_max = $val" \
-        || fail "kernel.pid_max is zero or missing"
+    if [ "${val:-0}" -gt 0 ]; then
+        ok "kernel.pid_max = $val"
+    else
+        fail "kernel.pid_max is zero or missing"
+    fi
 else
     skip "kernel.pid_max not readable"
 fi
@@ -25,9 +27,11 @@ fi
 # kernel.hostname — read
 if [ -r /proc/sys/kernel/hostname ]; then
     val=$(cat /proc/sys/kernel/hostname)
-    [ -n "$val" ] \
-        && ok "kernel.hostname = $val" \
-        || fail "kernel.hostname is empty"
+    if [ -n "$val" ]; then
+        ok "kernel.hostname = $val"
+    else
+        fail "kernel.hostname is empty"
+    fi
 else
     skip "kernel.hostname not readable"
 fi
@@ -38,9 +42,11 @@ if [ -w /proc/sys/kernel/hostname ]; then
     printf 'kernel-test\n' > /proc/sys/kernel/hostname
     new=$(cat /proc/sys/kernel/hostname)
     printf '%s\n' "$old" > /proc/sys/kernel/hostname
-    [ "$new" = "kernel-test" ] \
-        && ok "kernel.hostname write/read/restore" \
-        || fail "kernel.hostname write/read mismatch (got: '$new')"
+    if [ "$new" = "kernel-test" ]; then
+        ok "kernel.hostname write/read/restore"
+    else
+        fail "kernel.hostname write/read mismatch (got: '$new')"
+    fi
 else
     skip "kernel.hostname not writable"
 fi
@@ -58,9 +64,11 @@ fi
 # vm.swappiness — read (must be 0–200)
 if [ -r /proc/sys/vm/swappiness ]; then
     val=$(cat /proc/sys/vm/swappiness)
-    [ "${val:-999}" -le 200 ] \
-        && ok "vm.swappiness = $val" \
-        || fail "vm.swappiness out of range (got: '$val')"
+    if [ "${val:-999}" -le 200 ]; then
+        ok "vm.swappiness = $val"
+    else
+        fail "vm.swappiness out of range (got: '$val')"
+    fi
 else
     skip "vm.swappiness not readable"
 fi

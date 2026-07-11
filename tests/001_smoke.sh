@@ -8,8 +8,12 @@ fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # Shell is functional
-val=$(( 1 + 1 )) && [ "$val" = "2" ] \
-    && ok "shell arithmetic" || fail "shell arithmetic broken"
+val=$(( 1 + 1 ))
+if [ "$val" = "2" ]; then
+    ok "shell arithmetic"
+else
+    fail "shell arithmetic broken"
+fi
 
 # /dev/null is usable (created by /init if devtmpfs unavailable)
 if [ -e /dev/null ]; then

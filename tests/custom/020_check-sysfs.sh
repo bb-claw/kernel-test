@@ -14,8 +14,11 @@ fi
 
 # Core sysfs directories
 for d in /sys/kernel /sys/class /sys/bus /sys/devices; do
-    [ -d "$d" ] \
-        && ok "$d exists" || fail "$d missing"
+    if [ -d "$d" ]; then
+        ok "$d exists"
+    else
+        fail "$d missing"
+    fi
 done
 
 # /sys/kernel/osrelease — kernel version string

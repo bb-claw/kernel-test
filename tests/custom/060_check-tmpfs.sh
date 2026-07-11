@@ -16,8 +16,10 @@ printf 'kernel-test-write\n' > "$TESTFILE"
 val=$(cat "$TESTFILE")
 rm -f "$TESTFILE"
 
-[ "$val" = "kernel-test-write" ] \
-    && ok "tmpfs write/read" \
-    || fail "tmpfs write/read mismatch (got: '$val')"
+if [ "$val" = "kernel-test-write" ]; then
+    ok "tmpfs write/read"
+else
+    fail "tmpfs write/read mismatch (got: '$val')"
+fi
 
 [ $_fails -eq 0 ] || exit 1

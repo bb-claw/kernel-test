@@ -12,8 +12,10 @@ if [ ! -r /proc/slabinfo ]; then
 fi
 
 line_count=$(wc -l < /proc/slabinfo)
-[ "$line_count" -gt 2 ] \
-    && ok "/proc/slabinfo has $line_count entries" \
-    || fail "/proc/slabinfo exists but has too few entries ($line_count lines)"
+if [ "$line_count" -gt 2 ]; then
+    ok "/proc/slabinfo has $line_count entries"
+else
+    fail "/proc/slabinfo exists but has too few entries ($line_count lines)"
+fi
 
 [ $_fails -eq 0 ] || exit 1

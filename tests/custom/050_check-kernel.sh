@@ -28,8 +28,11 @@ fi
 # ostype — must be "Linux"
 if [ -r "$SYSCTL/ostype" ]; then
     ost=$(cat "$SYSCTL/ostype")
-    [ "$ost" = "Linux" ] \
-        && ok "ostype=Linux" || fail "ostype unexpected: $ost"
+    if [ "$ost" = "Linux" ]; then
+        ok "ostype=Linux"
+    else
+        fail "ostype unexpected: $ost"
+    fi
 else
     skip "$SYSCTL/ostype not readable"
 fi
@@ -37,8 +40,11 @@ fi
 # pid_max — must be a positive integer
 if [ -r "$SYSCTL/pid_max" ]; then
     pidmax=$(cat "$SYSCTL/pid_max")
-    [ -n "$pidmax" ] && [ "$pidmax" -gt 0 ] \
-        && ok "pid_max=$pidmax" || fail "pid_max invalid: $pidmax"
+    if [ -n "$pidmax" ] && [ "$pidmax" -gt 0 ]; then
+        ok "pid_max=$pidmax"
+    else
+        fail "pid_max invalid: $pidmax"
+    fi
 else
     skip "$SYSCTL/pid_max not readable"
 fi
@@ -54,8 +60,11 @@ fi
 # hostname
 if [ -r "$SYSCTL/hostname" ]; then
     hn=$(cat "$SYSCTL/hostname")
-    [ -n "$hn" ] \
-        && ok "hostname=$hn" || fail "hostname is empty"
+    if [ -n "$hn" ]; then
+        ok "hostname=$hn"
+    else
+        fail "hostname is empty"
+    fi
 else
     skip "$SYSCTL/hostname not readable"
 fi

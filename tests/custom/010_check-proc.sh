@@ -28,9 +28,11 @@ fi
 # /proc/meminfo — MemTotal must be > 0
 if [ -r /proc/meminfo ]; then
     mem=$(grep '^MemTotal:' /proc/meminfo | sed 's/[^0-9]//g')
-    [ -n "$mem" ] && [ "$mem" -gt 0 ] \
-        && ok "/proc/meminfo MemTotal=${mem}kB" \
-        || fail "/proc/meminfo MemTotal is zero or missing"
+    if [ -n "$mem" ] && [ "$mem" -gt 0 ]; then
+        ok "/proc/meminfo MemTotal=${mem}kB"
+    else
+        fail "/proc/meminfo MemTotal is zero or missing"
+    fi
 else
     fail "/proc/meminfo not readable"
 fi
@@ -38,8 +40,11 @@ fi
 # /proc/uptime
 if [ -r /proc/uptime ]; then
     up=$(cut -d. -f1 /proc/uptime)
-    [ -n "$up" ] \
-        && ok "/proc/uptime=${up}s" || fail "/proc/uptime malformed"
+    if [ -n "$up" ]; then
+        ok "/proc/uptime=${up}s"
+    else
+        fail "/proc/uptime malformed"
+    fi
 else
     fail "/proc/uptime not readable"
 fi
