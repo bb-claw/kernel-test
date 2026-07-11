@@ -10,6 +10,7 @@ TIMEOUT     ?= 60
 REPORT_DIR  ?= reports
 V           ?= 0
 NO_FETCH    ?= 0
+TAG         ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -46,7 +47,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report clean distclean bootstrap help
+.PHONY: all fetch build initramfs test report clean distclean bootstrap info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -71,6 +72,26 @@ $(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
 
 bootstrap:
 	$(Q)lib/bootstrap.sh
+
+# ── Kernel tree inspection ────────────────────────────────────────────────────
+
+# Show the current tag/commit checked out in KERNEL_TREE.
+info:
+	@printf 'Kernel tree:  %s\n' "$(KERNEL_TREE)"
+	@printf 'HEAD commit:  %s\n' \
+	    "$$(git -C "$(KERNEL_TREE)" rev-parse HEAD 2>/dev/null || echo '(git error — is KERNEL_TREE set?)')"
+	@tag=$$(git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null) \
+	    && printf 'Tag:          %s\n' "$$tag" \
+	    || printf 'Tag:          (not a tagged commit — nearest: %s)\n' \
+	        "$$(git -C "$(KERNEL_TREE)" describe HEAD 2>/dev/null || echo '?')"
+	@[[ -f $(BUILD_DIR)/.kernel-version ]] \
+	    && printf 'Version file: %s\n' "$$(cat $(BUILD_DIR)/.kernel-version)" \
+	    || printf 'Version file: (not set — run: make fetch  or  make checkout TAG=v7.2-rc2)\n'
+
+# Fetch and checkout a specific tag or commit. Usage: make checkout TAG=v7.2-rc2
+checkout:
+	$(if $(TAG),,$(error TAG is required — usage: make checkout TAG=v7.2-rc2))
+	$(Q)lib/checkout.sh "$(TAG)"
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -152,7 +173,9 @@ kernel-test — Linux -rc kernel test harness
 Targets:
   bootstrap    Install all build and test dependencies (distro-aware, needs sudo)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
-  fetch        Fetch and checkout the latest -rc tag
+  fetch        Fetch and checkout the latest -rc tag automatically
+  checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
+  info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS
   initramfs    Assemble BusyBox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
@@ -169,11 +192,14 @@ Variables (current values):
   REPORT_DIR   = $(REPORT_DIR)
   V            = $(V)  (set to 1 for verbose output)
   NO_FETCH     = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
+  TAG          = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
 
 Examples:
   make KERNEL_TREE=../linux
+  make checkout TAG=v7.2-rc2 KERNEL_TREE=../linux
+  make info KERNEL_TREE=../linux
   make build KERNEL_TREE=../linux CONFIGS=defconfig ARCHS=x86_64
-  make build initramfs test report KERNEL_TREE=../linux
+  make build initramfs test report NO_FETCH=1 KERNEL_TREE=../linux
   make V=1 KERNEL_TREE=../linux
 endef
 export HELP_TEXT

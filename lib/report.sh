@@ -4,14 +4,19 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-require_env BUILD_DIR CONFIGS ARCHS BUILD_ONLY_CONFIGS REPORT_DIR RUN_STAMP
+require_env BUILD_DIR CONFIGS ARCHS BUILD_ONLY_CONFIGS REPORT_DIR RUN_STAMP KERNEL_TREE
 
 REPORT_GEN_EPOCH=$(date -u +%s)
 
 # ── Resolve kernel version ────────────────────────────────────────────────────
 
 VERSION_FILE="$BUILD_DIR/.kernel-version"
-KERNEL_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "unknown")
+KERNEL_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || true)
+if [[ -z $KERNEL_VERSION ]]; then
+    KERNEL_VERSION=$(git -C "$KERNEL_TREE" describe --exact-match HEAD 2>/dev/null \
+        || git -C "$KERNEL_TREE" rev-parse --short HEAD 2>/dev/null \
+        || echo "unknown")
+fi
 
 # Directory name: YYYY-MM-DD_HH-MM-SS_<version>  (colons→dashes for fs safety)
 RUN_DIR_STAMP=$(date -d "$RUN_STAMP" +%Y-%m-%d_%H-%M-%S 2>/dev/null \
