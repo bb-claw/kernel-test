@@ -19,6 +19,12 @@ TAG         ?=
 BUILD_DIR := build
 CACHE_DIR := cache
 
+# Kernel version: version file written by fetch/checkout; fall back to git.
+KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
+    || git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null \
+    || git -C "$(KERNEL_TREE)" rev-parse --short HEAD 2>/dev/null \
+    || echo unknown)
+
 # Configs that are built but not booted:
 #   allmodconfig — kernel too large for the minimal initramfs
 # tinyconfig, allnoconfig, and defconfig are bootable via configs/<name>.config fragments.
@@ -133,7 +139,7 @@ endif
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
 # allmodconfig is included here (build only, not booted).
 build:
-	@echo "[build] Configs: $(CONFIGS) | Archs: $(ARCHS)"
+	@echo "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
 	for config in $(CONFIGS); do \
 		for arch in $(ARCHS); do \
@@ -158,7 +164,7 @@ initramfs:
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach a,$(ARCHS),build/initramfs-$(a).cpio.gz)
-	@echo "[test] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
+	@echo "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
 	for config in $(BOOT_CONFIGS); do \
 		for arch in $(ARCHS); do \
