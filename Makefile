@@ -278,32 +278,48 @@ Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test repo
   are skipped when any build fails. 'make all' continues through all stages and
   always writes a report; the test loop automatically skips configs that did not build.
 
+Note: run 'make clean' when switching between kernel trees (e.g. mainline → stable
+  or stable → mainline). Build directories contain generated headers tied to the
+  source tree they were built from; reusing them across trees causes subtle mismatches.
+
 Common workflows:
 
   # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
-  make KERNEL_TREE=~/git/linux-stable
-
-  # New mainline rc — pin exact version, then test (report always written)
-  make checkout TAG=v7.2-rc3 KERNEL_TREE=~/git/linux-stable
-  make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
-
-  # New stable release — auto-fetch latest v7.1.x and test everything
-  make STABLE_RELEASE=7.1
-
-  # New stable release — pin exact version, then test
-  make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
-  make all NO_FETCH=1 STABLE_RELEASE=7.1
+  make
 
   # Check what is currently checked out before running
-  make info KERNEL_TREE=~/git/linux-stable
+  make info
 
   # Quick single-arch test (report always written even on failure)
   make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
+
+  # New mainline rc — pin exact version, then test (report always written)
+  make checkout TAG=v7.2-rc3 
+  make all NO_FETCH=1 
 
   # Build and install daily-driver kernel (Manjaro base config + laptop hardware fragment)
   # BUILD_TIMEOUT=0 disables the 600s limit — localconfig is larger than defconfig
   make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
   make install            CONFIGS=localconfig ARCHS=x86_64
+
+  # New stable rc announced (e.g. v7.1-rc3) — auto-fetch and test everything
+  make KERNEL_TREE=~/git/linux-stable
+
+  # New stable release — auto-fetch latest v7.1.x and test everything
+  make STABLE_RELEASE=7.1
+
+  # Stable release with older GCC (e.g. 7.1.x fails on GCC 16 — use GCC=gcc-15)
+  make fetch STABLE_RELEASE=7.1
+  make all   NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
+
+  # New stable release — pin exact version, then test
+  make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
+  make all NO_FETCH=1 STABLE_RELEASE=7.1
+
+  # Stable localconfig build + install (daily-driver, real hardware)
+  make fetch STABLE_RELEASE=7.1
+  make build NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
+  make install           STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64
 
   # Verbose output for debugging
   make V=1 KERNEL_TREE=~/git/linux-stable

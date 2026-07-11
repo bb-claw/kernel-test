@@ -25,6 +25,16 @@ NPROC=$(nproc 2>/dev/null || echo 1)
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 
+# ── Kernel source identity ────────────────────────────────────────────────────
+
+TREE_TAG=$(git -C "$KERNEL_TREE" describe --exact-match HEAD 2>/dev/null \
+           || git -C "$KERNEL_TREE" describe --tags --abbrev=0 HEAD 2>/dev/null \
+           || echo "(untagged)")
+TREE_COMMIT=$(git -C "$KERNEL_TREE" rev-parse --short HEAD 2>/dev/null || echo "?")
+TREE_URL=$(git -C "$KERNEL_TREE" remote get-url origin 2>/dev/null || echo "(no remote)")
+info "Kernel: $TREE_TAG ($TREE_COMMIT) — $TREE_URL"
+info "Tree:   $KERNEL_TREE"
+
 # ccache: point at our local cache dir and expose via CC/HOSTCC
 export CCACHE_DIR="$PWD/$CACHE_DIR"
 mkdir -p "$CCACHE_DIR"
@@ -67,8 +77,8 @@ info "Configuring $CONFIG / $ARCH"
 if [[ $CONFIG == rand500config ]]; then
     # Base: tinyconfig (tiny, known-bootable kernel)
     if ! kmake tinyconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
     # Generate a fresh randconfig in a temp dir, constrain it to exclude heavy
@@ -91,8 +101,8 @@ if [[ $CONFIG == rand500config ]]; then
 elif [[ $CONFIG == randdefconfig ]]; then
     # Base: defconfig (broad, coherent, realistic baseline)
     if ! kmake defconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
     # Randomly disable ~300 options to reduce build surface.
@@ -105,8 +115,8 @@ elif [[ $CONFIG == kunitconfig ]]; then
     # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
     # 'kunitconfig' is not a kernel make target — use defconfig as the base.
     if ! kmake defconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
 elif [[ $CONFIG == localconfig ]]; then
@@ -116,13 +126,13 @@ elif [[ $CONFIG == localconfig ]]; then
         die "localconfig requires /proc/config.gz — enable CONFIG_IKCONFIG_PROC in your running kernel"
     zcat /proc/config.gz > "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
 elif ! kmake "$CONFIG"; then
-    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
@@ -134,8 +144,8 @@ if [[ -f $FRAGMENT ]]; then
     info "Applying config fragment: $FRAGMENT"
     cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config fragment failed: $FRAGMENT — see $LOG_FILE"
     fi
 fi
@@ -154,15 +164,15 @@ BUILD_EXIT=0
 kmake --timed -j"$NPROC" bzImage || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then
     if [[ $BUILD_EXIT -eq 124 ]]; then
-        printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
+        printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Build timed out after ${BUILD_TIMEOUT}s: $CONFIG / $ARCH — see $LOG_FILE"
     fi
-    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
-        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
+    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
+        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
-    "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
+printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
+    "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
 info "Build OK: $CONFIG / $ARCH"

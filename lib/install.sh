@@ -22,6 +22,11 @@ STATUS_FILE="$OUT_DIR/build.status"
 grep -q '^STATUS=PASS' "$STATUS_FILE" || \
     die "Build did not pass for $CONFIG/$ARCH ($(grep '^STATUS=' "$STATUS_FILE" || echo STATUS=UNKNOWN)) — see $OUT_DIR/build.log"
 
+# Use the kernel tree recorded at build time so 'make install' works without
+# re-specifying STABLE_RELEASE or KERNEL_TREE on the command line.
+BUILT_TREE=$(grep '^KERNEL_TREE=' "$STATUS_FILE" | cut -d= -f2-)
+[[ -n $BUILT_TREE ]] && KERNEL_TREE="$BUILT_TREE"
+
 KVER=$(cat "$OUT_DIR/include/config/kernel.release")
 BOOT_SUFFIX="${CONFIG}-${ARCH}"     # e.g. localconfig-x86_64
 NPROC=$(nproc 2>/dev/null || echo 1)
