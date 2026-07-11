@@ -22,19 +22,18 @@ else
     fail "subprocess exit code wrong (expected 42, got $rc)"
 fi
 
-# 20 sequential fork/exec cycles — stresses pid allocation and scheduler
-# Use /bin/true (instant Toybox applet) rather than sh -c to avoid
-# per-iteration shell startup overhead under the 60s VM timeout.
-i=0
-while [ "$i" -lt 20 ]; do
-    true || { fail "fork/exec failed at iteration $i"; break; }
-    i=$((i + 1))
+# 20 sequential fork/exec cycles — stresses pid allocation and scheduler.
+# Fixed word list avoids $(( )) arithmetic expansion: Toybox sh 0.8.9 has a
+# buffer pre-allocation bug in $((expr)) that causes OOM inside while loops.
+_fork_ok=1
+for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    true || { fail "fork/exec failed at iteration $_i"; _fork_ok=0; break; }
 done
-if [ "$i" -eq 20 ]; then
+if [ "$_fork_ok" -eq 1 ]; then
     ok "20 sequential fork/exec cycles"
 fi
 
-# Nested subshell (exec inside fork)
+# Subprocess stdout capture (command substitution)
 result=$(printf hello)
 if [ "$result" = "hello" ]; then
     ok "subprocess stdout capture"
