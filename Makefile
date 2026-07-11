@@ -44,6 +44,25 @@ endif
 # ── Phony targets ─────────────────────────────────────────────────────────────
 .PHONY: all fetch build initramfs test report clean distclean bootstrap help
 
+# ── File-producing rules (dependency tracking) ────────────────────────────────
+# Make uses these to auto-build missing or stale artifacts before 'test'.
+# build.status depends on the kernel Makefile so a fresh 'make fetch' (which
+# updates timestamps in the tree) invalidates old build results automatically.
+
+define _build_rule
+build/$(1)-$(2)/build.status: $$(KERNEL_TREE)/Makefile
+	@printf '[build] %-16s %s\n' $(1) $(2)
+	$$(Q)lib/build.sh $(1) $(2)
+endef
+$(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a)))))
+
+define _initramfs_rule
+build/initramfs-$(1).cpio.gz:
+	@printf '[initramfs] %s\n' $(1)
+	$$(Q)lib/initramfs.sh $(1)
+endef
+$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
+
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 bootstrap:
@@ -94,7 +113,9 @@ initramfs:
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
 # allmodconfig is excluded (BUILD_ONLY_CONFIGS).
-test:
+# File prerequisites trigger auto-build of missing/stale artifacts.
+test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
+     $(foreach a,$(ARCHS),build/initramfs-$(a).cpio.gz)
 	@echo "[test] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
 	for config in $(BOOT_CONFIGS); do \
