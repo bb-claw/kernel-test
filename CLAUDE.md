@@ -15,7 +15,10 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** BusyBox static binary packed into a cpio initramfs
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386`
-- **Kernel configs:** `defconfig`, `tinyconfig`, `allmodconfig`
+- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`
+  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`
+  - Build-only (no VM boot): `allmodconfig` (image too large for the minimal initramfs)
+  - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT, ACPI) that stripped configs disable
 
 ## Key files
 
@@ -37,7 +40,7 @@ The goal is systematic community verification of each -rc kernel.
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
 - Makefile variables (`KERNEL_TREE`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `REPORT_DIR`, `V`) are the public API
 - Lib scripts are invoked as subprocesses by the Makefile (not sourced), so they must not rely on shell state from each other
-- VM serial output is captured to `reports/<run>/dmesg-<config>-<arch>.txt`
+- VM serial output is captured live to `build/<config>-<arch>/dmesg.txt` and copied to `reports/<date>_<time>_<version>/dmesg-<config>-<arch>.txt` by the report step
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
 - Never write to the kernel source tree; all build artifacts go under `build/`
 
@@ -50,8 +53,10 @@ The goal is systematic community verification of each -rc kernel.
 ## How to add a new config profile
 
 Pass the profile name via the `CONFIGS` variable on the command line, or add it to
-the default value of `CONFIGS` in the `Makefile`. Optionally place a seed `.config`
-in `configs/<profile>.config`; if absent, `make <profile>` is used directly.
+the default value of `CONFIGS` in the `Makefile`. Optionally place a config fragment
+in `configs/<profile>.config`; if present, it is appended to `.config` after the
+kernel config target runs and `make olddefconfig` resolves dependencies. If absent,
+the kernel config target's output is used as-is.
 
 ## What NOT to do
 

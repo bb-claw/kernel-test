@@ -17,10 +17,8 @@ CACHE_DIR := cache
 
 # Configs that are built but not booted:
 #   allmodconfig — kernel too large for the minimal initramfs
-#   tinyconfig   — disables PRINTK, TTY, SERIAL, BLK_DEV_INITRD; boots silently forever
-#   allnoconfig  — even more stripped than tinyconfig; same problem
-# To boot a minimal kernel add a fragment: make CONFIGS=tinyboot (see configs/)
-BUILD_ONLY_CONFIGS := allmodconfig tinyconfig allnoconfig
+# tinyconfig, allnoconfig, and defconfig are bootable via configs/<name>.config fragments.
+BUILD_ONLY_CONFIGS := allmodconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
@@ -118,7 +116,7 @@ initramfs:
 	exit $$rc
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
-# allmodconfig is excluded (BUILD_ONLY_CONFIGS).
+# BUILD_ONLY_CONFIGS are excluded (currently: allmodconfig).
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach a,$(ARCHS),build/initramfs-$(a).cpio.gz)

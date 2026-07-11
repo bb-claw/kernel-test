@@ -7,9 +7,9 @@ back to the Linux kernel community.
 ## What it does
 
 1. Fetches the latest `-rc` tag from Linus's upstream tree
-2. Builds the kernel under three configuration profiles: `defconfig`, `tinyconfig`, `allmodconfig`
+2. Builds the kernel under four configuration profiles: `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`
 3. Constructs a minimal BusyBox initramfs (cpio)
-4. Boots each kernel variant in QEMU/KVM for both `x86_64` and `i386`
+4. Boots each bootable kernel variant in QEMU/KVM for both `x86_64` and `i386`
 5. Runs a boot smoke test and custom userland scripts inside the VM
 6. Writes a pass/fail report as a local HTML/text file
 
@@ -59,7 +59,7 @@ make build initramfs test report KERNEL_TREE=../kernel-src
 make help
 ```
 
-Reports are written to `reports/YYYY-MM-DD_<kernel-version>/`.
+Reports are written to `reports/YYYY-MM-DD_HH-MM-SS_<kernel-version>/`.
 
 ## Directory Layout
 
@@ -102,18 +102,23 @@ Override on the command line:
 |---|---|---|
 | `KERNEL_TREE` | `../linux` | Path to a cloned linux.git working tree |
 | `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
-| `CONFIGS` | `defconfig tinyconfig allmodconfig` | Space-separated list of config profiles |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated list of config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
 | `V` | `0` | Set to `1` for verbose output |
 
 ## Configuration Profiles
 
-| Profile | Description |
-|---|---|
-| `defconfig` | Architecture default — broad baseline coverage |
-| `tinyconfig` | Minimal kernel — tests lower bound of functionality |
-| `allmodconfig` | All options as modules — catches build-time regressions |
+| Profile | Boot tested | Description |
+|---|---|---|
+| `defconfig` | yes | Architecture default — broad baseline coverage |
+| `tinyconfig` | yes | Minimal kernel — tests lower bound of functionality |
+| `allnoconfig` | yes | Everything disabled — tests absolute minimum boot path |
+| `allmodconfig` | no (build only) | All options as modules — catches build-time regressions |
+
+`tinyconfig` and `allnoconfig` use a `configs/<profile>.config` fragment applied after
+the kernel config target runs to re-enable the minimum options needed for a bootable VM
+(TTY, serial console, initramfs, ELF/script execution, ACPI power-off).
 
 ## Adding Custom Tests
 
@@ -129,7 +134,7 @@ grep -q "Linux" /proc/version && echo "PASS: /proc/version OK" || { echo "FAIL: 
 
 ## Report Format
 
-After each run, `reports/<date>_<kernel>/` contains:
+After each run, `reports/<date>_<time>_<kernel>/` contains:
 
 - `summary.html` — pass/fail table per config × architecture × test
 - `summary.txt` — plain-text version for mailing list submission

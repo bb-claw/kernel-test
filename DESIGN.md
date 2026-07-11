@@ -18,7 +18,7 @@ a structured test report to the community.
 
 **In scope:**
 - Fetching the latest upstream -rc tag automatically
-- Building the kernel for x86_64 and i386 under three config profiles
+- Building the kernel for x86_64 and i386 under four config profiles
 - Booting each build in QEMU/KVM with a minimal initramfs
 - Running a boot smoke test and user-supplied custom scripts inside the VM
 - Writing a pass/fail report as local HTML and plain text
@@ -95,22 +95,35 @@ build/
   defconfig-i386/
   tinyconfig-x86_64/
   tinyconfig-i386/
+  allnoconfig-x86_64/
+  allnoconfig-i386/
   allmodconfig-x86_64/
   allmodconfig-i386/
 ```
 
 Build command (x86_64 example):
 ```sh
-make -C "$KERNEL_TREE" O="$BUILD_DIR" ARCH=x86_64 CROSS_COMPILE="" "$CONFIG"
+# Step 1: generate .config
+make -C "$KERNEL_TREE" O="$BUILD_DIR" ARCH=x86_64 "$CONFIG"
+# Step 1b: apply fragment if configs/<config>.config exists
+cat "configs/$CONFIG.config" >> "$BUILD_DIR/.config"
+make -C "$KERNEL_TREE" O="$BUILD_DIR" ARCH=x86_64 olddefconfig
+# Step 2: build
 make -C "$KERNEL_TREE" O="$BUILD_DIR" ARCH=x86_64 -j"$(nproc)" bzImage
 ```
 
 `KBUILD_BUILD_TIMESTAMP` is set to a fixed value to make builds reproducible.
-ccache is prepended to `PATH`; `CCACHE_DIR` points to `cache/`.
+`CC` and `HOSTCC` are set to `ccache gcc`; `CCACHE_DIR` points to `cache/`.
+
+**Config fragments:** `configs/<profile>.config` is appended to `.config` after the
+kernel config target runs, then `make olddefconfig` resolves Kconfig dependencies.
+This is used instead of `KCONFIG_ALLCONFIG` because some targets (e.g. `tinyconfig`)
+override that variable on the command line.
 
 **allmodconfig note:** `allmodconfig` is build-only — the resulting kernel is not
-booted (it is too large and the module loading infrastructure is too heavy for
-the minimal initramfs). It exists purely to catch compilation errors.
+booted (it is too large for the minimal initramfs). It exists purely to catch
+compilation errors. All other profiles (`defconfig`, `tinyconfig`, `allnoconfig`)
+are booted and tested.
 
 ### 4.3 Initramfs
 
@@ -156,14 +169,19 @@ QEMU is launched with a timeout (default 60 s) and serial output redirected to a
 ```sh
 timeout 60 qemu-system-x86_64 \
     -enable-kvm \
+    -M q35 \
     -m 512M \
-    -nographic \
+    -display none \
+    -no-reboot \
     -kernel "$BZIMAGE" \
     -initrd "$INITRAMFS" \
     -append "console=ttyS0 panic=5 quiet" \
-    -serial file:"$DMESG_FILE" \
-    -no-reboot
+    -serial file:"$DMESG_FILE"
 ```
+
+Note: `-display none` is used instead of `-nographic`. With `-nographic`, QEMU implicitly
+binds serial0 to stdio, causing `-serial file:` to register as serial1 — kernel output
+would go to /dev/null instead of the capture file.
 
 i386 uses `qemu-system-i386` with `ARCH=i386` kernel and the same flags.
 
@@ -184,18 +202,22 @@ i386 uses `qemu-system-i386` with `ARCH=i386` kernel and the same flags.
 ```
 Linux <version> boot test report
 Host: <uname -m>, <CPU model>, <RAM>
-Date: <ISO-8601>
+Started:  <ISO-8601>
+Duration: <Xm YYs>
+Result:   PASS
 
-Config       Arch    Boot    Tests
------------  ------  ------  -----
-defconfig    x86_64  PASS    2/2
-defconfig    i386    PASS    2/2
-tinyconfig   x86_64  PASS    1/2
-...
-allmodconfig x86_64  BUILD OK (not booted)
-...
+Config           Arch     Build    Boot         Tests    Started   Dur      Notes
+------           ----     -----    ----         -----    -------   ---      -----
+defconfig        x86_64   PASS     PASS         6/6      08:12:01  12s
+defconfig        i386     PASS     PASS         0/0      08:12:13  8s
+tinyconfig       x86_64   PASS     PASS         6/6      08:12:21  10s
+tinyconfig       i386     PASS     PASS         0/0      08:12:31  9s
+allnoconfig      x86_64   PASS     PASS         6/6      08:12:40  10s
+allnoconfig      i386     PASS     PASS         0/0      08:12:50  8s
+allmodconfig     x86_64   PASS     build-only   —        08:12:58  4m12s
+allmodconfig     i386     PASS     build-only   —        08:17:10  4m05s
 
-Full dmesg logs: reports/<run>/dmesg-*.txt
+Full dmesg logs: reports/<run>/
 ```
 
 **`summary.html`** — same data in an HTML table with pass=green / fail=red styling.
@@ -206,13 +228,15 @@ Full dmesg logs: reports/<run>/dmesg-*.txt
 
 ```
 reports/
-  2026-07-09_v6.15-rc2/
+  2026-07-09_08-12-01_v6.15-rc2/
     summary.html
     summary.txt
     dmesg-defconfig-x86_64.txt
     dmesg-defconfig-i386.txt
     dmesg-tinyconfig-x86_64.txt
     dmesg-tinyconfig-i386.txt
+    dmesg-allnoconfig-x86_64.txt
+    dmesg-allnoconfig-i386.txt
     build-allmodconfig-x86_64.log
     build-allmodconfig-i386.log
 ```
@@ -254,7 +278,7 @@ make KERNEL_TREE=../linux V=1                            # verbose output
 |---|---|---|
 | `KERNEL_TREE` | `../linux` | Path to linux.git working tree |
 | `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
-| `CONFIGS` | `defconfig tinyconfig allmodconfig` | Space-separated config profiles |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `REPORT_DIR` | `reports` | Directory for output reports |
 | `V` | `0` | Set to `1` for verbose build and VM output |
