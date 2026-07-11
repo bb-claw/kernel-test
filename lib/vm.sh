@@ -87,10 +87,10 @@ if [[ -s $DMESG_FILE ]]; then
     grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1   || true
     grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1    || true
 
-    # grep -c exits 1 on zero matches but still prints "0" — do NOT use "|| echo 0"
-    # because that produces "0\n0" in $(), breaking arithmetic. Use "|| true" instead.
-    PASS_COUNT=$(grep -c "^PASS:" "$DMESG_FILE" 2>/dev/null || true)
-    FAIL_COUNT=$(grep -c "^FAIL:" "$DMESG_FILE" 2>/dev/null || true)
+    # Count test-level results from the init wrapper markers.
+    # grep -c exits 1 on zero matches — use "|| true" not "|| echo 0" (avoids "0\n0").
+    PASS_COUNT=$(grep -c "^< TEST PASS:" "$DMESG_FILE" 2>/dev/null || true)
+    FAIL_COUNT=$(grep -c "^< TEST FAIL:" "$DMESG_FILE" 2>/dev/null || true)
     PASS_COUNT=${PASS_COUNT:-0}
     FAIL_COUNT=${FAIL_COUNT:-0}
     TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))

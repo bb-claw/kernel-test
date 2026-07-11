@@ -63,7 +63,44 @@ BUILD_START_EPOCH=$(date -u +%s)
 
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
-if ! kmake "$CONFIG"; then
+if [[ $CONFIG == rand500config ]]; then
+    # Base: tinyconfig (tiny, known-bootable kernel)
+    if ! kmake tinyconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+    # Generate a fresh randconfig in a temp dir, constrain it to exclude heavy
+    # subsystems (same set as configs/randconfig.config), then sample 500 =y lines.
+    # Constraining before sampling prevents accidentally pulling in DRM/SOUND/etc.
+    # 500 lines compensates for dependency attrition: many options get discarded by
+    # olddefconfig when their prerequisites are absent in the tinyconfig base.
+    RAND_TMP=$(mktemp -d)
+    trap 'rm -rf "$RAND_TMP"' EXIT
+    make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
+        KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
+    cat "$SCRIPT_DIR/configs/randconfig.config" >> "$RAND_TMP/.config"
+    make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
+        KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" olddefconfig >> "$LOG_FILE" 2>&1
+    cp "$RAND_TMP/.config" "$OUT_DIR/rand-source.config"
+    grep '^CONFIG_[A-Z0-9_]*=y$' "$RAND_TMP/.config" | shuf -n 500 \
+        | tee "$OUT_DIR/rand-sampled.config" >> "$PWD/$OUT_DIR/.config"
+    rm -rf "$RAND_TMP"
+    trap - EXIT
+elif [[ $CONFIG == randdefconfig ]]; then
+    # Base: defconfig (broad, coherent, realistic baseline)
+    if ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+    # Randomly disable ~300 options to reduce build surface.
+    # The fragment (step 1b) forces heavy subsystems off and re-pins bootability options,
+    # so olddefconfig resolves any cascading conflicts safely.
+    grep '^CONFIG_[A-Z0-9_]*=[ym]$' "$PWD/$OUT_DIR/.config" | shuf -n 300 \
+        | sed 's/=[ym]$/=n/' \
+        | tee "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
+elif ! kmake "$CONFIG"; then
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
@@ -83,6 +120,10 @@ if [[ -f $FRAGMENT ]]; then
     fi
 fi
 
+# Fingerprint the final .config — config is now fully resolved
+CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
+info "Config SHA256: $CONFIG_SHA256 — $CONFIG / $ARCH"
+
 # Step 2: build bzImage
 # For build-only configs (allmodconfig, randconfig) the goal is catching
 # compilation errors; bzImage covers the core kernel.
@@ -93,15 +134,15 @@ BUILD_EXIT=0
 kmake --timed -j"$NPROC" bzImage || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then
     if [[ $BUILD_EXIT -eq 124 ]]; then
-        printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
         die "Build timed out after ${BUILD_TIMEOUT}s: $CONFIG / $ARCH — see $LOG_FILE"
     fi
-    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
-        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+    printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
+        "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\n' \
-    "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\n' \
+    "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" > "$STATUS_FILE"
 info "Build OK: $CONFIG / $ARCH"

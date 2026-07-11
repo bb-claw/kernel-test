@@ -93,10 +93,12 @@ echo "BOOT_OK: kernel reached init"
 
 for t in /tests/*.sh; do
     [ -f "$t" ] || continue
+    name=$(basename "$t" .sh)
+    echo "> TEST RUN: $name"
     if sh "$t"; then
-        echo "PASS: $t"
+        echo "< TEST PASS: $name"
     else
-        echo "FAIL: $t"
+        echo "< TEST FAIL: $name"
     fi
 done
 
@@ -107,9 +109,9 @@ EOF
 
     # ── Copy tests ────────────────────────────────────────────────────────────
 
-    if [[ -f "$SCRIPT_DIR/tests/smoke.sh" ]]; then
-        cp "$SCRIPT_DIR/tests/smoke.sh" "$STAGE/tests/"
-        chmod +x "$STAGE/tests/smoke.sh"
+    if [[ -f "$SCRIPT_DIR/tests/001_smoke.sh" ]]; then
+        cp "$SCRIPT_DIR/tests/001_smoke.sh" "$STAGE/tests/"
+        chmod +x "$STAGE/tests/001_smoke.sh"
     fi
 
     if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then

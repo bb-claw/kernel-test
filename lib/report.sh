@@ -49,6 +49,7 @@ fmt_time() {
 # ── Collect per-(config,arch) data ────────────────────────────────────────────
 
 ROWS=()
+CONFIG_ROWS=()
 OVERALL=PASS
 
 for config in $CONFIGS; do
@@ -61,8 +62,9 @@ for config in $CONFIGS; do
             [[ -z $build_status ]] && build_status=$(cat "$out/build.status")
             build_start=$(read_status  "$out/build.status" START_TIME)
             build_dur=$(read_status    "$out/build.status" DURATION)
+            config_sha256=$(read_status "$out/build.status" CONFIG_SHA256)
         else
-            build_status='?'; build_start=''; build_dur=''
+            build_status='?'; build_start=''; build_dur=''; config_sha256=''
         fi
 
         if is_build_only "$config"; then
@@ -74,6 +76,7 @@ for config in $CONFIGS; do
         elif [[ -f "$out/vm.status" ]]; then
             boot=$(read_status        "$out/vm.status" BOOT)
             tests_pass=$(read_status  "$out/vm.status" TESTS_PASS)
+            tests_fail=$(read_status  "$out/vm.status" TESTS_FAIL)
             tests_total=$(read_status "$out/vm.status" TESTS_TOTAL)
             fail_reason=$(read_status "$out/vm.status" FAIL_REASON)
             vm_start=$(read_status    "$out/vm.status" START_TIME)
@@ -81,18 +84,35 @@ for config in $CONFIGS; do
             started=$(fmt_time "$vm_start")
             duration=$(fmt_dur  "$vm_dur")
         else
-            boot='?'; tests_pass='?'; tests_total='?'; fail_reason=''
+            boot='?'; tests_pass='?'; tests_fail='0'; tests_total='?'; fail_reason=''
             started='?'; duration='?'
         fi
 
         [[ $build_status == PASS ]] || OVERALL=FAIL
         [[ $boot == PASS || $boot == build-only || $boot == '?' ]] || OVERALL=FAIL
+        [[ ${tests_fail:-0} -eq 0 ]] || OVERALL=FAIL
 
-        # Copy dmesg and build logs into the report dir
+        # Copy artifacts into the report dir
         [[ -f "$out/dmesg.txt" ]] && \
             cp "$out/dmesg.txt" "$RUN_DIR/dmesg-${config}-${arch}.txt"
         is_build_only "$config" && [[ -f "$out/build.log" ]] && \
             cp "$out/build.log" "$RUN_DIR/build-${config}-${arch}.log"
+        [[ -f "$out/.config" ]] && \
+            cp "$out/.config" "$RUN_DIR/kconfig-${config}-${arch}.config"
+        [[ -f "$out/rand-sampled.config" ]] && \
+            cp "$out/rand-sampled.config" "$RUN_DIR/rand-sampled-${config}-${arch}.config"
+        [[ -f "$out/randdef-disabled.config" ]] && \
+            cp "$out/randdef-disabled.config" "$RUN_DIR/randdef-disabled-${config}-${arch}.config"
+
+        # Verify stored config matches build-time fingerprint
+        config_file="kconfig-${config}-${arch}.config"
+        if [[ -n $config_sha256 && -f "$RUN_DIR/$config_file" ]]; then
+            stored_sha=$(sha256sum "$RUN_DIR/$config_file" | awk '{print $1}')
+            [[ $stored_sha == "$config_sha256" ]] && config_verify=OK || config_verify=MISMATCH
+        else
+            config_verify='?'
+        fi
+        CONFIG_ROWS+=("$config|$arch|${config_sha256:-unknown}|$config_file|$config_verify")
 
         ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|$started|$duration|$fail_reason")
     done
@@ -140,7 +160,15 @@ TXT="$RUN_DIR/summary.txt"
             "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$fr"
     done
 
-    printf '\nFull dmesg logs: %s/\n' "$RUN_DIR"
+    printf '\nConfig fingerprints (sha256):\n'
+    printf '  %-16s %-8s %-64s %-10s %s\n' Config Arch SHA256 Verified File
+    printf '  %-16s %-8s %-64s %-10s %s\n' ------ ---- ------ -------- ----
+    for crow in "${CONFIG_ROWS[@]}"; do
+        IFS='|' read -r cfg arc sha file ok <<< "$crow"
+        printf '  %-16s %-8s %-64s %-10s %s\n' "$cfg" "$arc" "$sha" "$ok" "$file"
+    done
+
+    printf '\nReport dir: %s/\n' "$RUN_DIR"
 } > "$TXT"
 
 # ── summary.html ──────────────────────────────────────────────────────────────
@@ -189,6 +217,15 @@ HTMLHEAD
             "$cfg" "$arc" "$bld_cls" "$bld" "$bt_cls" "$bt" "$tests_cell" "$ts" "$dur" "$fr"
     done
 
+    printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">Config fingerprints (sha256)</h2>\n'
+    printf '<table>\n<tr><th>Config</th><th>Arch</th><th>SHA256</th><th>Verified</th><th>File</th></tr>\n'
+    for crow in "${CONFIG_ROWS[@]}"; do
+        IFS='|' read -r cfg arc sha file ok <<< "$crow"
+        ok_cls=$( [[ $ok == OK ]] && echo pass || { [[ $ok == MISMATCH ]] && echo fail || echo unk; } )
+        printf '<tr><td>%s</td><td>%s</td><td style="font-size:.85em">%s</td><td class="%s">%s</td><td>%s</td></tr>\n' \
+            "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file"
+    done
+
     cat << HTMLFOOT
 </table>
 </body>
@@ -201,5 +238,9 @@ HTMLFOOT
 info "Report written: $RUN_DIR/"
 info "  summary.txt  — $TXT"
 info "  summary.html — $HTML"
+for crow in "${CONFIG_ROWS[@]}"; do
+    IFS='|' read -r cfg arc sha file ok <<< "$crow"
+    info "  Config $cfg/$arc  [sha256:${sha:0:16}...]  $RUN_DIR/$file  [$ok]"
+done
 printf '\nOverall result: %s  (duration: %s)\n' "$OVERALL" "$OVERALL_DURATION"
 cat "$TXT"

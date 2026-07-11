@@ -18,7 +18,7 @@ endif
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
 ARCHS       ?= x86_64 i386
-CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig randconfig
+CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 600
 REPORT_DIR  ?= reports
@@ -38,7 +38,7 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 # Configs that are built but not booted:
 #   allmodconfig — kernel too large for the minimal initramfs
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
-# tinyconfig, allnoconfig, and defconfig are bootable via configs/<name>.config fragments.
+# tinyconfig, allnoconfig, defconfig, and rand500config are bootable via configs/<name>.config fragments.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
@@ -68,7 +68,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report clean distclean bootstrap info checkout help
+.PHONY: all fetch build initramfs test report clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -93,6 +93,10 @@ $(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
 
 bootstrap:
 	$(Q)lib/bootstrap.sh
+
+hooks:
+	@git config core.hooksPath .githooks
+	@echo "[hooks] Git hooks activated (.githooks/pre-push)"
 
 # ── Kernel tree inspection ────────────────────────────────────────────────────
 
@@ -131,12 +135,16 @@ checkout:
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
 # The exported RUN_STAMP is inherited, so all stages share one timestamp.
+# report always runs — even on build or test failure — so there is always an
+# artifact to inspect.  The overall exit code reflects build+test failures.
 all:
 	+@$(MAKE) fetch
-	+@$(MAKE) build
-	+@$(MAKE) initramfs
-	+@$(MAKE) test
-	+@$(MAKE) report
+	+@rc=0; \
+	 $(MAKE) build    || rc=1; \
+	 $(MAKE) initramfs || true; \
+	 $(MAKE) test     || rc=1; \
+	 $(MAKE) report; \
+	 exit $$rc
 
 # ── Pipeline stages ───────────────────────────────────────────────────────────
 
@@ -206,7 +214,8 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap    Install all build and test dependencies (distro-aware, needs sudo)
+  bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
+  hooks        Activate git hooks only (no package install)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch        Fetch and checkout the latest -rc tag automatically
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
@@ -236,23 +245,22 @@ Common workflows:
   # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
   make KERNEL_TREE=~/git/linux-stable
 
-  # New mainline rc — pin exact version, then test
+  # New mainline rc — pin exact version, then test (report always written)
   make checkout TAG=v7.2-rc3 KERNEL_TREE=~/git/linux-stable
-  make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+  make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
 
   # New stable release — auto-fetch latest v7.1.x and test everything
   make STABLE_RELEASE=7.1
 
   # New stable release — pin exact version, then test
   make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
-  make build initramfs test report NO_FETCH=1 STABLE_RELEASE=7.1
+  make all NO_FETCH=1 STABLE_RELEASE=7.1
 
   # Check what is currently checked out before running
   make info KERNEL_TREE=~/git/linux-stable
 
-  # Quick single-arch test (faster)
-  make build initramfs test report NO_FETCH=1 \
-      KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig ARCHS=x86_64
+  # Quick single-arch test (report always written even on failure)
+  make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
   # Verbose output for debugging
   make V=1 KERNEL_TREE=~/git/linux-stable
