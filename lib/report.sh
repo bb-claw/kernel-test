@@ -209,6 +209,22 @@ TXT="$RUN_DIR/summary.txt"
     printf '\nReport dir: %s/\n' "$RUN_DIR"
 } > "$TXT"
 
+# ── summary.mail ──────────────────────────────────────────────────────────────
+# Email-ready preamble only — paste as the body of an LKML report mail.
+
+MAIL="$RUN_DIR/summary.mail"
+{
+    printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
+    printf 'build and booted: %s\n' "$OVERALL"
+    printf 'Repository:       %s\n' "$REPO_URL"
+    printf 'Commit:           %s\n' "$COMMIT_SHA"
+    printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Tested ARCH:      %s\n' "$ARCHS"
+    printf '\n'
+    [[ -n $TESTED_BY ]] && printf 'Tested-by: %s\n' "$TESTED_BY"
+    printf '\n'
+} > "$MAIL"
+
 # ── summary.html ──────────────────────────────────────────────────────────────
 
 HTML="$RUN_DIR/summary.html"
@@ -308,6 +324,7 @@ HTMLFOOT
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 info "Report written: $RUN_DIR/"
+info "  summary.mail — $MAIL"
 info "  summary.txt  — $TXT"
 info "  summary.html — $HTML"
 for crow in "${CONFIG_ROWS[@]}"; do
