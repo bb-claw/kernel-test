@@ -12,25 +12,16 @@ if [ ! -d /proc/net ] && [ ! -d /sys/class/net ]; then
     exit 0
 fi
 
-# Bring up loopback — try ip first (iproute2/busybox), then ifconfig
-if ip link set lo up 2>/dev/null; then
-    ok "loopback interface up (ip)"
-elif ifconfig lo up 2>/dev/null; then
-    ok "loopback interface up (ifconfig)"
+# Bring up loopback — Toybox provides ifconfig, not ip
+if ifconfig lo up 2>/dev/null; then
+    ok "loopback interface up"
 else
-    skip "cannot bring up loopback — ip/ifconfig unavailable"
+    skip "cannot bring up loopback (ifconfig unavailable or CONFIG_NET off)"
     exit 0
 fi
 
-# Verify loopback address is present.
-# Avoid \<newline> continuation — Toybox sh 0.8.9 passes an empty word to grep.
-_has_addr=0
-if ip addr show lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
-    _has_addr=1
-elif ifconfig lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
-    _has_addr=1
-fi
-if [ "$_has_addr" -eq 1 ]; then
+# Verify loopback address is present
+if ifconfig lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
     ok "loopback has 127.0.0.1"
 else
     skip "127.0.0.1 not configured on lo (CONFIG_INET may be off)"
