@@ -3,8 +3,6 @@
 # Installed by: make bootstrap  (git config core.hooksPath .githooks)
 set -euo pipefail
 
-PASS=0
-FAIL=1
 rc=0
 
 ok()   { printf '[pre-push] ok:   %s\n' "$*"; }
@@ -31,7 +29,7 @@ fi
 
 # ── 2. Executable bit on test scripts ────────────────────────────────────────
 
-mapfile -t TEST_FILES < <(git ls-files 'tests/*.sh' 'tests/custom/*.sh' | sed "s|^|$REPO_ROOT/|")
+mapfile -t TEST_FILES < <(git ls-files 'tests/*.sh' 'tests/custom/*.sh' 'tests/hardware/*.sh' | sed "s|^|$REPO_ROOT/|")
 missing_x=()
 for f in "${TEST_FILES[@]}"; do
     [[ -x $f ]] || missing_x+=("${f#$REPO_ROOT/}")
