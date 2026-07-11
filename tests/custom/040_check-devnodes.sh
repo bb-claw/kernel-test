@@ -12,7 +12,7 @@ if [ -e /dev/null ]; then
     printf 'test' > /dev/null \
         && ok "/dev/null: write OK" || fail "/dev/null: write failed"
     # Read returns nothing
-    data=$(dd if=/dev/null bs=1 count=1 2>/dev/null)
+    data=$(head -c 1 /dev/null 2>/dev/null)
     [ -z "$data" ] \
         && ok "/dev/null: read returns empty" || fail "/dev/null: read not empty"
 else
@@ -21,7 +21,7 @@ fi
 
 # /dev/zero — zero-byte source
 if [ -e /dev/zero ]; then
-    byte=$(dd if=/dev/zero bs=1 count=1 2>/dev/null | wc -c)
+    byte=$(head -c 1 /dev/zero 2>/dev/null | wc -c)
     [ "$byte" = "1" ] \
         && ok "/dev/zero: read 1 byte" || fail "/dev/zero: could not read"
 else
@@ -37,7 +37,7 @@ fi
 
 # /dev/urandom or /dev/random — entropy source
 if [ -e /dev/urandom ]; then
-    byte=$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | wc -c)
+    byte=$(head -c 1 /dev/urandom 2>/dev/null | wc -c)
     [ "$byte" = "1" ] \
         && ok "/dev/urandom readable" || fail "/dev/urandom: read failed"
 elif [ -e /dev/random ]; then

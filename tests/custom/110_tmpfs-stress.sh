@@ -15,8 +15,8 @@ fi
 
 TESTFILE=/tmp/kernel-test-stress-$$
 
-# Write 1 MiB (1024 x 1 KiB blocks of zeros)
-if ! dd if=/dev/zero of="$TESTFILE" bs=1024 count=1024 2>/dev/null; then
+# Write 1 MiB of zeros
+if ! head -c 1048576 /dev/zero > "$TESTFILE" 2>/dev/null; then
     rm -f "$TESTFILE"
     fail "tmpfs 1MiB write failed"
     exit 1
@@ -32,7 +32,7 @@ else
 fi
 
 # Read back and discard
-if dd if="$TESTFILE" of=/dev/null bs=1024 2>/dev/null; then
+if cat "$TESTFILE" > /dev/null 2>/dev/null; then
     ok "tmpfs 1MiB read"
 else
     fail "tmpfs 1MiB read failed"

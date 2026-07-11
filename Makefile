@@ -17,14 +17,15 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
-ARCHS       ?= x86_64 i386
-CONFIGS     ?= tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig
+ARCHS         ?= x86_64 i386
+CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1200
 GCC           ?= gcc
-REPORT_DIR  ?= reports
-V           ?= 0
-NO_FETCH    ?= 0
+REPORT_DIR    ?= reports
+V             ?= 0
+NO_FETCH      ?= 0
+TOYBOX_VERSION ?= 0.8.9
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -57,6 +58,7 @@ export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH
 export STABLE_RELEASE STABLE_KERNEL_TREE
+export TOYBOX_VERSION
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -240,7 +242,7 @@ Targets:
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
   info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS
-  initramfs    Assemble BusyBox cpio initramfs for each arch
+  initramfs    Assemble Toybox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
   report       Generate HTML and plain-text report from last test run
   install      Install built kernel to /boot; update mkinitcpio + GRUB (needs sudo, x86_64 only)
@@ -272,6 +274,7 @@ Variables (current values):
   REPORT_DIR          = $(REPORT_DIR)
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
+  TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686})
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report

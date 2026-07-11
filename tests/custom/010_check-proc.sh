@@ -27,7 +27,7 @@ fi
 
 # /proc/meminfo — MemTotal must be > 0
 if [ -r /proc/meminfo ]; then
-    mem=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    mem=$(grep '^MemTotal:' /proc/meminfo | sed 's/[^0-9]//g')
     [ -n "$mem" ] && [ "$mem" -gt 0 ] \
         && ok "/proc/meminfo MemTotal=${mem}kB" \
         || fail "/proc/meminfo MemTotal is zero or missing"

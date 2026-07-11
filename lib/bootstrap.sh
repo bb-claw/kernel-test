@@ -26,7 +26,7 @@ install_packages() {
     case "$PM" in
 
         pacman)
-            # gcc-multilib replaces gcc and adds 32-bit support for i386 builds.
+            # gcc-multilib replaces gcc and adds 32-bit support for i386 kernel builds.
             # Remove gcc first if present to avoid the conflict.
             if pacman -Q gcc &>/dev/null && ! pacman -Q gcc-multilib &>/dev/null; then
                 info "Replacing gcc with gcc-multilib for i386 support"
@@ -35,7 +35,7 @@ install_packages() {
             sudo pacman -S --needed --noconfirm \
                 gcc-multilib make ccache \
                 qemu-system-x86 \
-                busybox cpio git \
+                cpio git \
                 bc flex bison libelf pahole
             ;;
 
@@ -44,7 +44,7 @@ install_packages() {
             sudo apt-get install -y \
                 gcc gcc-multilib make ccache \
                 qemu-system-x86 \
-                busybox-static cpio git \
+                cpio git \
                 bc flex bison libelf-dev dwarves
             ;;
 
@@ -52,7 +52,7 @@ install_packages() {
             sudo dnf install -y \
                 gcc gcc-multilib make ccache \
                 qemu-system-x86 \
-                busybox cpio git \
+                cpio git \
                 bc flex bison elfutils-libelf-devel dwarves
             ;;
 
@@ -60,7 +60,7 @@ install_packages() {
             sudo zypper install -y \
                 gcc gcc-multilib make ccache \
                 qemu-x86 \
-                busybox cpio git \
+                cpio git \
                 bc flex bison libelf-devel dwarves
             ;;
 
@@ -73,37 +73,54 @@ install_packages() {
 info "Installing packages..."
 install_packages
 
-# ── BusyBox: must be statically linked ───────────────────────────────────────
+# ── Toybox: download static binaries for each arch ───────────────────────────
 
-check_busybox() {
-    local bb
-    bb=$(command -v busybox 2>/dev/null || true)
-    [[ -n $bb && -x $bb ]] || die "busybox not found after installation"
+TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.9}
+CACHE_DIR=${CACHE_DIR:-cache}
+TOYBOX_BASE_URL="https://www.landley.net/toybox/downloads/binaries/${TOYBOX_VERSION}"
 
-    if file "$bb" | grep -q "statically linked"; then
-        info "busybox is statically linked: $bb"
-        return 0
-    fi
-
-    warn "busybox at $bb is dynamically linked — shared libs won't be in the initramfs"
-    case "$PM" in
-        pacman)
-            warn "Install the static variant from AUR:"
-            warn "  yay -S busybox-static"
-            warn "  sudo ln -sf /usr/bin/busybox-static /usr/local/bin/busybox"
-            ;;
-        apt)
-            warn "Try: sudo apt-get install busybox-static"
-            warn "  and: sudo ln -sf /bin/busybox.static /usr/local/bin/busybox"
-            ;;
-        *)
-            warn "Build BusyBox from source with CONFIG_STATIC=y"
-            ;;
-    esac
-    return 1
+download_toybox() {
+    mkdir -p "$CACHE_DIR"
+    local -a arches=(x86_64 i686)
+    for ta in "${arches[@]}"; do
+        local dest="$CACHE_DIR/toybox-${ta}"
+        if [[ -f $dest && -x $dest ]]; then
+            info "toybox-${ta} already cached: $dest"
+            continue
+        fi
+        local url="${TOYBOX_BASE_URL}/toybox-${ta}"
+        info "Downloading toybox-${ta} ${TOYBOX_VERSION}..."
+        if command -v curl &>/dev/null; then
+            curl -fsSL --output "$dest" "$url" \
+                || die "Download failed: $url — check network or TOYBOX_VERSION=$TOYBOX_VERSION"
+        elif command -v wget &>/dev/null; then
+            wget -q --output-document="$dest" "$url" \
+                || die "Download failed: $url — check network or TOYBOX_VERSION=$TOYBOX_VERSION"
+        else
+            die "Neither curl nor wget found — cannot download Toybox"
+        fi
+        chmod +x "$dest"
+        info "Cached: $dest"
+    done
 }
 
-check_busybox || warn "busybox issue detected — initramfs builds may fail"
+check_toybox() {
+    local ok=1
+    for ta in x86_64 i686; do
+        local dest="$CACHE_DIR/toybox-${ta}"
+        if [[ -f $dest && -x $dest ]]; then
+            info "toybox-${ta}: OK  ($dest)"
+        else
+            warn "toybox-${ta}: MISSING — run: make bootstrap"
+            ok=0
+        fi
+    done
+    [[ $ok -eq 1 ]]
+}
+
+info "Downloading Toybox ${TOYBOX_VERSION} static binaries..."
+download_toybox
+check_toybox || warn "Toybox binary missing — initramfs builds will fail"
 
 # ── KVM access ────────────────────────────────────────────────────────────────
 
@@ -126,19 +143,19 @@ setup_kvm() {
 
 setup_kvm
 
-# ── gcc -m32 sanity check (i386 builds) ──────────────────────────────────────
+# ── gcc -m32 sanity check (i386 kernel builds) ───────────────────────────────
 
 if printf 'int main(){}' | gcc -m32 -x c - -o /dev/null 2>/dev/null; then
-    info "gcc -m32: OK (i386 builds supported)"
+    info "gcc -m32: OK (i386 kernel builds supported)"
 else
-    warn "gcc -m32 failed — i386 builds will not work"
+    warn "gcc -m32 failed — i386 kernel builds will not work"
     warn "On Arch: sudo pacman -S gcc-multilib lib32-glibc"
     warn "Continuing with x86_64 only: make ARCHS=x86_64"
 fi
 
 # ── Verify all required tools are present ────────────────────────────────────
 
-REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 busybox cpio git bc flex bison)
+REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 cpio git bc flex bison)
 missing=0
 info "Checking required tools:"
 for cmd in "${REQUIRED[@]}"; do

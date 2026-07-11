@@ -1,85 +1,57 @@
 #!/bin/bash
-# Build a minimal BusyBox cpio initramfs for one architecture.
+# Build a minimal Toybox cpio initramfs for one architecture.
 # Usage: initramfs.sh <arch>
 # Output: build/initramfs-<arch>.cpio.gz
+set -x
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
 ARCH=${1:?usage: initramfs.sh <arch>}
 
-require_env BUILD_DIR
+require_env BUILD_DIR CACHE_DIR
 
 STAGE="$BUILD_DIR/initramfs-$ARCH"
 OUTPUT="$BUILD_DIR/initramfs-$ARCH.cpio.gz"
 
-# ── Locate static BusyBox ─────────────────────────────────────────────────────
+# ── Locate Toybox binary for this arch ───────────────────────────────────────
+# Map kernel arch name → Toybox binary name (matches landley.net download names).
 
-BUSYBOX=$(command -v busybox 2>/dev/null || true)
-[[ -n $BUSYBOX && -x $BUSYBOX ]] || die "busybox not found in PATH"
+case "$ARCH" in
+    x86_64) TOYBOX_ARCH=x86_64 ;;
+    i386)   TOYBOX_ARCH=i686   ;;
+    *)      die "Unsupported arch for initramfs: $ARCH (no Toybox binary mapping)" ;;
+esac
 
-if file "$BUSYBOX" 2>/dev/null | grep -q 'dynamically linked'; then
-    warn "busybox at $BUSYBOX is dynamically linked — shared libs will be missing in the VM"
-fi
-
-# ── Architecture compatibility check ─────────────────────────────────────────
-# If the host BusyBox ELF class doesn't match the target arch, fall back to a
-# minimal static C init that prints BOOT_OK/TEST_DONE and powers off.
-# Boot verification still works; test scripts are skipped (need a 32-bit shell).
-
-BB_BITS=$(file "$BUSYBOX" 2>/dev/null | grep -oE 'ELF [0-9]+-bit' | grep -oE '[0-9]+')
-BB_BITS=${BB_BITS:-64}
-MINIMAL_INIT=0
-if [[ $ARCH == i386 && $BB_BITS != 32 ]]; then
-    warn "BusyBox is ${BB_BITS}-bit but ARCH=i386 needs 32-bit — compiling minimal C init (boot-only, no test scripts)"
-    MINIMAL_INIT=1
-fi
+TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
+[[ -f $TOYBOX && -x $TOYBOX ]] || \
+    die "Toybox binary not found: $TOYBOX — run: make bootstrap"
 
 # ── Build staging tree ────────────────────────────────────────────────────────
 
-info "Building initramfs for $ARCH in $STAGE"
+info "Building initramfs for $ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"/{bin,dev,proc,sys,tmp,tests}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-if [[ $MINIMAL_INIT -eq 1 ]]; then
-    # ── Minimal static C /init (32-bit arch, 64-bit host BusyBox) ────────────
-    TMPC=$(mktemp /tmp/init-XXXXXX.c)
-    cat > "$TMPC" << 'CSRC'
-#include <sys/mount.h>
-#include <sys/reboot.h>
-#include <unistd.h>
+# ── Install Toybox ────────────────────────────────────────────────────────────
 
-int main(void) {
-    mount("proc",     "/proc", "proc",     0, (void *)0);
-    mount("sysfs",    "/sys",  "sysfs",    0, (void *)0);
-    mount("devtmpfs", "/dev",  "devtmpfs", 0, (void *)0);
-    write(1, "BOOT_OK: kernel reached init\n", 29);
-    write(1, "TEST_DONE\n", 10);
-    sync();
-    sleep(1); /* let emulated UART drain before QEMU exits */
-    reboot(RB_AUTOBOOT);
-    return 0;
-}
-CSRC
-    gcc -m32 -static -O2 -o "$STAGE/init" "$TMPC" \
-        || die "Failed to compile 32-bit init — is gcc-multilib installed? (run: make bootstrap)"
-    rm -f "$TMPC"
-    chmod +x "$STAGE/init"
+cp "$TOYBOX" "$STAGE/bin/toybox"
+chmod +x "$STAGE/bin/toybox"
 
-else
-    # ── BusyBox /init with full test-script support ───────────────────────────
-
-    cp "$BUSYBOX" "$STAGE/bin/busybox"
-    chmod +x "$STAGE/bin/busybox"
-
-    # Symlinks for all BusyBox applets (skip 'busybox' itself — would overwrite the binary)
-    "$BUSYBOX" --list | while read -r applet; do
-        [[ $applet == busybox ]] && continue
-        ln -sf busybox "$STAGE/bin/$applet"
+# Symlinks for all Toybox applets.
+# --list may emit space-separated or newline-separated output depending on version;
+# tr normalises to one-per-line before the symlink loop.
+"$STAGE/bin/toybox" --list 2>/dev/null \
+    | tr ' ' '\n' | grep -v '^$' \
+    | while read -r applet; do
+        [[ $applet == toybox ]] && continue
+        ln -sf toybox "$STAGE/bin/$applet"
     done
 
-    cat > "$STAGE/init" << 'EOF'
+# ── Write /init ───────────────────────────────────────────────────────────────
+
+cat > "$STAGE/init" << 'EOF'
 #!/bin/sh
 
 mount -t proc     none /proc      2>/dev/null || true
@@ -108,23 +80,21 @@ echo "TEST_DONE"
 sleep 1
 reboot -f
 EOF
-    chmod +x "$STAGE/init"
+chmod +x "$STAGE/init"
 
-    # ── Copy tests ────────────────────────────────────────────────────────────
+# ── Copy tests ────────────────────────────────────────────────────────────────
 
-    if [[ -f "$SCRIPT_DIR/tests/001_smoke.sh" ]]; then
-        cp "$SCRIPT_DIR/tests/001_smoke.sh" "$STAGE/tests/"
-        chmod +x "$STAGE/tests/001_smoke.sh"
-    fi
+if [[ -f "$SCRIPT_DIR/tests/001_smoke.sh" ]]; then
+    cp "$SCRIPT_DIR/tests/001_smoke.sh" "$STAGE/tests/"
+    chmod +x "$STAGE/tests/001_smoke.sh"
+fi
 
-    if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then
-        for f in "$SCRIPT_DIR/tests/custom/"*.sh; do
-            [[ -f $f ]] || continue
-            cp "$f" "$STAGE/tests/"
-            chmod +x "$STAGE/tests/$(basename "$f")"
-        done
-    fi
-
+if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then
+    for f in "$SCRIPT_DIR/tests/custom/"*.sh; do
+        [[ -f $f ]] || continue
+        cp "$f" "$STAGE/tests/"
+        chmod +x "$STAGE/tests/$(basename "$f")"
+    done
 fi
 
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────

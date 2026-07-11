@@ -4,7 +4,7 @@
 
 This repo is a Bash-based harness for testing Linux release-candidate (-rc) kernels.
 It builds kernels under multiple config profiles, boots them in QEMU/KVM with a minimal
-BusyBox initramfs, runs tests inside the VM, and writes a local HTML/text report.
+Toybox initramfs, runs tests inside the VM, and writes a local HTML/text report.
 The goal is systematic community verification of each -rc kernel.
 
 ## Tech stack
@@ -12,7 +12,7 @@ The goal is systematic community verification of each -rc kernel.
 - **Entry point:** `Makefile` — all commands are invoked via `make <target> [VAR=value]`
 - **Language:** Bash for all lib scripts — no Python, no Ruby, no extra runtimes
 - **Virtualization:** QEMU/KVM (`qemu-system-x86_64`, `qemu-system-i386`)
-- **Userland:** BusyBox static binary packed into a cpio initramfs
+- **Userland:** Toybox static binary (prebuilt, downloaded by `make bootstrap`) packed into a cpio initramfs; arch mapping: `x86_64` → `toybox-x86_64`, `i386` → `toybox-i686`; version pinned via `TOYBOX_VERSION` (default `0.8.9`)
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386`
 - **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
@@ -33,7 +33,7 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write |
-| `lib/initramfs.sh` | Assemble BusyBox cpio initramfs; inject test scripts |
+| `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686}` to `cache/` |
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
 | `lib/report.sh` | Collate results; write `summary.html` and `summary.txt` |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
@@ -68,7 +68,7 @@ The goal is systematic community verification of each -rc kernel.
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
-- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16
+- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`, `TOYBOX_VERSION`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16; `TOYBOX_VERSION` defaults to `0.8.9`
 - `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
 - `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually (chaining stops at the first failure)
 - `make test` skips any config whose `build.status` is not `STATUS=PASS` (prints `SKIP (build TIMEOUT/FAIL)`) so partial build failures don't block testing of the configs that did build

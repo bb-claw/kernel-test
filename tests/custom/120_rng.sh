@@ -13,7 +13,7 @@ if [ ! -c /dev/urandom ]; then
 fi
 
 # Read 512 bytes and verify the count
-bytes=$(dd if=/dev/urandom bs=512 count=1 2>/dev/null | wc -c)
+bytes=$(head -c 512 /dev/urandom 2>/dev/null | wc -c)
 if [ "${bytes:-0}" -eq 512 ]; then
     ok "/dev/urandom read 512 bytes"
 else
@@ -21,7 +21,7 @@ else
 fi
 
 # Read 4096 bytes (one page) — exercises the CRNG output path more
-bytes=$(dd if=/dev/urandom bs=4096 count=1 2>/dev/null | wc -c)
+bytes=$(head -c 4096 /dev/urandom 2>/dev/null | wc -c)
 if [ "${bytes:-0}" -eq 4096 ]; then
     ok "/dev/urandom read 4096 bytes (one page)"
 else
