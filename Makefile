@@ -4,6 +4,9 @@
 
 # ── User-settable variables ────────────────────────────────────────────────────
 KERNEL_TREE ?= ../linux
+# Expand leading ~ and resolve to an absolute path so git/shell never see '~'.
+# 'override' is required because command-line variables suppress ordinary :=.
+override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 ARCHS       ?= x86_64 i386
 CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig
 TIMEOUT     ?= 60
