@@ -41,11 +41,15 @@ environment and invokes lib scripts as subprocesses for each pipeline stage.
 ```
 Makefile  (make all / make fetch / make checkout / make info / make build / ...)
     │
-    │   exports: KERNEL_TREE (tilde-expanded, absolutified), ARCHS, CONFIGS,
-    │            TIMEOUT, REPORT_DIR, V, TAG
+    │   exports: KERNEL_TREE (tilde-expanded, absolutified), STABLE_KERNEL_TREE,
+    │            STABLE_RELEASE, TAG, NO_FETCH, ARCHS, CONFIGS, TIMEOUT, REPORT_DIR, V
     │
     ├── make fetch      → lib/fetch.sh
-    │                         git fetch + auto-checkout latest -rc tag
+    │                         ls-remote to discover latest matching tag (no objects)
+    │                         fetch only that one tag with --depth=1
+    │                         mainline mode: latest v*-rc* from KERNEL_TREE
+    │                         stable mode (STABLE_RELEASE=X.Y): latest vX.Y.* (non-rc)
+    │                           from STABLE_KERNEL_TREE; remote URL verified
     │
     ├── make checkout   → lib/checkout.sh  (TAG=<tag-or-commit> required)
     │                         fetch ref if not local
@@ -88,15 +92,36 @@ Makefile  (make all / make fetch / make checkout / make info / make build / ...)
 
 ### 4.1 Fetch
 
-`lib/fetch.sh` operates on the caller-provided `KERNEL_TREE` directory.
+`lib/fetch.sh` supports two modes, selected by the `STABLE_RELEASE` variable:
 
-```
-git -C "$KERNEL_TREE" fetch --tags origin
-LATEST_RC=$(git -C "$KERNEL_TREE" tag -l 'v*-rc*' | sort -V | tail -1)
-git -C "$KERNEL_TREE" checkout "$LATEST_RC"
-```
+Both modes use the same two-step strategy to avoid downloading unnecessary objects:
 
-The fetched tag name is exported as `KERNEL_VERSION` for use in report filenames.
+**Step 1 — discover the latest matching tag via `ls-remote` (no objects transferred):**
+```
+git ls-remote --tags origin "refs/tags/v*-rc*"   # mainline
+git ls-remote --tags origin "refs/tags/v7.1.*"   # stable, STABLE_RELEASE=7.1
+```
+The output is filtered (exclude `^{}` peel entries, exclude `-rc` in stable mode),
+sorted with `sort -V`, and the highest version is selected.
+
+**Step 2 — fetch only that one tag if not already local:**
+```
+git fetch --depth=1 origin refs/tags/v7.2-rc2:refs/tags/v7.2-rc2
+```
+If the tag commit is already in the local object store, this step is skipped entirely.
+
+**Mainline rc mode (default — `STABLE_RELEASE` unset):**
+- Tag pattern: `refs/tags/v*-rc*`
+- Tree: `KERNEL_TREE` (default `../linux`)
+
+**Stable release mode (`STABLE_RELEASE=7.1`):**
+- The Makefile overrides `KERNEL_TREE` → `STABLE_KERNEL_TREE` (default `~/git/linux-stable`)
+- `fetch.sh` verifies `git remote get-url origin` contains `/stable/` or `linux-stable` — dies if not
+- Tag pattern: `refs/tags/v7.1.*`, excluding `-rc` tags
+
+The checked-out tag name is written to `build/.kernel-version` and read by
+`KERNEL_VERSION` in the Makefile for use in report filenames and `[build]`/`[test]`
+header lines.
 
 ### 4.2 Build
 
@@ -167,7 +192,7 @@ for t in /tests/*.sh; do
 done
 
 echo "TEST_DONE"
-poweroff -f
+reboot -f
 ```
 
 The initramfs is packed:
@@ -213,27 +238,34 @@ i386 uses `qemu-system-i386` with `ARCH=i386` kernel and the same flags.
 
 **`summary.txt`** (plain text, suitable for mailing list):
 ```
-Linux <version> boot test report
-Host: <uname -m>, <CPU model>, <RAM>
-Started:  <ISO-8601>
-Duration: <Xm YYs>
-Result:   PASS
+Linux v7.2-rc2 boot test report
+Repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
+Commit:     abc1234def567890abcdef1234567890abcdef12
+Host:       x86_64  |  Intel Core i9-13900K  |  65536 MiB
+Started:    2026-07-11T10:30:00Z
+Duration:   8m42s
+Result:     PASS
 
 Config           Arch     Build    Boot         Tests    Started   Dur      Notes
 ------           ----     -----    ----         -----    -------   ---      -----
-defconfig        x86_64   PASS     PASS         6/6      08:12:01  12s
-defconfig        i386     PASS     PASS         0/0      08:12:13  8s
-tinyconfig       x86_64   PASS     PASS         6/6      08:12:21  10s
-tinyconfig       i386     PASS     PASS         0/0      08:12:31  9s
-allnoconfig      x86_64   PASS     PASS         6/6      08:12:40  10s
-allnoconfig      i386     PASS     PASS         0/0      08:12:50  8s
-allmodconfig     x86_64   PASS     build-only   —        08:12:58  4m12s
-allmodconfig     i386     PASS     build-only   —        08:17:10  4m05s
+defconfig        x86_64   PASS     PASS         6/6      10:30:01  12s
+defconfig        i386     PASS     PASS         0/0      10:30:13  8s
+tinyconfig       x86_64   PASS     PASS         6/6      10:30:21  10s
+tinyconfig       i386     PASS     PASS         0/0      10:30:31  9s
+allnoconfig      x86_64   PASS     PASS         6/6      10:30:40  10s
+allnoconfig      i386     PASS     PASS         0/0      10:30:50  8s
+allmodconfig     x86_64   PASS     build-only   —        10:30:58  4m12s
+allmodconfig     i386     PASS     build-only   —        10:35:10  4m05s
 
 Full dmesg logs: reports/<run>/
 ```
 
-**`summary.html`** — same data in an HTML table with pass=green / fail=red styling.
+`Repository` and `Commit` are read from `git remote get-url origin` and
+`git rev-parse HEAD` on `KERNEL_TREE` at report generation time — unambiguous
+whether the run was against mainline or a stable tree.
+
+**`summary.html`** — same data in an HTML table with pass=green / fail=red styling,
+plus Repository and Commit fields in the header.
 
 ---
 
@@ -281,20 +313,30 @@ Reports directory is gitignored. Users choose what to share publicly.
 All variables have defaults and can be overridden on the command line:
 
 ```
-make info KERNEL_TREE=~/git/linux                        # show current version
-make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux       # pin a specific version
-make KERNEL_TREE=~/git/linux                             # full pipeline
-make KERNEL_TREE=~/git/linux ARCHS=x86_64               # single arch
-make KERNEL_TREE=~/git/linux CONFIGS=defconfig           # single config
-make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux
-make KERNEL_TREE=~/git/linux TIMEOUT=120                 # longer VM timeout
-make KERNEL_TREE=~/git/linux V=1                         # verbose output
+# Mainline rc
+make KERNEL_TREE=~/git/linux-stable                      # full pipeline, latest rc
+make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
+make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+make info KERNEL_TREE=~/git/linux-stable                 # show current version
+
+# Stable release
+make STABLE_RELEASE=7.1                                  # full pipeline, latest v7.1.x
+make checkout TAG=v7.1.3 STABLE_RELEASE=7.1              # pin exact stable tag
+make build initramfs test report NO_FETCH=1 STABLE_RELEASE=7.1
+
+# Scoped runs
+make KERNEL_TREE=~/git/linux-stable ARCHS=x86_64         # single arch
+make KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig    # single config
+make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 ```
 
 | Variable | Default | Description |
 |---|---|---|
-| `KERNEL_TREE` | `../linux` | Path to linux.git working tree; `~/...` and relative paths are accepted — expanded to absolute at parse time |
+| `KERNEL_TREE` | `../linux` | Path to mainline linux.git; `~/...` and relative paths accepted — expanded to absolute at parse time. Overridden automatically when `STABLE_RELEASE` is set. |
+| `STABLE_KERNEL_TREE` | `~/git/linux-stable` | Path to stable linux.git clone; used automatically when `STABLE_RELEASE` is set |
+| `STABLE_RELEASE` | _(none)_ | Stable series to fetch, e.g. `7.1`; triggers stable mode in `fetch.sh` and overrides `KERNEL_TREE` to `STABLE_KERNEL_TREE` |
 | `TAG` | _(none)_ | Tag or commit for `make checkout`; ignored by all other targets |
+| `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
 | `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |

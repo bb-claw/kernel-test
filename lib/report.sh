@@ -111,15 +111,22 @@ CPU_MODEL=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null \
 RAM=$(awk '/MemTotal/ {printf "%.0f MiB", $2/1024}' /proc/meminfo 2>/dev/null \
     || echo 'unknown')
 
+# ── Kernel source info ────────────────────────────────────────────────────────
+
+REPO_URL=$(git -C "$KERNEL_TREE" remote get-url origin 2>/dev/null || echo 'unknown')
+COMMIT_SHA=$(git -C "$KERNEL_TREE" rev-parse HEAD 2>/dev/null || echo 'unknown')
+
 # ── summary.txt ───────────────────────────────────────────────────────────────
 
 TXT="$RUN_DIR/summary.txt"
 {
     printf 'Linux %s boot test report\n' "$KERNEL_VERSION"
-    printf 'Host:     %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
-    printf 'Started:  %s\n' "$RUN_STAMP"
-    printf 'Duration: %s\n' "$OVERALL_DURATION"
-    printf 'Result:   %s\n\n' "$OVERALL"
+    printf 'Repository: %s\n' "$REPO_URL"
+    printf 'Commit:     %s\n' "$COMMIT_SHA"
+    printf 'Host:       %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Started:    %s\n' "$RUN_STAMP"
+    printf 'Duration:   %s\n' "$OVERALL_DURATION"
+    printf 'Result:     %s\n\n' "$OVERALL"
 
     printf '%-16s %-8s %-8s %-12s %-8s %-9s %-8s %s\n' \
         Config Arch Build Boot Tests Started Dur Notes
@@ -161,6 +168,8 @@ HTML="$RUN_DIR/summary.html"
 </head>
 <body>
 <h1>Linux $KERNEL_VERSION — boot test report</h1>
+<p>Repository: $REPO_URL</p>
+<p>Commit: $COMMIT_SHA</p>
 <p>Host: $HOST_ARCH | $CPU_MODEL | $RAM</p>
 <p>Started: $RUN_STAMP</p>
 <p>Duration: $OVERALL_DURATION</p>

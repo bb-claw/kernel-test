@@ -39,27 +39,65 @@ sudo apt install gcc gcc-multilib make ccache qemu-system-x86 busybox-static cpi
 ## Quick Start
 
 ```sh
-git clone https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git kernel-src
+# Clone the stable kernel tree (contains both mainline rc and stable release tags)
+git clone --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git ~/git/linux-stable
+
 git clone https://github.com/YOUR_USERNAME/kernel-test.git
 cd kernel-test
+make bootstrap                          # install build deps (needs sudo, once)
 
-# Full pipeline: fetch latest -rc, build, boot, test, report
-make KERNEL_TREE=../kernel-src
-
-# Test a single architecture
-make KERNEL_TREE=../kernel-src ARCHS=x86_64
-
-# Test a single config variant
-make KERNEL_TREE=../kernel-src CONFIGS=defconfig
-
-# Skip fetch, use current HEAD
-make build initramfs test report KERNEL_TREE=../kernel-src
-
-# Show all available targets
-make help
+make KERNEL_TREE=~/git/linux-stable     # full pipeline: fetch latest rc, build, test, report
+make help                               # list all targets and variables
 ```
 
 Reports are written to `reports/YYYY-MM-DD_HH-MM-SS_<kernel-version>/`.
+
+## Practical Examples
+
+### Test a new mainline rc (most common workflow)
+
+When Linus announces a new rc on LKML (e.g. Linux 7.2-rc3):
+
+```sh
+# Option A — auto-fetch the latest rc and run everything
+make KERNEL_TREE=~/git/linux-stable
+
+# Option B — pin the exact announced version, then run
+make checkout TAG=v7.2-rc3 KERNEL_TREE=~/git/linux-stable
+make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+
+# Check what is currently checked out before running
+make info KERNEL_TREE=~/git/linux-stable
+```
+
+### Test a specific stable release
+
+When Greg announces a stable release (e.g. 7.1.3):
+
+```sh
+# Auto-fetch latest 7.1.x release and run everything
+make STABLE_RELEASE=7.1
+
+# Pin the exact version
+make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
+make build initramfs test report NO_FETCH=1 STABLE_RELEASE=7.1
+```
+
+`STABLE_RELEASE` automatically uses `~/git/linux-stable` and verifies the remote
+is a stable tree before fetching.
+
+### Quick single-arch build to verify a config
+
+```sh
+make build initramfs test report NO_FETCH=1 \
+    KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig ARCHS=x86_64
+```
+
+### Verbose output for debugging
+
+```sh
+make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable V=1
+```
 
 ## Directory Layout
 
@@ -96,14 +134,66 @@ kernel-test/
 | `make distclean` | Remove `build/`, `cache/`, and `reports/` |
 | `make help` | List all targets with descriptions |
 
+## Fetching Kernels
+
+The harness supports two fetch modes controlled by `STABLE_RELEASE`.
+
+### Mainline rc (default)
+
+Fetches the latest `-rc` tag from `KERNEL_TREE`:
+
+```sh
+make fetch KERNEL_TREE=~/git/linux
+```
+
+### Stable releases
+
+Fetches the latest point release for a given stable series from `STABLE_KERNEL_TREE`
+(default: `~/git/linux-stable`). The remote is verified to be a stable tree before
+fetching — the origin URL must contain `/stable/` or `linux-stable`:
+
+```sh
+make fetch STABLE_RELEASE=7.1
+# → checks out latest v7.1.x tag from ~/git/linux-stable
+```
+
+Setting `STABLE_RELEASE` automatically redirects `KERNEL_TREE` to `STABLE_KERNEL_TREE`,
+so all subsequent build, test, and report steps use the stable tree without further flags.
+
+Override the stable tree path if needed:
+
+```sh
+make fetch STABLE_RELEASE=7.1 STABLE_KERNEL_TREE=/path/to/linux-stable
+```
+
+### Pinning a specific version
+
+Skip auto-fetch and check out an exact tag or commit:
+
+```sh
+make checkout TAG=v7.2-rc2                          # mainline
+make checkout TAG=v7.1.3 STABLE_RELEASE=7.1         # stable (uses STABLE_KERNEL_TREE)
+```
+
+### Skip fetch entirely
+
+Use `NO_FETCH=1` to build and test whatever is currently checked out:
+
+```sh
+make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux
+```
+
 ## Make Variables
 
 Override on the command line:
 
 | Variable | Default | Description |
 |---|---|---|
-| `KERNEL_TREE` | `../linux` | Path to a cloned linux.git working tree (`~/...` and relative paths are accepted) |
-| `TAG` | _(none)_ | Tag or commit to check out; required by `make checkout` |
+| `KERNEL_TREE` | `../linux` | Path to mainline linux.git working tree (`~/...` and relative paths accepted) |
+| `STABLE_KERNEL_TREE` | `~/git/linux-stable` | Path to stable linux.git clone; used automatically when `STABLE_RELEASE` is set |
+| `STABLE_RELEASE` | _(none)_ | Stable series to fetch, e.g. `7.1`; selects latest `v7.1.*` tag and switches to `STABLE_KERNEL_TREE` |
+| `TAG` | _(none)_ | Exact tag or commit for `make checkout` |
+| `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
 | `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated list of config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |

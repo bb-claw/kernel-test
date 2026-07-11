@@ -3,17 +3,26 @@
 # Usage: make [target] [VAR=value ...]
 
 # ── User-settable variables ────────────────────────────────────────────────────
-KERNEL_TREE ?= ../linux
+KERNEL_TREE        ?= ../linux
+STABLE_KERNEL_TREE ?= ~/git/linux-stable
+STABLE_RELEASE     ?=
+TAG                ?=
+
+# When STABLE_RELEASE is set, use the stable tree automatically.
+ifdef STABLE_RELEASE
+override KERNEL_TREE := $(STABLE_KERNEL_TREE)
+endif
+
 # Expand leading ~ and resolve to an absolute path so git/shell never see '~'.
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
+
 ARCHS       ?= x86_64 i386
 CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig
 TIMEOUT     ?= 60
 REPORT_DIR  ?= reports
 V           ?= 0
 NO_FETCH    ?= 0
-TAG         ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -44,6 +53,7 @@ endif
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT REPORT_DIR V RUN_STAMP NO_FETCH
+export STABLE_RELEASE STABLE_KERNEL_TREE
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -208,22 +218,42 @@ Targets:
   help         Show this message
 
 Variables (current values):
-  KERNEL_TREE  = $(KERNEL_TREE)
-  ARCHS        = $(ARCHS)
-  CONFIGS      = $(CONFIGS)
-  TIMEOUT      = $(TIMEOUT)s
-  REPORT_DIR   = $(REPORT_DIR)
-  V            = $(V)  (set to 1 for verbose output)
-  NO_FETCH     = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
-  TAG          = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
+  KERNEL_TREE         = $(KERNEL_TREE)
+  STABLE_KERNEL_TREE  = $(STABLE_KERNEL_TREE)  (used when STABLE_RELEASE is set)
+  STABLE_RELEASE      = $(if $(STABLE_RELEASE),$(STABLE_RELEASE),(not set — mainline rc mode))
+  TAG                 = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
+  ARCHS               = $(ARCHS)
+  CONFIGS             = $(CONFIGS)
+  TIMEOUT             = $(TIMEOUT)s
+  REPORT_DIR          = $(REPORT_DIR)
+  V                   = $(V)  (set to 1 for verbose output)
+  NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
 
-Examples:
-  make KERNEL_TREE=../linux
-  make checkout TAG=v7.2-rc2 KERNEL_TREE=../linux
-  make info KERNEL_TREE=../linux
-  make build KERNEL_TREE=../linux CONFIGS=defconfig ARCHS=x86_64
-  make build initramfs test report NO_FETCH=1 KERNEL_TREE=../linux
-  make V=1 KERNEL_TREE=../linux
+Common workflows:
+
+  # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
+  make KERNEL_TREE=~/git/linux-stable
+
+  # New mainline rc — pin exact version, then test
+  make checkout TAG=v7.2-rc3 KERNEL_TREE=~/git/linux-stable
+  make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+
+  # New stable release — auto-fetch latest v7.1.x and test everything
+  make STABLE_RELEASE=7.1
+
+  # New stable release — pin exact version, then test
+  make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
+  make build initramfs test report NO_FETCH=1 STABLE_RELEASE=7.1
+
+  # Check what is currently checked out before running
+  make info KERNEL_TREE=~/git/linux-stable
+
+  # Quick single-arch test (faster)
+  make build initramfs test report NO_FETCH=1 \
+      KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig ARCHS=x86_64
+
+  # Verbose output for debugging
+  make V=1 KERNEL_TREE=~/git/linux-stable
 endef
 export HELP_TEXT
 
