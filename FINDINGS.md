@@ -249,11 +249,93 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-11 — 7.1.3 localconfig Second Boot
+
+### High — Boot Failure
+
+- [x] **7.1.3 localconfig: `failed to validate module [snd] BTF: -22` causes boot degradation** ✅ resolved 2026-07-11
+  After installing the 7.1.3 localconfig kernel, boot dropped into emergency mode. The console
+  showed repeated BTF validation failures:
+  ```
+  BPF: [148026] FUNC 59A_suspend
+  BPF: type_id=40426
+  BPF: Invalid name
+  failed to validate module [snd] BTF: -22
+  ```
+  `-22` = `-EINVAL`. The kernel's in-kernel BPF module loader is rejecting BTF (BPF Type Format)
+  metadata embedded in the `snd` module at load time.
+
+  **Root cause:** pahole v1.31 (the BTF-generation tool) encodes modules with
+  `--btf_features=layout` (added for pahole ≥1.31 in the kernel's `scripts/Makefile.btf`).
+  The `layout` encoding produces BTF data that the 7.1.3 stable kernel's BPF module verifier
+  does not recognise, causing it to reject the module with `-EINVAL`. The Manjaro 7.0.x kernel
+  is patched to handle this; vanilla stable 7.1.3 is not. This is a toolchain/kernel-age
+  mismatch — newer pahole, older stable kernel.
+
+  **Fix:** Added to `configs/localconfig.config`:
+  ```
+  CONFIG_DEBUG_INFO_BTF=n
+  CONFIG_DEBUG_INFO_BTF_MODULES=n
+  ```
+  This disables BTF generation entirely. BPF CO-RE (Compile Once, Run Everywhere) is
+  unavailable on this kernel, but the kernel is otherwise fully functional. bpftrace and
+  libbpf-based tools that use CO-RE will fall back or fail gracefully. Kernel-internal BPF
+  (used by systemd, network tools) is unaffected — BTF is only needed for CO-RE portability.
+
+  **Emergency mode root cause:** Unknown without `journalctl -b -p err`. The `snd` BTF
+  failure alone should not trigger emergency mode — a kernel module failing to load doesn't
+  halt boot. The actual trigger is a failed mount or systemd unit that requires investigation
+  from the emergency shell:
+  ```sh
+  journalctl -xb --no-pager | grep -E 'Failed|Dependency|error' | head -30
+  systemctl --failed
+  ```
+
+### Medium — Emergency Recovery
+
+- [x] **Magic SysRq (REISUB) disabled at boot despite CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE=1** ✅ resolved 2026-07-11
+  Even after adding `CONFIG_MAGIC_SYSRQ=y` and `CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE=1` to
+  `configs/localconfig.config`, REISUB still did not work. The console showed:
+  ```
+  sysrq: This sysrq operation is disabled
+  ```
+
+  **Root cause:** `/usr/lib/sysctl.d/50-default.conf` (installed by systemd) sets:
+  ```
+  kernel.sysrq = 16
+  ```
+  `systemd-sysctl.service` applies this early in boot and overrides the kernel compile-time
+  default. Value 16 is bitmask bit 4 (sync only). The required operations for REISUB are:
+  - R (unraw) → bit 2 = not in 16
+  - E/I (signal processes) → bit 6 = not in 16
+  - S (sync) → bit 4 = ✓ in 16
+  - U (remount ro) → bit 5 = not in 16
+  - B (reboot) → bit 7 = not in 16
+
+  The `CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE` option sets the kernel's own default, but sysctl
+  files take effect after the kernel starts and always win.
+
+  **Fix:** `lib/install.sh` now writes `/etc/sysctl.d/99-sysrq.conf` (priority 99 > systemd's
+  50) as part of the install step:
+  ```
+  kernel.sysrq = 1
+  ```
+  Files in `/etc/sysctl.d/` override `/usr/lib/sysctl.d/` by naming convention (etc wins over
+  usr). This applies on every boot, for any kernel, without any per-kernel configuration.
+
+  **Manual workaround** when the file isn't installed yet (from any shell):
+  ```sh
+  echo 1 | sudo tee /proc/sys/kernel/sysrq
+  ```
+  Then REISUB works immediately for the current boot.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
 | Open   | 0     |
-| Resolved | 11  |
+| Resolved | 13  |
 | Won't fix | 0  |
 | Reconsider later | 2 |

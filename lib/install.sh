@@ -86,6 +86,17 @@ PRESETS=('default')
 default_image="/boot/initramfs-$BOOT_SUFFIX.img"
 EOF
 
+# ── Step 4b: sysrq override ──────────────────────────────────────────────────
+# systemd's /usr/lib/sysctl.d/50-default.conf sets kernel.sysrq=16 (sync only)
+# at boot, overriding the kernel compile-time default of 1.
+# Write a higher-priority override so REISUB works for emergency recovery.
+info "Writing /etc/sysctl.d/99-sysrq.conf (sudo)..."
+sudo tee /etc/sysctl.d/99-sysrq.conf > /dev/null <<'SYSCTL'
+# Enable all Magic SysRq keys (including REISUB safe reboot).
+# Overrides /usr/lib/sysctl.d/50-default.conf which restricts to 16 (sync only).
+kernel.sysrq = 1
+SYSCTL
+
 # ── Step 5: generate initramfs ────────────────────────────────────────────────
 info "Generating initramfs (sudo mkinitcpio -p $CONFIG)..."
 sudo mkinitcpio -p "$CONFIG"
@@ -110,6 +121,7 @@ info ""
 info "To remove this kernel later:"
 info "  sudo rm /boot/vmlinuz-$BOOT_SUFFIX /boot/initramfs-$BOOT_SUFFIX.img \\"
 info "          /boot/System.map-$BOOT_SUFFIX \\"
-info "          /etc/mkinitcpio.d/$CONFIG.preset /etc/mkinitcpio.d/$CONFIG.conf"
+info "          /etc/mkinitcpio.d/$CONFIG.preset /etc/mkinitcpio.d/$CONFIG.conf \\"
+info "          /etc/sysctl.d/99-sysrq.conf"
 info "  sudo rm -rf /lib/modules/$KVER/"
 info "  sudo grub-mkconfig -o /boot/grub/grub.cfg"
