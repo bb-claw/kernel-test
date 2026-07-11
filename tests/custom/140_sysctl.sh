@@ -54,9 +54,11 @@ fi
 # kernel.panic — read (must be a number)
 if [ -r /proc/sys/kernel/panic ]; then
     val=$(cat /proc/sys/kernel/panic)
-    printf '%s' "$val" | grep -qE '^-?[0-9]+$' \
-        && ok "kernel.panic = $val" \
-        || fail "kernel.panic not numeric (got: '$val')"
+    if printf '%s' "$val" | grep -qE '^-?[0-9]+$'; then
+        ok "kernel.panic = $val"
+    else
+        fail "kernel.panic not numeric (got: '$val')"
+    fi
 else
     skip "kernel.panic not readable"
 fi

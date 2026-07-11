@@ -28,7 +28,8 @@ else
     exit 0
 fi
 
-# ICMP echo — show ping output on failure for diagnosis
+# ICMP echo — Toybox ping uses SOCK_DGRAM (not raw); allow GID 0 via sysctl
+printf '0\t2147483647\n' > /proc/sys/net/ipv4/ping_group_range 2>/dev/null || true
 if ping -c1 -W2 127.0.0.1 >/dev/null 2>&1; then
     ok "ping 127.0.0.1"
 else

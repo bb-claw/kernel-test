@@ -39,16 +39,16 @@ else
 fi
 
 # Verify multiple small files (inode allocation path).
-# Fixed word list avoids $(( )) arithmetic expansion which loops forever in
-# Toybox sh 0.8.9 (same bug as 130_fork-exec).
-_inode_ok=1
-for _i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
-    printf '%d\n' "$_i" > "/tmp/kernel-test-inode-$$-$_i" \
-        || { fail "inode alloc failed at $_i"; _inode_ok=0; break; }
+# Fixed word list avoids $(( )) infinite loop (Toybox sh 0.8.9 bug).
+# Plain variable name (no leading _): Toybox sh parses $_x as $_ + literal x.
+inode_ok=1
+for fn in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
+    printf '%s\n' "$fn" > "/tmp/kernel-test-inode-$$-$fn" \
+        || { fail "inode alloc failed at $fn"; inode_ok=0; break; }
 done
-[ "$_inode_ok" -eq 1 ] && ok "tmpfs 20 small file allocations"
-for _i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
-    rm -f "/tmp/kernel-test-inode-$$-$_i"
+[ "$inode_ok" -eq 1 ] && ok "tmpfs 20 small file allocations"
+for fn in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
+    rm -f "/tmp/kernel-test-inode-$$-$fn"
 done
 
 rm -f "$TESTFILE"
