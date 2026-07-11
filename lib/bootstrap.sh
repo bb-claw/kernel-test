@@ -164,6 +164,21 @@ if [[ $missing -gt 0 ]]; then
     die "$missing required tool(s) still missing after bootstrap — see warnings above"
 fi
 
+# ── Git hooks ────────────────────────────────────────────────────────────────
+
+setup_hooks() {
+    local hooks_dir="$REPO_ROOT/.githooks"
+    if [[ -d $hooks_dir ]]; then
+        git -C "$REPO_ROOT" config core.hooksPath .githooks
+        info "Git hooks activated (core.hooksPath = .githooks)"
+    else
+        warn ".githooks/ not found — skipping hook setup"
+    fi
+}
+
+REPO_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || true)
+[[ -n $REPO_ROOT ]] && setup_hooks || warn "Not inside a git repo — skipping hook setup"
+
 # ── Done ─────────────────────────────────────────────────────────────────────
 
 info "Bootstrap complete. Suggested next steps:"

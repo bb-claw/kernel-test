@@ -33,6 +33,7 @@ read_kernel_makefile_version() {
     _pl=$( grep -m1 '^PATCHLEVEL[[:space:]]*='   "$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]')
     _sl=$( grep -m1 '^SUBLEVEL[[:space:]]*='     "$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]')
     _ev=$( grep -m1 '^EXTRAVERSION[[:space:]]*=' "$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]')
+    # shellcheck disable=SC2034  # read by caller (checkout.sh) after sourcing common.sh
     KMV_FULL="${_ver}.${_pl}.${_sl}${_ev}"
     if [[ ${_sl:-0} -eq 0 && $_ev == -rc* ]]; then
         KMV_TAG="v${_ver}.${_pl}${_ev}"

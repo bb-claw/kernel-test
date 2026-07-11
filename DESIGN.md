@@ -1,7 +1,7 @@
 # Design Document — kernel-test
 
 **Version:** 0.1  
-**Date:** 2026-07-09  
+**Date:** 2026-07-11  
 **Status:** Draft
 
 ---
@@ -18,9 +18,9 @@ a structured test report to the community.
 
 **In scope:**
 - Fetching the latest upstream -rc tag automatically
-- Building the kernel for x86_64 and i386 under four config profiles
+- Building the kernel for x86_64 and i386 under seven config profiles
 - Booting each build in QEMU/KVM with a minimal initramfs
-- Running a boot smoke test and user-supplied custom scripts inside the VM
+- Running a boot smoke test and functional kernel-path tests inside the VM (network, RNG, tmpfs stress, fork/exec, sysctl)
 - Writing a pass/fail report as local HTML and plain text
 
 **Out of scope (for now):**
@@ -64,26 +64,30 @@ Makefile  (make all / make fetch / make checkout / make info / make build / ...)
     │                         and build/.kernel-version
     │
     ├── make build   → lib/build.sh        (for each config × arch)
-    │                     make <config>        # generate .config
-    │                     make -j$(nproc)      # build bzImage (ccache)
+    │                     make <config>        # generate .config (rand500config: tinyconfig + 500 sampled =y lines)
+    │                     apply configs/<config>.config fragment if present
+    │                     timeout $BUILD_TIMEOUT make -j$(nproc) bzImage (ccache)
+    │                     write build/<config>-<arch>/build.status (PASS|FAIL|TIMEOUT)
     │
     ├── make initramfs → lib/initramfs.sh  (for each arch)
     │                     copy BusyBox static binary
-    │                     generate /init shell script
-    │                     copy tests/smoke.sh + tests/custom/*.sh
+    │                     generate /init shell script with > TEST RUN / < TEST PASS/FAIL markers
+    │                     copy tests/001_smoke.sh + tests/custom/NNN_*.sh (in filename order)
     │                     pack with cpio + gzip → initramfs-<arch>.cpio.gz
     │
     ├── make test    → lib/vm.sh           (for each config × arch)
     │                     qemu-system-<arch> -kernel bzImage -initrd initramfs.cpio.gz
     │                     capture serial → dmesg-<config>-<arch>.txt
     │                     detect: "BOOT_OK:" line = booted
-    │                     detect: "Kernel panic" / "BUG:" / "Oops:" = failure
+    │                     detect: "Kernel panic" / "Oops:" = failure
+    │                     count: "^< TEST PASS:" / "^< TEST FAIL:" lines
     │                     timeout: $TIMEOUT seconds (default 60)
     │
-    └── make report  → lib/report.sh
-                          aggregate all results
-                          write reports/<date>_<time>_<version>/summary.html
-                          write reports/<date>_<time>_<version>/summary.txt
+    └── make report  → lib/report.sh       (always runs — even after build/test failure)
+                          aggregate build.status + vm.status for all (config, arch)
+                          OVERALL=FAIL if any build!=PASS, boot!=PASS, or TESTS_FAIL>0
+                          copy kconfig-*, dmesg-*, rand-sampled-*, randdef-disabled-* into report dir
+                          write reports/<date>_<time>_<version>/summary.html + summary.txt
 ```
 
 ---
@@ -129,14 +133,20 @@ Each (config, arch) pair gets an isolated out-of-tree build directory:
 
 ```
 build/
-  defconfig-x86_64/
+  defconfig-x86_64/         # build.status, .config, dmesg.txt, vm.status
   defconfig-i386/
   tinyconfig-x86_64/
   tinyconfig-i386/
   allnoconfig-x86_64/
   allnoconfig-i386/
-  allmodconfig-x86_64/
+  rand500config-x86_64/     # also: rand-source.config, rand-sampled.config
+  rand500config-i386/
+  randdefconfig-x86_64/     # also: randdef-disabled.config
+  randdefconfig-i386/
+  allmodconfig-x86_64/      # build-only: build.log instead of dmesg.txt/vm.status
   allmodconfig-i386/
+  randconfig-x86_64/
+  randconfig-i386/
 ```
 
 Build command (x86_64 example):
@@ -158,10 +168,34 @@ kernel config target runs, then `make olddefconfig` resolves Kconfig dependencie
 This is used instead of `KCONFIG_ALLCONFIG` because some targets (e.g. `tinyconfig`)
 override that variable on the command line.
 
-**allmodconfig note:** `allmodconfig` is build-only — the resulting kernel is not
-booted (it is too large for the minimal initramfs). It exists purely to catch
-compilation errors. All other profiles (`defconfig`, `tinyconfig`, `allnoconfig`)
-are booted and tested.
+**Build-only configs (`BUILD_ONLY_CONFIGS`):** `allmodconfig` and `randconfig` are not booted.
+`allmodconfig` is too large for the minimal initramfs; `randconfig` may produce a kernel with
+unpredictable boot behavior — its value is in catching compile-time regressions.
+`randconfig` is constrained by `configs/randconfig.config` (`CONFIG_MODULES=n` + 5 heavy
+subsystems disabled) and subject to `BUILD_TIMEOUT`.
+
+**rand500config:** handled specially in `build.sh`:
+1. `make tinyconfig` — tiny, known-bootable base
+2. Generate a fresh `randconfig` in a temp dir; apply `configs/randconfig.config` constraints (no modules, heavy subsystems off); run `olddefconfig` to resolve; sample 500 `CONFIG_*=y` lines with `shuf -n 500`
+3. Append those to `.config`, then apply `configs/rand500config.config` (bootability fragment) last
+4. `make olddefconfig` — resolve all dependencies
+
+Saves `rand-source.config` (full constrained randconfig) and `rand-sampled.config` (the 500 sampled
+lines) in `build/rand500config-<arch>/` for inspection. The bootability fragment is applied last so
+TTY, serial console, initramfs, and ELF options always win over any conflicting random selection.
+The 500-line count compensates for dependency attrition: many options get disabled by `olddefconfig`
+when their prerequisites are absent in the tinyconfig base.
+
+**randdefconfig:** handled specially in `build.sh`:
+1. `make defconfig` — broad, coherent baseline
+2. Randomly disable 300 `=[ym]` options (`shuf -n 300 | sed 's/=[ym]$/=n/'`); append to `.config`
+3. Apply `configs/randdefconfig.config`: force heavy subsystems off (DRM, SOUND, STAGING, INFINIBAND, MEDIA_SUPPORT) and re-pin bootability options; run `olddefconfig`
+
+Saves `randdef-disabled.config` (the 300 disabled lines) in `build/randdefconfig-<arch>/`.
+Heavy subsystem force-off keeps build time reliably under 5 minutes on a 16-core machine.
+
+**BUILD_TIMEOUT:** applies only to the `bzImage` build step via GNU `timeout(1)`. If exceeded,
+`build.sh` exits 124 and writes `STATUS=TIMEOUT` to `build.status` (distinct from `STATUS=FAIL`).
 
 ### 4.3 Initramfs
 
@@ -170,30 +204,39 @@ The initramfs is built once per architecture (shared across config variants):
 ```
 initramfs-<arch>/
   bin/          # busybox + symlinks (sh, ls, cat, dmesg, ...)
-  dev/          # null, console, tty (mknod)
+  dev/          # null, console (mknod fallback if devtmpfs unavailable)
   proc/
   sys/
   tmp/
-  tests/        # smoke.sh + custom/*.sh
+  tests/        # 001_smoke.sh + custom/NNN_*.sh (all in filename order)
   init          # generated shell script (see below)
 ```
 
-`/init` script:
+`/init` script (runs tests in filename-sorted order, emits structured markers):
 ```sh
 #!/bin/sh
-mount -t proc none /proc
-mount -t sysfs none /sys
-mount -t devtmpfs none /dev
+mount -t proc     none /proc 2>/dev/null || true
+mount -t sysfs    none /sys  2>/dev/null || true
+mount -t devtmpfs none /dev  2>/dev/null || { mknod /dev/console ...; mknod /dev/null ...; }
 
 echo "BOOT_OK: kernel reached init"
 
 for t in /tests/*.sh; do
-    sh "$t" && echo "PASS: $t" || echo "FAIL: $t"
+    [ -f "$t" ] || continue
+    name=$(basename "$t" .sh)
+    echo "> TEST RUN: $name"
+    if sh "$t"; then
+        echo "< TEST PASS: $name"
+    else
+        echo "< TEST FAIL: $name"
+    fi
 done
 
 echo "TEST_DONE"
 reboot -f
 ```
+
+`vm.sh` counts `^< TEST PASS:` and `^< TEST FAIL:` lines to derive `TESTS_PASS` and `TESTS_FAIL`.
 
 The initramfs is packed:
 ```sh
@@ -223,49 +266,54 @@ would go to /dev/null instead of the capture file.
 
 i386 uses `qemu-system-i386` with `ARCH=i386` kernel and the same flags.
 
-**Success detection** (parsed from `$DMESG_FILE`):
-- `BOOT_OK:` line present → booted successfully
-- `TEST_DONE` line present → tests completed
+**Boot detection** (parsed from `$DMESG_FILE`):
+- `BOOT_OK:` line present → kernel reached `/init`
+- `Kernel panic` or `Oops:` → `BOOT_STATUS=FAIL`
+- QEMU exit 124 → timeout before reaching init
+- `TEST_DONE` line present → all test scripts completed
 
-**Failure detection:**
-- `Kernel panic` in output
-- `BUG:` or `Oops:` in output
-- QEMU exit code non-zero (including timeout)
+**Test counting:**
+- `^< TEST PASS: <name>` → increment `PASS_COUNT` (one per passing test script)
+- `^< TEST FAIL: <name>` → increment `FAIL_COUNT` (one per failing test script)
+- `TESTS_TOTAL = PASS_COUNT + FAIL_COUNT`
 
 ### 4.5 Report
 
-`lib/report.sh` reads result files written by the VM step and produces:
+`lib/report.sh` reads `build.status` and `vm.status` files written by earlier stages and
+always runs — even when build or test steps failed — so there is always an artifact to inspect.
+
+**OVERALL result logic:**
+- `OVERALL=FAIL` if any `build.status` has `STATUS != PASS`
+- `OVERALL=FAIL` if any `vm.status` has `BOOT != PASS` (and config is not build-only)
+- `OVERALL=FAIL` if any `vm.status` has `TESTS_FAIL > 0`
 
 **`summary.txt`** (plain text, suitable for mailing list):
 ```
 Linux v7.2-rc2 boot test report
-Repository: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
-Commit:     abc1234def567890abcdef1234567890abcdef12
-Host:       x86_64  |  Intel Core i9-13900K  |  65536 MiB
-Started:    2026-07-11T10:30:00Z
-Duration:   8m42s
+Repository: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Commit:     8cdeaa50eae8dad34885515f62559ee83e7e8dda
+Host:       x86_64  |  AMD Ryzen 7 5800H  |  31939 MiB
+Started:    2026-07-11T12:44:28Z
+Duration:   1m16s
 Result:     PASS
 
 Config           Arch     Build    Boot         Tests    Started   Dur      Notes
 ------           ----     -----    ----         -----    -------   ---      -----
-defconfig        x86_64   PASS     PASS         6/6      10:30:01  12s
-defconfig        i386     PASS     PASS         0/0      10:30:13  8s
-tinyconfig       x86_64   PASS     PASS         6/6      10:30:21  10s
-tinyconfig       i386     PASS     PASS         0/0      10:30:31  9s
-allnoconfig      x86_64   PASS     PASS         6/6      10:30:40  10s
-allnoconfig      i386     PASS     PASS         0/0      10:30:50  8s
-allmodconfig     x86_64   PASS     build-only   —        10:30:58  4m12s
-allmodconfig     i386     PASS     build-only   —        10:35:10  4m05s
+defconfig        x86_64   PASS     PASS         15/15    10:30:01  12s
+tinyconfig       x86_64   PASS     PASS         10/15    10:30:21  10s
+allnoconfig      x86_64   PASS     PASS         10/15    10:30:40  10s
+rand500config    x86_64   PASS     PASS         13/15    10:30:58  53s
+randdefconfig    x86_64   PASS     PASS         14/15    10:31:51  4m01s
+allmodconfig     x86_64   PASS     build-only   —        10:35:52  4m12s
+randconfig       x86_64   PASS     build-only   —        10:40:04  3m20s
 
-Full dmesg logs: reports/<run>/
+Report dir: reports/<run>/
 ```
 
-`Repository` and `Commit` are read from `git remote get-url origin` and
-`git rev-parse HEAD` on `KERNEL_TREE` at report generation time — unambiguous
-whether the run was against mainline or a stable tree.
+`Repository` and `Commit` are read from `git remote get-url origin` and `git rev-parse HEAD`
+at report generation time — unambiguous whether the run was against mainline or a stable tree.
 
-**`summary.html`** — same data in an HTML table with pass=green / fail=red styling,
-plus Repository and Commit fields in the header.
+**`summary.html`** — same data as an HTML table with pass=green / fail=red / timeout=red styling.
 
 ---
 
@@ -273,17 +321,25 @@ plus Repository and Commit fields in the header.
 
 ```
 reports/
-  2026-07-09_08-12-01_v6.15-rc2/
+  2026-07-11_12-44-28_v7.2-rc2/
     summary.html
     summary.txt
-    dmesg-defconfig-x86_64.txt
-    dmesg-defconfig-i386.txt
+    dmesg-defconfig-x86_64.txt          # serial console output per bootable variant
     dmesg-tinyconfig-x86_64.txt
-    dmesg-tinyconfig-i386.txt
     dmesg-allnoconfig-x86_64.txt
-    dmesg-allnoconfig-i386.txt
-    build-allmodconfig-x86_64.log
-    build-allmodconfig-i386.log
+    dmesg-rand500config-x86_64.txt
+    dmesg-randdefconfig-x86_64.txt
+    kconfig-defconfig-x86_64.config     # exact .config used for each build
+    kconfig-tinyconfig-x86_64.config
+    kconfig-allnoconfig-x86_64.config
+    kconfig-rand500config-x86_64.config
+    kconfig-randdefconfig-x86_64.config
+    kconfig-allmodconfig-x86_64.config
+    kconfig-randconfig-x86_64.config
+    rand-sampled-rand500config-x86_64.config      # the 500 randomly sampled lines
+    randdef-disabled-randdefconfig-x86_64.config  # the 300 randomly disabled lines
+    build-allmodconfig-x86_64.log       # build log (build-only configs only)
+    build-randconfig-x86_64.log
 ```
 
 Reports directory is gitignored. Users choose what to share publicly.
@@ -304,6 +360,8 @@ Reports directory is gitignored. Users choose what to share publicly.
 | `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
 | `make report` | Aggregate results into HTML and plain-text report |
+| `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
+| `make hooks` | Activate git pre-push hook only (`git config core.hooksPath .githooks`) |
 | `make clean` | Remove `build/` and `cache/` |
 | `make distclean` | Remove `build/`, `cache/`, and `reports/` |
 | `make help` | Print available targets and variables |
@@ -316,17 +374,18 @@ All variables have defaults and can be overridden on the command line:
 # Mainline rc
 make KERNEL_TREE=~/git/linux-stable                      # full pipeline, latest rc
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
-make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable       # always writes report
 make info KERNEL_TREE=~/git/linux-stable                 # show current version
 
 # Stable release
 make STABLE_RELEASE=7.1                                  # full pipeline, latest v7.1.x
 make checkout TAG=v7.1.3 STABLE_RELEASE=7.1              # pin exact stable tag
-make build initramfs test report NO_FETCH=1 STABLE_RELEASE=7.1
+make all NO_FETCH=1 STABLE_RELEASE=7.1
 
 # Scoped runs
-make KERNEL_TREE=~/git/linux-stable ARCHS=x86_64         # single arch
-make KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig    # single config
+make all NO_FETCH=1 ARCHS=x86_64                         # single arch
+make all NO_FETCH=1 CONFIGS=defconfig                    # single config
+make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64   # rand500config only
 make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 ```
 
@@ -338,8 +397,9 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 | `TAG` | _(none)_ | Tag or commit for `make checkout`; ignored by all other targets |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
 | `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
-| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig` | Space-separated config profiles |
+| `CONFIGS` | `tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
+| `BUILD_TIMEOUT` | `600` | bzImage build timeout in seconds; exit 124 → `STATUS=TIMEOUT` |
 | `REPORT_DIR` | `reports` | Directory for output reports |
 | `V` | `0` | Set to `1` for verbose build and VM output |
 

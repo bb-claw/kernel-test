@@ -1,0 +1,55 @@
+#!/bin/bash
+# Pre-push hook: shellcheck + executable-bit check on all shell scripts.
+# Installed by: make bootstrap  (git config core.hooksPath .githooks)
+set -euo pipefail
+
+PASS=0
+FAIL=1
+rc=0
+
+ok()   { printf '[pre-push] ok:   %s\n' "$*"; }
+fail() { printf '[pre-push] FAIL: %s\n' "$*"; rc=1; }
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# ── 1. shellcheck ─────────────────────────────────────────────────────────────
+
+if ! command -v shellcheck &>/dev/null; then
+    printf '[pre-push] SKIP: shellcheck not installed — run: make bootstrap\n'
+else
+    mapfile -t SH_FILES < <(git ls-files '*.sh' | sed "s|^|$REPO_ROOT/|")
+    if [[ ${#SH_FILES[@]} -eq 0 ]]; then
+        ok "no .sh files tracked"
+    else
+        if shellcheck --severity=warning "${SH_FILES[@]}"; then
+            ok "shellcheck (${#SH_FILES[@]} files)"
+        else
+            fail "shellcheck found issues — fix before pushing"
+        fi
+    fi
+fi
+
+# ── 2. Executable bit on test scripts ────────────────────────────────────────
+
+mapfile -t TEST_FILES < <(git ls-files 'tests/*.sh' 'tests/custom/*.sh' | sed "s|^|$REPO_ROOT/|")
+missing_x=()
+for f in "${TEST_FILES[@]}"; do
+    [[ -x $f ]] || missing_x+=("${f#$REPO_ROOT/}")
+done
+
+if [[ ${#missing_x[@]} -eq 0 ]]; then
+    ok "executable bit (${#TEST_FILES[@]} test scripts)"
+else
+    for f in "${missing_x[@]}"; do
+        fail "not executable: $f  (fix: chmod +x $f)"
+    done
+fi
+
+# ── Result ────────────────────────────────────────────────────────────────────
+
+if [[ $rc -eq 0 ]]; then
+    printf '[pre-push] all checks passed\n'
+else
+    printf '[pre-push] push blocked — fix the issues above\n'
+fi
+exit $rc

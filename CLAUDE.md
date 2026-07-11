@@ -15,10 +15,13 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** BusyBox static binary packed into a cpio initramfs
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386`
-- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`
-  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`
-  - Build-only (no VM boot): `allmodconfig` (image too large for the minimal initramfs)
-  - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT, ACPI) that stripped configs disable
+- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`
+  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `rand500config`, `randdefconfig`
+  - Build-only (no VM boot): `allmodconfig` (image too large), `randconfig` (unpredictable boot)
+  - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
+  - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes
+  - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems) and subject to `BUILD_TIMEOUT` (default 600 s); exits with `STATUS=TIMEOUT` if exceeded
+  - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT) that stripped configs disable
 
 ## Key files
 
@@ -32,27 +35,52 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
 | `lib/report.sh` | Collate results; write `summary.html` and `summary.txt` |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
-| `tests/smoke.sh` | Minimal boot smoke: did we reach init without a panic or oops? |
-| `tests/custom/*.sh` | User-provided test scripts (copy-in, run inside VM, check exit code) |
+| `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
+| `tests/custom/010_check-proc.sh` | `/proc` content: cpuinfo, meminfo, uptime, cmdline, filesystems |
+| `tests/custom/020_check-sysfs.sh` | `/sys` hierarchy: kernel, block, class presence |
+| `tests/custom/030_check-dmesg.sh` | dmesg output: kernel version string, no early oops/panic |
+| `tests/custom/040_check-devnodes.sh` | `/dev` nodes: null, zero, console, urandom presence |
+| `tests/custom/050_check-kernel.sh` | Kernel version format, UTS fields, `/proc/sys/kernel` |
+| `tests/custom/060_check-tmpfs.sh` | tmpfs write/read round-trip |
+| `tests/custom/070_check-proc-interrupts.sh` | `/proc/interrupts` readable and non-empty |
+| `tests/custom/080_check-slabinfo.sh` | `/proc/slabinfo` readable (CONFIG_SLUB_DEBUG) |
+| `tests/custom/090_check-clocksource.sh` | Active clocksource registered in dmesg |
+| `tests/custom/100_network-loopback.sh` | Bring up `lo`, ping `127.0.0.1` (CONFIG_NET + CONFIG_INET) |
+| `tests/custom/110_tmpfs-stress.sh` | 1 MiB write/read/verify + 20-file inode allocation on tmpfs |
+| `tests/custom/120_rng.sh` | `/dev/urandom` read at 512 B and 4096 B (CRNG output path) |
+| `tests/custom/130_fork-exec.sh` | fork/exec, exit-code propagation, 20 sequential forks, SIGCHLD |
+| `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
+| `.githooks/pre-push` | Pre-push hook: shellcheck on all `.sh` files + executable-bit check on test scripts |
+| `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
+| `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
+| `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off) |
 
 ## Conventions
 
+- Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); the pre-push hook runs shellcheck and checks test script executable bits
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
-- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `REPORT_DIR`, `V`) are the public API
+- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `REPORT_DIR`, `V`) are the public API
+- `BUILD_TIMEOUT` (default 600 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`
+- `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually
 - `KERNEL_TREE` is normalized at parse time: leading `~` is expanded and the path is made absolute via `$(abspath ...)`; pass `~/git/linux` or `../linux` freely
 - When `STABLE_RELEASE` is set, `KERNEL_TREE` is overridden to `STABLE_KERNEL_TREE` (default: `~/git/linux-stable`) before normalization — all downstream scripts (build, test, report) automatically use the stable tree
 - Lib scripts are invoked as subprocesses by the Makefile (not sourced), so they must not rely on shell state from each other
 - VM serial output is captured live to `build/<config>-<arch>/dmesg.txt` and copied to `reports/<date>_<time>_<version>/dmesg-<config>-<arch>.txt` by the report step
+- Test output protocol inside the VM: `/init` emits `> TEST RUN: <name>` before each script and `< TEST PASS: <name>` / `< TEST FAIL: <name>` after; `vm.sh` counts those markers for TESTS_PASS/TESTS_FAIL
+- Report `OVERALL` is `FAIL` when any build status is non-PASS, any boot fails, or any test fails (`TESTS_FAIL > 0`)
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
 - Never write to the kernel source tree; all build artifacts go under `build/`
 
 ## How to add a test
 
-1. Create `tests/custom/my-test.sh` (exit 0 = pass, non-zero = fail)
-2. The harness automatically discovers and runs all `tests/custom/*.sh` inside the VM
-3. Output lines starting with `PASS:` or `FAIL:` are parsed into the report table
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `150_my-test.sh`)
+   — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
+2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
+3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM
+4. Serial output: `/init` wraps each test with `> TEST RUN: NNN_my-test` and `< TEST PASS/FAIL: NNN_my-test`
+5. `vm.sh` counts `< TEST PASS:` / `< TEST FAIL:` lines; counts feed the report table and OVERALL result
 
 ## How to add a new config profile
 
@@ -100,7 +128,7 @@ make checkout TAG=v7.1.3 STABLE_RELEASE=7.1               # stable
 
 **Skip fetch entirely:**
 ```sh
-make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux
+make all NO_FETCH=1 KERNEL_TREE=~/git/linux
 ```
 
 ## Running locally
@@ -109,7 +137,7 @@ make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux
 # Show what is currently checked out
 make info KERNEL_TREE=~/git/linux-stable
 
-# Full pipeline — latest mainline rc
+# Full pipeline — latest mainline rc (report always written even on failure)
 make KERNEL_TREE=~/git/linux-stable
 
 # Full pipeline — latest stable release (e.g. v7.1.x)
@@ -117,14 +145,20 @@ make STABLE_RELEASE=7.1
 
 # Pin a specific version, then test without re-fetching
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
-make build initramfs test report NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
 
-# Partial run (single config and arch)
-make build initramfs test report NO_FETCH=1 \
-    KERNEL_TREE=~/git/linux-stable CONFIGS=defconfig ARCHS=x86_64
+# Partial run — single config and arch
+make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
+
+# Test rand500config only (tinyconfig + 500 random options, bootable)
+make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
 
 # Verbose mode
 make V=1 KERNEL_TREE=~/git/linux-stable
 ```
+
+Always use `make all NO_FETCH=1` (not `make build initramfs test report`) — `all` guarantees
+the report is written even when build or test steps fail; individual target chaining stops at
+the first failure.
 
 All output goes to stdout; the final report path is printed by the `report` target.
