@@ -86,10 +86,10 @@ KUNIT_PASS=0
 KUNIT_FAIL=0
 
 if [[ -s $DMESG_FILE ]]; then
-    grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1    || true
-    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1      || true
-    grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1       || true
-    grep -q  "^TEST_DONE$"  "$DMESG_FILE" 2>/dev/null && TEST_DONE=1  || true
+    grep -q  "BOOT_OK:"   "$DMESG_FILE" 2>/dev/null && BOOT_OK=1   || true
+    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1   || true
+    grep -q  "Oops:"      "$DMESG_FILE" 2>/dev/null && OOPS=1      || true
+    grep -qF "TEST_DONE"  "$DMESG_FILE" 2>/dev/null && TEST_DONE=1 || true
 
     # Count test-level results from the init wrapper markers.
     # grep -c exits 1 on zero matches — use "|| true" not "|| echo 0" (avoids "0\n0").

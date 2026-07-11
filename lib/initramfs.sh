@@ -57,6 +57,7 @@ int main(void) {
     write(1, "BOOT_OK: kernel reached init\n", 29);
     write(1, "TEST_DONE\n", 10);
     sync();
+    sleep(1); /* let emulated UART drain before QEMU exits */
     reboot(RB_AUTOBOOT);
     return 0;
 }
@@ -103,6 +104,8 @@ for t in /tests/*.sh; do
 done
 
 echo "TEST_DONE"
+# Brief pause so the emulated UART drains to the serial file before QEMU exits.
+sleep 1
 reboot -f
 EOF
     chmod +x "$STAGE/init"
