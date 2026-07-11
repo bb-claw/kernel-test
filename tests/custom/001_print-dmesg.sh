@@ -10,6 +10,5 @@ info() { printf 'info: %s\n' "$*"; }
 info ">>> dmesg >>>"
 dmesg
 info "<<< dmesg <<<"
-ok "dmesg succesfuly run
 
 [ $_fails -eq 0 ] || exit 1

@@ -11,11 +11,11 @@ if ! command -v dmesg >/dev/null 2>&1; then
     exit 0
 fi
 
-if dmesg | grep -qi 'clocksource.*registered\|registered.*clocksource\|using clocksource'; then
-    cs=$(dmesg | grep -i 'clocksource' | tail -1 | sed 's/.*\[.*\] //')
+if dmesg | grep -qi 'Switched to clocksource\|clocksource.*registered\|registered.*clocksource\|using clocksource'; then
+    cs=$(dmesg | grep -i 'Switched to clocksource\|clocksource.*registered\|using clocksource' | tail -1)
     ok "clocksource active: $cs"
 else
-    fail "no clocksource registration found in dmesg"
+    fail "no active clocksource found in dmesg"
 fi
 
 [ $_fails -eq 0 ] || exit 1
