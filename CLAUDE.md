@@ -52,6 +52,7 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/130_fork-exec.sh` | fork/exec, exit-code propagation, 20 sequential forks, SIGCHLD |
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all `.sh` files + executable-bit check on test scripts |
+| `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
 | `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off) |

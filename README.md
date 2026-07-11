@@ -132,6 +132,8 @@ kernel-test/
 ├── .githooks/
 │   └── pre-push          # shellcheck + executable-bit check (activate: make hooks)
 ├── configs/              # Config fragments applied after kernel config targets
+├── tests/hardware/
+│   └── verify.sh         # Real-hardware verification for localconfig (run on the booted laptop)
 ├── reports/              # Output directory for test reports
 └── cache/                # ccache directory (gitignored)
 ```
