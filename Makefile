@@ -18,8 +18,9 @@ endif
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
 ARCHS       ?= x86_64 i386
-CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig
-TIMEOUT     ?= 60
+CONFIGS     ?= tinyconfig allnoconfig defconfig allmodconfig randconfig
+TIMEOUT       ?= 60
+BUILD_TIMEOUT ?= 600
 REPORT_DIR  ?= reports
 V           ?= 0
 NO_FETCH    ?= 0
@@ -36,8 +37,9 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 
 # Configs that are built but not booted:
 #   allmodconfig — kernel too large for the minimal initramfs
+#   randconfig   — random config, boot result unpredictable; value is in build coverage
 # tinyconfig, allnoconfig, and defconfig are bootable via configs/<name>.config fragments.
-BUILD_ONLY_CONFIGS := allmodconfig
+BUILD_ONLY_CONFIGS := allmodconfig randconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
@@ -52,7 +54,7 @@ endif
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT REPORT_DIR V RUN_STAMP NO_FETCH
+export TIMEOUT BUILD_TIMEOUT REPORT_DIR V RUN_STAMP NO_FETCH
 export STABLE_RELEASE STABLE_KERNEL_TREE
 
 # ── Shell ─────────────────────────────────────────────────────────────────────

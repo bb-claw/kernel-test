@@ -9,6 +9,7 @@ CONFIG=${1:?usage: build.sh <config> <arch>}
 ARCH=${2:?usage: build.sh <config> <arch>}
 
 require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
+BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
 
 # Catch an empty/missing working tree early with a clear message
 [[ -f "$KERNEL_TREE/Makefile" ]] || \
@@ -33,8 +34,14 @@ command -v ccache &>/dev/null || die "ccache not found in PATH"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FRAGMENT="$SCRIPT_DIR/configs/${CONFIG}.config"
 
-# Kernel make wrapper — respects V for verbosity
+# Kernel make wrapper — respects V for verbosity.
+# Pass --timed as the first argument to enforce BUILD_TIMEOUT on the make call.
 kmake() {
+    local pfx=()
+    if [[ ${1:-} == --timed ]]; then
+        shift
+        [[ $BUILD_TIMEOUT -gt 0 ]] && pfx=( timeout "$BUILD_TIMEOUT" )
+    fi
     local make_args=(
         -C "$KERNEL_TREE"
         O="$PWD/$OUT_DIR"
@@ -45,9 +52,9 @@ kmake() {
         "$@"
     )
     if [[ ${V:-0} == 1 ]]; then
-        make "${make_args[@]}" 2>&1 | tee -a "$LOG_FILE"
+        "${pfx[@]}" make "${make_args[@]}" 2>&1 | tee -a "$LOG_FILE"
     else
-        make "${make_args[@]}" >> "$LOG_FILE" 2>&1
+        "${pfx[@]}" make "${make_args[@]}" >> "$LOG_FILE" 2>&1
     fi
 }
 
@@ -77,10 +84,19 @@ if [[ -f $FRAGMENT ]]; then
 fi
 
 # Step 2: build bzImage
-# For allmodconfig the goal is catching compilation errors; bzImage covers the
-# core kernel. Module compilation is a future improvement (takes much longer).
-info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
-if ! kmake -j"$NPROC" bzImage; then
+# For build-only configs (allmodconfig, randconfig) the goal is catching
+# compilation errors; bzImage covers the core kernel.
+[[ $BUILD_TIMEOUT -gt 0 ]] \
+    && info "Building bzImage ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH" \
+    || info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
+BUILD_EXIT=0
+kmake --timed -j"$NPROC" bzImage || BUILD_EXIT=$?
+if [[ $BUILD_EXIT -ne 0 ]]; then
+    if [[ $BUILD_EXIT -eq 124 ]]; then
+        printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
+        die "Build timed out after ${BUILD_TIMEOUT}s: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" > "$STATUS_FILE"
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"

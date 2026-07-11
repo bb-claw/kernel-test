@@ -181,7 +181,7 @@ HTMLHEAD
     for row in "${ROWS[@]}"; do
         IFS='|' read -r cfg arc bld bt tp tt ts dur fr <<< "$row"
 
-        bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL ]] && echo fail || echo unk; } )
+        bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
         bt_cls=$(  [[ $bt  == PASS ]] && echo pass || { [[ $bt  == FAIL ]] && echo fail || { [[ $bt == build-only ]] && echo skip || echo unk; }; } )
         [[ $tp == '-' ]] && tests_cell='<td>—</td>' || tests_cell="<td>${tp}/${tt}</td>"
 
