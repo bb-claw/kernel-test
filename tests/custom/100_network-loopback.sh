@@ -22,19 +22,26 @@ else
     exit 0
 fi
 
-# Verify loopback address is present
-if ip addr show lo 2>/dev/null | grep -q '127\.0\.0\.1' \
-        || ifconfig lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
+# Verify loopback address is present.
+# Avoid \<newline> continuation — Toybox sh 0.8.9 passes an empty word to grep.
+_has_addr=0
+if ip addr show lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
+    _has_addr=1
+elif ifconfig lo 2>/dev/null | grep -q '127\.0\.0\.1'; then
+    _has_addr=1
+fi
+if [ "$_has_addr" -eq 1 ]; then
     ok "loopback has 127.0.0.1"
 else
     skip "127.0.0.1 not configured on lo (CONFIG_INET may be off)"
     exit 0
 fi
 
-# ICMP echo
+# ICMP echo — show ping output on failure for diagnosis
 if ping -c1 -W2 127.0.0.1 >/dev/null 2>&1; then
     ok "ping 127.0.0.1"
 else
+    ping -c1 -W2 127.0.0.1 2>&1 | head -5 || true
     fail "ping 127.0.0.1 failed"
 fi
 

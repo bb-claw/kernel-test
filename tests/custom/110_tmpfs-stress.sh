@@ -38,15 +38,18 @@ else
     fail "tmpfs 1MiB read failed"
 fi
 
-# Verify multiple small files (inode allocation path)
-i=0
-while [ $i -lt 20 ]; do
-    printf '%d\n' "$i" > "/tmp/kernel-test-inode-$$-$i" || { fail "inode alloc failed at $i"; break; }
-    i=$((i + 1))
+# Verify multiple small files (inode allocation path).
+# Fixed word list avoids $(( )) arithmetic expansion which loops forever in
+# Toybox sh 0.8.9 (same bug as 130_fork-exec).
+_inode_ok=1
+for _i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
+    printf '%d\n' "$_i" > "/tmp/kernel-test-inode-$$-$_i" \
+        || { fail "inode alloc failed at $_i"; _inode_ok=0; break; }
 done
-[ $i -eq 20 ] && ok "tmpfs 20 small file allocations"
-i=0
-while [ $i -lt 20 ]; do rm -f "/tmp/kernel-test-inode-$$-$i"; i=$((i + 1)); done
+[ "$_inode_ok" -eq 1 ] && ok "tmpfs 20 small file allocations"
+for _i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
+    rm -f "/tmp/kernel-test-inode-$$-$_i"
+done
 
 rm -f "$TESTFILE"
 [ $_fails -eq 0 ] || exit 1

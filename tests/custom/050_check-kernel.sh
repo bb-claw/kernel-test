@@ -17,10 +17,12 @@ fi
 # osrelease — version string must start with a digit
 if [ -r "$SYSCTL/osrelease" ]; then
     ver=$(cat "$SYSCTL/osrelease")
-    case "$ver" in
-        [0-9]*) ok "osrelease=$ver" ;;
-        *)      fail "osrelease malformed: $ver" ;;
-    esac
+    # Toybox sh 0.8.9 case patterns with [0-9] are buggy; use grep instead.
+    if printf '%s\n' "$ver" | grep -q '^[0-9]'; then
+        ok "osrelease=$ver"
+    else
+        fail "osrelease malformed: $ver"
+    fi
 else
     fail "$SYSCTL/osrelease not readable"
 fi
