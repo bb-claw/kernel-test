@@ -78,6 +78,7 @@ timeout "$TIMEOUT" "$QEMU" \
 BOOT_OK=0
 PANIC=0
 OOPS=0
+TEST_DONE=0
 PASS_COUNT=0
 FAIL_COUNT=0
 TESTS_TOTAL=0
@@ -85,9 +86,10 @@ KUNIT_PASS=0
 KUNIT_FAIL=0
 
 if [[ -s $DMESG_FILE ]]; then
-    grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1 || true
-    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1   || true
-    grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1    || true
+    grep -q  "BOOT_OK:"     "$DMESG_FILE" 2>/dev/null && BOOT_OK=1    || true
+    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1      || true
+    grep -q  "Oops:"        "$DMESG_FILE" 2>/dev/null && OOPS=1       || true
+    grep -q  "^TEST_DONE$"  "$DMESG_FILE" 2>/dev/null && TEST_DONE=1  || true
 
     # Count test-level results from the init wrapper markers.
     # grep -c exits 1 on zero matches — use "|| true" not "|| echo 0" (avoids "0\n0").
@@ -112,8 +114,13 @@ fi
 # ── Determine overall result ──────────────────────────────────────────────────
 
 if [[ $BOOT_OK -eq 1 && $PANIC -eq 0 && $OOPS -eq 0 ]]; then
-    BOOT_STATUS=PASS
-    FAIL_REASON=''
+    if [[ $TEST_DONE -eq 0 ]]; then
+        BOOT_STATUS=FAIL
+        FAIL_REASON="Init started but TEST_DONE not reached — VM may have crashed mid-test"
+    else
+        BOOT_STATUS=PASS
+        FAIL_REASON=''
+    fi
 else
     BOOT_STATUS=FAIL
     if   [[ $PANIC -eq 1 ]]; then
@@ -131,6 +138,7 @@ fi
 
 {
     printf 'BOOT=%s\n'        "$BOOT_STATUS"
+    printf 'TEST_DONE=%d\n'   "$TEST_DONE"
     printf 'TESTS_TOTAL=%d\n' "$TESTS_TOTAL"
     printf 'TESTS_PASS=%d\n'  "$PASS_COUNT"
     printf 'TESTS_FAIL=%d\n'  "$FAIL_COUNT"

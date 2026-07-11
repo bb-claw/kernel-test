@@ -105,6 +105,32 @@ sudo mkinitcpio -p "$CONFIG"
 info "Updating GRUB (sudo grub-mkconfig)..."
 sudo grub-mkconfig -o /boot/grub/grub.cfg
 
+# ── Step 7: sanity checks ────────────────────────────────────────────────────
+SANITY_FAIL=0
+
+if [[ -f "/boot/initramfs-$BOOT_SUFFIX.img" ]]; then
+    info "OK  /boot/initramfs-$BOOT_SUFFIX.img"
+else
+    warn "MISSING  /boot/initramfs-$BOOT_SUFFIX.img — mkinitcpio may have failed"
+    SANITY_FAIL=1
+fi
+
+if [[ -f "/boot/vmlinuz-$BOOT_SUFFIX" ]]; then
+    info "OK  /boot/vmlinuz-$BOOT_SUFFIX"
+else
+    warn "MISSING  /boot/vmlinuz-$BOOT_SUFFIX"
+    SANITY_FAIL=1
+fi
+
+if grep -q "vmlinuz-$BOOT_SUFFIX" /boot/grub/grub.cfg 2>/dev/null; then
+    info "OK  vmlinuz-$BOOT_SUFFIX found in grub.cfg"
+else
+    warn "NOT FOUND in grub.cfg — grub-mkconfig may have failed or boot suffix changed"
+    SANITY_FAIL=1
+fi
+
+[[ $SANITY_FAIL -ne 0 ]] && warn "One or more sanity checks failed — review output above before rebooting"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 info "Install complete: $CONFIG / $ARCH  ($KVER)"
 info ""

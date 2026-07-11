@@ -101,6 +101,8 @@ for config in $CONFIGS; do
             cp "$out/dmesg.txt" "$RUN_DIR/dmesg-${config}-${arch}.txt"
         [[ -f "$out/build.log" ]] && \
             cp "$out/build.log" "$RUN_DIR/build-${config}-${arch}.log"
+        [[ -f "$out/qemu.log" ]] && \
+            cp "$out/qemu.log"  "$RUN_DIR/qemu-${config}-${arch}.log"
         [[ -f "$out/.config" ]] && \
             cp "$out/.config" "$RUN_DIR/kconfig-${config}-${arch}.config"
         [[ -f "$out/rand-sampled.config" ]] && \
@@ -140,10 +142,26 @@ RAM=$(awk '/MemTotal/ {printf "%.0f MiB", $2/1024}' /proc/meminfo 2>/dev/null \
 REPO_URL=$(git -C "$KERNEL_TREE" remote get-url origin 2>/dev/null || echo 'unknown')
 COMMIT_SHA=$(git -C "$KERNEL_TREE" rev-parse HEAD 2>/dev/null || echo 'unknown')
 
+# ── LKML identity (from harness repo git config) ──────────────────────────────
+
+_git_name=$(git config user.name  2>/dev/null || echo '')
+_git_email=$(git config user.email 2>/dev/null || echo '')
+if [[ -n $_git_name && -n $_git_email ]]; then
+    TESTED_BY="$_git_name <$_git_email>"
+else
+    TESTED_BY=''
+fi
+ARCH_LIST=$(echo "$ARCHS" | tr ' ' '/')
+
 # ── summary.txt ───────────────────────────────────────────────────────────────
 
 TXT="$RUN_DIR/summary.txt"
 {
+    # LKML-ready header — paste into email Subject: / body as-is
+    printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
+    [[ -n $TESTED_BY ]] && printf 'Tested-by: %s\n' "$TESTED_BY"
+    printf '\n---\n\n'
+
     printf 'Linux %s boot test report\n' "$KERNEL_VERSION"
     printf 'Repository: %s\n' "$REPO_URL"
     printf 'Commit:     %s\n' "$COMMIT_SHA"
@@ -206,6 +224,7 @@ HTML="$RUN_DIR/summary.html"
   .fail { background: #f8d7da; color: #721c24; font-weight: bold; }
   .skip { background: #fff3cd; color: #856404; }
   .unk  { color: #888; }
+  td a  { color: inherit; text-decoration: none; border-bottom: 1px dotted #888; }
 </style>
 </head>
 <body>
@@ -225,6 +244,27 @@ HTMLHEAD
 
         bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
         bt_cls=$(  [[ $bt  == PASS ]] && echo pass || { [[ $bt  == FAIL ]] && echo fail || { [[ $bt == build-only ]] && echo skip || echo unk; }; } )
+
+        # Artifact links (relative paths — HTML lives in same dir)
+        build_log="build-${cfg}-${arc}.log"
+        dmesg_file="dmesg-${cfg}-${arc}.txt"
+        qemu_log="qemu-${cfg}-${arc}.log"
+        [[ -f "$RUN_DIR/$build_log" ]] \
+            && bld_cell="<td class=\"${bld_cls}\"><a href=\"${build_log}\">${bld}</a></td>" \
+            || bld_cell="<td class=\"${bld_cls}\">${bld}</td>"
+        if [[ $bt == build-only ]]; then
+            bt_cell="<td class=\"${bt_cls}\">${bt}</td>"
+        elif [[ -f "$RUN_DIR/$dmesg_file" ]]; then
+            bt_cell="<td class=\"${bt_cls}\"><a href=\"${dmesg_file}\">${bt}</a></td>"
+        else
+            bt_cell="<td class=\"${bt_cls}\">${bt}</td>"
+        fi
+        notes_content="${fr}"
+        [[ -f "$RUN_DIR/$qemu_log" ]] && {
+            [[ -n $notes_content ]] && notes_content="${notes_content} "
+            notes_content="${notes_content}<a href=\"${qemu_log}\">[qemu]</a>"
+        }
+
         if [[ $tp == '-' ]]; then
             tests_cell='<td>—</td>'
         else
@@ -238,8 +278,8 @@ HTMLHEAD
             tests_cell="<td>${tests_label}</td>"
         fi
 
-        printf '<tr><td>%s</td><td>%s</td><td class="%s">%s</td><td class="%s">%s</td>%s<td>%s</td><td>%s</td><td>%s</td></tr>\n' \
-            "$cfg" "$arc" "$bld_cls" "$bld" "$bt_cls" "$bt" "$tests_cell" "$ts" "$dur" "$fr"
+        printf '<tr><td>%s</td><td>%s</td>%s%s%s<td>%s</td><td>%s</td><td>%s</td></tr>\n' \
+            "$cfg" "$arc" "$bld_cell" "$bt_cell" "$tests_cell" "$ts" "$dur" "$notes_content"
     done
 
     printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">Config fingerprints (sha256)</h2>\n'
@@ -247,8 +287,9 @@ HTMLHEAD
     for crow in "${CONFIG_ROWS[@]}"; do
         IFS='|' read -r cfg arc sha file ok <<< "$crow"
         ok_cls=$( [[ $ok == OK ]] && echo pass || { [[ $ok == MISMATCH ]] && echo fail || echo unk; } )
+        [[ -f "$RUN_DIR/$file" ]] && file_cell="<a href=\"${file}\">${file}</a>" || file_cell="$file"
         printf '<tr><td>%s</td><td>%s</td><td style="font-size:.85em">%s</td><td class="%s">%s</td><td>%s</td></tr>\n' \
-            "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file"
+            "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file_cell"
     done
 
     cat << HTMLFOOT
