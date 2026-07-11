@@ -32,7 +32,7 @@ The goal is systematic community verification of each -rc kernel.
 | `Makefile` | Main entry point; defines all targets and variables; calls lib scripts |
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
-| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/` |
+| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write |
 | `lib/initramfs.sh` | Assemble BusyBox cpio initramfs; inject test scripts |
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
 | `lib/report.sh` | Collate results; write `summary.html` and `summary.txt` |
@@ -54,7 +54,7 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
-| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, grub-mkconfig |
+| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
@@ -68,7 +68,7 @@ The goal is systematic community verification of each -rc kernel.
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
-- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `REPORT_DIR`, `V`) are the public API
+- Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16
 - `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
 - `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually (chaining stops at the first failure)
 - `make test` skips any config whose `build.status` is not `STATUS=PASS` (prints `SKIP (build TIMEOUT/FAIL)`) so partial build failures don't block testing of the configs that did build
@@ -81,6 +81,8 @@ The goal is systematic community verification of each -rc kernel.
 - KUnit KTAP output: `vm.sh` detects `KTAP version` or `# Subtest:` in dmesg, then counts indented `ok`/`not ok` lines (`{4,}` spaces after timestamp); non-indented suite summaries are excluded to avoid double-counting; results stored as KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
 - Never write to the kernel source tree; all build artifacts go under `build/`
+- `build.status` stores `KERNEL_TREE=<absolute-path>` at build time; `install.sh` reads it back so `make install` always uses the correct tree without re-specifying `STABLE_RELEASE` or `KERNEL_TREE`
+- Run `make clean` when switching between kernel trees (mainline ↔ stable); generated headers in `build/` are tied to the tree they were built from — reusing them across trees causes subtle mismatches (e.g. `ucs_width_table.h` format differs between mainline and stable 7.1.x)
 
 ## How to add a test
 
@@ -152,6 +154,10 @@ make KERNEL_TREE=~/git/linux-stable
 # Full pipeline — latest stable release (e.g. v7.1.x)
 make STABLE_RELEASE=7.1
 
+# Stable release with older GCC (e.g. 7.1.x fails on GCC 16)
+make fetch STABLE_RELEASE=7.1
+make all NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
+
 # Pin a specific version, then test without re-fetching
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
 make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
@@ -164,6 +170,10 @@ make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
 
 # Verbose mode
 make V=1 KERNEL_TREE=~/git/linux-stable
+
+# Daily-driver localconfig build + install (stable tree)
+make build   NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
+make install            CONFIGS=localconfig ARCHS=x86_64   # KERNEL_TREE read from build.status automatically
 ```
 
 Always use `make all NO_FETCH=1` (not `make build initramfs test report`) — `all` guarantees

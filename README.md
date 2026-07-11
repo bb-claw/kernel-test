@@ -86,10 +86,28 @@ make STABLE_RELEASE=7.1
 # Pin the exact version
 make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
 make all NO_FETCH=1 STABLE_RELEASE=7.1
+
+# With older GCC (some stable releases fail on GCC 16 — use gcc-15)
+make fetch STABLE_RELEASE=7.1
+make all   NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
 ```
 
 `STABLE_RELEASE` automatically uses `~/git/linux-stable` and verifies the remote
 is a stable tree before fetching.
+
+> **Note:** run `make clean` when switching between kernel trees (mainline ↔ stable).
+> Build directories contain generated headers tied to the source tree they were built
+> from; reusing them across trees causes subtle mismatches.
+
+### Build and install a daily-driver kernel from a stable tree
+
+```sh
+# Build localconfig against stable 7.1.x (BUILD_TIMEOUT=0 — larger than defconfig)
+make build   NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
+
+# Install — KERNEL_TREE is read automatically from build.status; no need to repeat STABLE_RELEASE
+make install CONFIGS=localconfig ARCHS=x86_64
+```
 
 ### Quick single-arch build to verify a config
 
@@ -228,6 +246,7 @@ Override on the command line:
 | `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles (`localconfig` not in default list — requires `/proc/config.gz`) |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `BUILD_TIMEOUT` | `1200` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT`; set to `0` for localconfig |
+| `GCC` | `gcc` | Compiler binary; e.g. `GCC=gcc-15` for stable kernels that predate GCC 16 |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
 | `V` | `0` | Set to `1` for verbose output |
 

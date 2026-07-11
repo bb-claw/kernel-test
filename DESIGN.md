@@ -165,7 +165,16 @@ make -C "$KERNEL_TREE" O="$BUILD_DIR" ARCH=x86_64 -j"$(nproc)" bzImage
 ```
 
 `KBUILD_BUILD_TIMESTAMP` is set to a fixed value to make builds reproducible.
-`CC` and `HOSTCC` are set to `ccache gcc`; `CCACHE_DIR` points to `cache/`.
+`CC` and `HOSTCC` are set to `ccache $GCC` (defaults to `ccache gcc`; override with `GCC=gcc-15` for
+stable kernels that predate GCC 16); `CCACHE_DIR` points to `cache/`.
+
+**Kernel identity:** at the start of each build, `build.sh` prints the tag, short commit, and remote
+URL from the kernel tree (`git describe`, `git rev-parse --short HEAD`, `git remote get-url origin`).
+This is visible in build output and in the build log.
+
+**`build.status` stores `KERNEL_TREE=<absolute-path>`** in every write (PASS, FAIL, TIMEOUT, and all
+early config-fail paths). `install.sh` reads this value back so `make install` always uses the correct
+kernel tree without requiring the user to re-specify `STABLE_RELEASE` or `KERNEL_TREE`.
 
 **Config fragments:** `configs/<profile>.config` is appended to `.config` after the
 kernel config target runs, then `make olddefconfig` resolves Kconfig dependencies.
@@ -394,7 +403,7 @@ Reports directory is gitignored. Users choose what to share publicly.
 | `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
 | `make report` | Aggregate results into HTML and plain-text report |
-| `make install` | Install built kernel to `/boot`; modules, custom mkinitcpio conf + preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
+| `make install` | Install built kernel to `/boot`; reads `KERNEL_TREE` from `build.status`; modules, custom mkinitcpio conf (`MODULES=()`) + preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
 | `make hooks` | Activate git hooks only (`git config core.hooksPath .githooks`) |
 | `make clean` | Remove `build/` and `cache/` |
@@ -417,12 +426,25 @@ make STABLE_RELEASE=7.1                                  # full pipeline, latest
 make checkout TAG=v7.1.3 STABLE_RELEASE=7.1              # pin exact stable tag
 make all NO_FETCH=1 STABLE_RELEASE=7.1
 
+# Stable release with older GCC (e.g. 7.1.x fails on GCC 16)
+make fetch STABLE_RELEASE=7.1
+make all   NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
+
+# Daily-driver localconfig on stable tree — install reads KERNEL_TREE from build.status
+make build   NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
+make install            CONFIGS=localconfig ARCHS=x86_64
+
 # Scoped runs
 make all NO_FETCH=1 ARCHS=x86_64                         # single arch
 make all NO_FETCH=1 CONFIGS=defconfig                    # single config
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64   # rand500config only
 make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 ```
+
+> **Note:** always run `make clean` when switching between kernel trees (mainline ↔ stable).
+> Generated headers in `build/` are tied to the tree they were compiled from; reusing them
+> across trees causes subtle mismatches (e.g. `ucs_width_table.h` format differs between
+> mainline and stable 7.1.x).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -435,6 +457,7 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 | `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `BUILD_TIMEOUT` | `1200` | bzImage build timeout in seconds; exit 124 → `STATUS=TIMEOUT`; set to `0` for localconfig |
+| `GCC` | `gcc` | Compiler binary; e.g. `GCC=gcc-15` for stable kernels that predate GCC 16 |
 | `REPORT_DIR` | `reports` | Directory for output reports |
 | `V` | `0` | Set to `1` for verbose build and VM output |
 
