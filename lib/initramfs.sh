@@ -21,25 +21,64 @@ if file "$BUSYBOX" 2>/dev/null | grep -q 'dynamically linked'; then
     warn "busybox at $BUSYBOX is dynamically linked — shared libs will be missing in the VM"
 fi
 
+# ── Architecture compatibility check ─────────────────────────────────────────
+# If the host BusyBox ELF class doesn't match the target arch, fall back to a
+# minimal static C init that prints BOOT_OK/TEST_DONE and powers off.
+# Boot verification still works; test scripts are skipped (need a 32-bit shell).
+
+BB_BITS=$(file "$BUSYBOX" 2>/dev/null | grep -oE 'ELF [0-9]+-bit' | grep -oE '[0-9]+')
+BB_BITS=${BB_BITS:-64}
+MINIMAL_INIT=0
+if [[ $ARCH == i386 && $BB_BITS != 32 ]]; then
+    warn "BusyBox is ${BB_BITS}-bit but ARCH=i386 needs 32-bit — compiling minimal C init (boot-only, no test scripts)"
+    MINIMAL_INIT=1
+fi
+
 # ── Build staging tree ────────────────────────────────────────────────────────
 
 info "Building initramfs for $ARCH in $STAGE"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"/{bin,dev,proc,sys,tmp,tests}
 
-# BusyBox binary
-cp "$BUSYBOX" "$STAGE/bin/busybox"
-chmod +x "$STAGE/bin/busybox"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Symlinks for all BusyBox applets (skip 'busybox' itself — would overwrite the binary)
-"$BUSYBOX" --list | while read -r applet; do
-    [[ $applet == busybox ]] && continue
-    ln -sf busybox "$STAGE/bin/$applet"
-done
+if [[ $MINIMAL_INIT -eq 1 ]]; then
+    # ── Minimal static C /init (32-bit arch, 64-bit host BusyBox) ────────────
+    TMPC=$(mktemp /tmp/init-XXXXXX.c)
+    cat > "$TMPC" << 'CSRC'
+#include <sys/mount.h>
+#include <sys/reboot.h>
+#include <unistd.h>
 
-# ── /init script ─────────────────────────────────────────────────────────────
+int main(void) {
+    mount("proc",     "/proc", "proc",     0, (void *)0);
+    mount("sysfs",    "/sys",  "sysfs",    0, (void *)0);
+    mount("devtmpfs", "/dev",  "devtmpfs", 0, (void *)0);
+    write(1, "BOOT_OK: kernel reached init\n", 29);
+    write(1, "TEST_DONE\n", 10);
+    sync();
+    reboot(RB_POWER_OFF);
+    return 0;
+}
+CSRC
+    gcc -m32 -static -O2 -o "$STAGE/init" "$TMPC" \
+        || die "Failed to compile 32-bit init — is gcc-multilib installed? (run: make bootstrap)"
+    rm -f "$TMPC"
+    chmod +x "$STAGE/init"
 
-cat > "$STAGE/init" << 'EOF'
+else
+    # ── BusyBox /init with full test-script support ───────────────────────────
+
+    cp "$BUSYBOX" "$STAGE/bin/busybox"
+    chmod +x "$STAGE/bin/busybox"
+
+    # Symlinks for all BusyBox applets (skip 'busybox' itself — would overwrite the binary)
+    "$BUSYBOX" --list | while read -r applet; do
+        [[ $applet == busybox ]] && continue
+        ln -sf busybox "$STAGE/bin/$applet"
+    done
+
+    cat > "$STAGE/init" << 'EOF'
 #!/bin/sh
 
 mount -t proc     none /proc      2>/dev/null || true
@@ -64,23 +103,23 @@ done
 echo "TEST_DONE"
 poweroff -f
 EOF
-chmod +x "$STAGE/init"
+    chmod +x "$STAGE/init"
 
-# ── Copy tests ────────────────────────────────────────────────────────────────
+    # ── Copy tests ────────────────────────────────────────────────────────────
 
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+    if [[ -f "$SCRIPT_DIR/tests/smoke.sh" ]]; then
+        cp "$SCRIPT_DIR/tests/smoke.sh" "$STAGE/tests/"
+        chmod +x "$STAGE/tests/smoke.sh"
+    fi
 
-if [[ -f "$SCRIPT_DIR/tests/smoke.sh" ]]; then
-    cp "$SCRIPT_DIR/tests/smoke.sh" "$STAGE/tests/"
-    chmod +x "$STAGE/tests/smoke.sh"
-fi
+    if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then
+        for f in "$SCRIPT_DIR/tests/custom/"*.sh; do
+            [[ -f $f ]] || continue
+            cp "$f" "$STAGE/tests/"
+            chmod +x "$STAGE/tests/$(basename "$f")"
+        done
+    fi
 
-if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then
-    for f in "$SCRIPT_DIR/tests/custom/"*.sh; do
-        [[ -f $f ]] || continue
-        cp "$f" "$STAGE/tests/"
-        chmod +x "$STAGE/tests/$(basename "$f")"
-    done
 fi
 
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────
