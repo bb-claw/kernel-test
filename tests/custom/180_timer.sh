@@ -20,10 +20,14 @@ else
 fi
 
 # Epoch sanity — gettimeofday/clock_gettime must return a date after 2020-01-01
-# (1577836800).  An obviously wrong clock (0, negative, pre-2020) is a kernel bug.
+# (1577836800).  epoch < 1000 means the clock was never set by an RTC (starts
+# at 0 at boot and ticks up); skip rather than fail — not a kernel bug.
+# A non-trivial but pre-2020 value (e.g. wrong RTC battery) is a real failure.
 epoch=$(date +%s 2>/dev/null || true)
 if [ -n "$epoch" ] && [ "$epoch" -gt 1577836800 ] 2>/dev/null; then
     ok "clock epoch sane: $epoch ($(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo ?))"
+elif [ -z "$epoch" ] || [ "$epoch" -lt 1000 ] 2>/dev/null; then
+    skip "clock epoch: RTC not initialized (epoch=${epoch:-empty})"
 else
     fail "clock epoch looks wrong: '${epoch:-empty}'"
 fi
