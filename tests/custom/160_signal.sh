@@ -50,11 +50,6 @@ fi
 # Sets 'killed' to 1 if process was dead on the single check, 0 otherwise.
 _signal_test() {
     sig="$1"
-    # arm64 TCG: fork() faults in parent's full COW RSS, OOMing the 1G guest.
-    if [ "$ARCH" = "aarch64" ]; then
-        killed=0
-        return
-    fi
     ( while :; do :; done ) &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
@@ -65,34 +60,36 @@ _signal_test() {
     wait "$bg_pid" 2>/dev/null || true
 }
 
-# SIGTERM — default termination signal
-_signal_test -TERM
-if [ "$killed" -eq 1 ]; then
-    ok "SIGTERM (-TERM) terminates background process"
-elif [ "$ARCH" = "aarch64" ]; then
+# SIGTERM/SIGKILL/SIGUSR1 — arm64 TCG: fork() faults in parent's full COW RSS,
+# OOMing the 1G guest; skip all busyloop-based delivery tests on aarch64.
+if [ "$ARCH" = "aarch64" ]; then
     skip "SIGTERM: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
-else
-    skip "SIGTERM delivery unverifiable (process still alive on single check)"
-fi
-
-# SIGKILL — unblockable; kernel must enforce termination
-_signal_test -KILL
-if [ "$killed" -eq 1 ]; then
-    ok "SIGKILL (-KILL) terminates background process"
-elif [ "$ARCH" = "aarch64" ]; then
     skip "SIGKILL: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
-else
-    skip "SIGKILL delivery unverifiable (process still alive on single check)"
-fi
-
-# SIGUSR1 — user-defined signal, default action terminate
-_signal_test -USR1
-if [ "$killed" -eq 1 ]; then
-    ok "SIGUSR1 (-USR1) terminates background process"
-elif [ "$ARCH" = "aarch64" ]; then
     skip "SIGUSR1: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
 else
-    skip "SIGUSR1 delivery unverifiable (process still alive on single check)"
+    # SIGTERM — default termination signal
+    _signal_test -TERM
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGTERM (-TERM) terminates background process"
+    else
+        skip "SIGTERM delivery unverifiable (process still alive on single check)"
+    fi
+
+    # SIGKILL — unblockable; kernel must enforce termination
+    _signal_test -KILL
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGKILL (-KILL) terminates background process"
+    else
+        skip "SIGKILL delivery unverifiable (process still alive on single check)"
+    fi
+
+    # SIGUSR1 — user-defined signal, default action terminate
+    _signal_test -USR1
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGUSR1 (-USR1) terminates background process"
+    else
+        skip "SIGUSR1 delivery unverifiable (process still alive on single check)"
+    fi
 fi
 
 # /proc/self/status signal mask fields — kernel tracks per-thread signal state

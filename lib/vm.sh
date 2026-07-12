@@ -79,7 +79,7 @@ esac
 
 case "$ARCH" in
     arm64)
-        VM_TIMEOUT=$(( TIMEOUT * 3 ))
+        VM_TIMEOUT=$(( TIMEOUT * 2 ))
         VM_MEM=1G
         ;;
     *)
