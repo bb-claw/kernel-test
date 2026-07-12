@@ -12,8 +12,8 @@ Goal: systematic community verification of each -rc kernel.
 ```
 make all
   └─ lib/fetch.sh        discover + fetch latest tag (ls-remote, --depth=1)
-  └─ lib/build.sh        cross-compile kernel per (config × arch), ccache
-  └─ lib/initramfs.sh    BusyBox cpio initramfs + inject test scripts
+  └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
+  └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
   └─ lib/vm.sh           QEMU/KVM boot, capture serial, count TEST PASS/FAIL
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt
 ```
@@ -26,19 +26,20 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | Decision | Rationale |
 |---|---|
 | Bash only | No extra runtimes; any Linux box can run it |
-| BusyBox static binary | No package manager, no rootfs; just a cpio + the binary |
+| Toybox static binary | No package manager, no rootfs; just a cpio + the binary |
 | Out-of-tree builds `O=build/<config>-<arch>/` | Isolates artifacts; enables parallel builds |
 | ccache always on | 2–10× rebuild speedup; `cache/` is gitignored |
 | `make all` always runs `report` | Even on build/test failure there is always an artifact |
 | Config fragment via `cat >> .config + olddefconfig` | Reliable for all targets; `KCONFIG_ALLCONFIG` is overridden by `tinyconfig` internally |
 | `BUILD_TIMEOUT` wraps only bzImage step | Prevents runaway builds; exit 124 = TIMEOUT |
-| Sanitizers excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base (no infrastructure); excluding prevents false boot failures |
+| Sanitizers excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base; excluding prevents false boot failures |
+| build.sh deletes vm.status at start | Failed builds never show stale test results from a prior run |
 
-## Current State (2026-07-11)
+## Current State (2026-07-12)
 
-- **Architectures:** x86_64 (full tests), i386 (boot-only; BusyBox is 64-bit → C fallback init)
-- **Config profiles:** 7 (see config-profiles.md)
-- **Tests:** 16 total (1 smoke + 15 custom; see test-inventory.md)
+- **Architectures:** x86_64 + i386 — both run full 21/21 tests via Toybox (x86_64: toybox-x86_64, i386: toybox-i686)
+- **Config profiles:** 8 (defconfig tinyconfig allnoconfig kunitconfig allmodconfig randconfig rand500config randdefconfig)
+- **Tests:** 21 total (1 smoke + 20 custom; see test-inventory.md); next slot: 200_
 - **Kernel tree:** `~/git/linux-stable` (contains both mainline rc and stable point release tags)
 - **Current kernel:** v7.2-rc2
 
@@ -47,12 +48,13 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh common.sh checkout.sh
+├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh common.sh checkout.sh install.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   └── custom/     010_ … 140_ (15 scripts)
+│   └── custom/     001_print-dmesg + 010_ … 190_ (20 scripts)
 ├── configs/        *.config fragments applied post-config
-├── memory/         this directory
+├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
+├── memory/         this directory — persistent AI context
 ├── build/          gitignored; out-of-tree kernel builds + initramfs
 ├── cache/          gitignored; ccache
 └── reports/        gitignored; HTML + txt reports per run
@@ -62,25 +64,13 @@ kernel-test/
 
 ```
 build/<config>-<arch>/
-  build.status        STATUS=PASS|FAIL|TIMEOUT, START_TIME, DURATION, CONFIG_SHA256
+  build.status        STATUS=PASS|FAIL|TIMEOUT, START_TIME, DURATION, CONFIG_SHA256, KERNEL_TREE
   build.log           full make output
   .config             final resolved kernel config
-  vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, TESTS_TOTAL, FAIL_REASON
+  vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, FAILED_TESTS (space-sep list)
   dmesg.txt           serial console output
   rand-sampled.config rand500config only: the 500 sampled =y lines
   randdef-disabled.config randdefconfig only: the 300 randomly disabled lines
-```
-
-## Report Artifacts
-
-```
-reports/YYYY-MM-DD_HH-MM-SS_<version>/
-  summary.html / summary.txt
-  dmesg-<config>-<arch>.txt
-  kconfig-<config>-<arch>.config      SHA256-verified against build.status
-  rand-sampled-<config>-<arch>.config
-  randdef-disabled-<config>-<arch>.config
-  build-<config>-<arch>.log           build-only configs only
 ```
 
 ## Test Protocol (serial output)
@@ -96,4 +86,4 @@ TEST_DONE
 ```
 
 `vm.sh` counts `^< TEST PASS:` and `^< TEST FAIL:` lines.
-`OVERALL=FAIL` when any build ≠ PASS, any boot ≠ PASS, or TESTS_FAIL > 0.
+`OVERALL=FAIL` when any build ≠ PASS, any boot ≠ PASS, TESTS_FAIL > 0, KUNIT_FAIL > 0, or config MISMATCH.

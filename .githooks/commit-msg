@@ -1,0 +1,30 @@
+#!/bin/bash
+# Enforce conventional commit format: <type>[(<scope>)]: <description>
+# See https://www.conventionalcommits.org/
+# Installed by: make hooks  (git config core.hooksPath .githooks)
+set -euo pipefail
+
+msg_file="$1"
+subject=$(head -1 "$msg_file")
+
+# Allow git-generated messages (merge commits, reverts, fixups)
+if printf '%s\n' "$subject" | grep -qE '^(Merge|Revert) |^(fixup|squash)!'; then
+    exit 0
+fi
+
+types='feat|fix|docs|refactor|chore|ci|test|style|perf'
+if printf '%s\n' "$subject" | grep -qE "^(${types})(\([^)]+\))?!?: .+"; then
+    exit 0
+fi
+
+printf '[commit-msg] ERROR: commit message does not follow conventional commit format\n' >&2
+printf '\n' >&2
+printf '  Format:  <type>[(<scope>)]: <description>\n' >&2
+printf '  Types:   feat  fix  docs  refactor  chore  ci  test  style  perf\n' >&2
+printf '\n' >&2
+printf '  OK:      feat: add 200_my-test.sh\n' >&2
+printf '  OK:      fix(180_timer): skip sleep on Toybox i686\n' >&2
+printf '  OK:      chore(hooks): add commit-msg conventional format check\n' >&2
+printf '\n' >&2
+printf '  Got:     %s\n' "$subject" >&2
+exit 1

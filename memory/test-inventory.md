@@ -1,153 +1,77 @@
 # Test Inventory
 
-## How Tests Run
+## Execution
 
-All scripts in `tests/001_smoke.sh` and `tests/custom/NNN_*.sh` are copied into
-the initramfs at `/tests/` and run in filename-sorted order by `/init`.
-
-Protocol:
+Scripts in `tests/001_smoke.sh` and `tests/custom/NNN_*.sh` are copied into the initramfs
+and run in filename-sorted order by `/init`. Protocol:
 ```
-> TEST RUN: <name>     # before script runs
-< TEST PASS: <name>    # on exit 0
-< TEST FAIL: <name>    # on non-zero exit
+> TEST RUN: <name>     # before script
+< TEST PASS: <name>    # exit 0
+< TEST FAIL: <name>    # non-zero exit
 ```
-
-`vm.sh` counts `^< TEST PASS:` and `^< TEST FAIL:` lines → `TESTS_PASS`, `TESTS_FAIL`.
-
-Exit convention: `0` = pass, non-zero = fail. Use `ok:` / `FAIL:` / `skip:` prefixes
-for assertion output. `skip()` + `exit 0` to skip a test gracefully when the required
-config option is absent.
+`vm.sh` counts `< TEST PASS:` / `< TEST FAIL:` markers → `TESTS_PASS` / `TESTS_FAIL`.
 
 ---
 
 ## Test Scripts
 
-### 001_smoke.sh — Boot smoke
+| Script | What it exercises |
+|---|---|
+| `001_smoke` | Shell arithmetic, `/dev/null`, `/proc/version`, `/sys/kernel` |
+| `001_print-dmesg` | Diagnostic dmesg dump — always passes; useful for post-failure inspection |
+| `010_check-proc` | `/proc`: cpuinfo, meminfo, uptime, cmdline, filesystems |
+| `020_check-sysfs` | `/sys`: kernel, block, class/net hierarchy |
+| `030_check-dmesg` | dmesg: kernel version string, no early oops/panic |
+| `040_check-devnodes` | `/dev`: null, zero, console, urandom nodes |
+| `050_check-kernel` | `/proc/version` format, UTS fields, `/proc/sys/kernel` |
+| `060_check-tmpfs` | tmpfs write/read round-trip |
+| `070_check-proc-interrupts` | `/proc/interrupts` readable + non-empty |
+| `080_check-slabinfo` | `/proc/slabinfo` (CONFIG_SLUB_DEBUG; skip if absent) |
+| `090_check-clocksource` | Active clocksource in dmesg |
+| `100_network-loopback` | Bring up `lo`, ping 127.0.0.1 (CONFIG_NET + CONFIG_INET) |
+| `110_tmpfs-stress` | 1 MiB write/read/verify + 20-file inode allocation on tmpfs |
+| `120_rng` | `/dev/urandom` read at 512 B and 4096 B |
+| `130_fork-exec` | fork/exec, exit-code propagation, 20 sequential forks, SIGCHLD |
+| `140_sysctl` | `/proc/sys` read + write/restore of hostname, pid_max, panic, swappiness |
+| `150_mmap` | VMA table via `/proc/self/maps`: count, `[stack]`, anonymous; `/proc/meminfo` AnonPages |
+| `160_signal` | `kill -0` self; SIGTERM/SIGKILL/SIGUSR1 via `/bin/kill` + busyloop target; SigBlk/SigIgn/SigCgt fields |
+| `170_pipe` | Basic pipe data flow, 3-process pipeline, exit-code, 1 MiB transfer, 10 sequential writes |
+| `180_timer` | `/proc/uptime` readable + advancing, epoch sanity via `date +%s`, `sleep 0`, `/proc/timer_list` |
+| `190_scheduler` | `/proc/loadavg` format, `nice -n ±N` (setpriority), context switch counters, `/proc/schedstat` |
 
-Minimal: shell arithmetic, `/dev/null` writable, `/proc/version` contains "Linux", `/sys/kernel` present.
-Always runs. Failure = fundamental kernel or initramfs problem.
-
-### 010_check-proc.sh
-
-`/proc` content: `/proc/version`, `/proc/cpuinfo` (processor entry), `/proc/meminfo` (MemTotal > 0),
-`/proc/uptime`, `/proc/cmdline` (has `console=`), `/proc/filesystems`.
-Skip: procfs not mounted.
-
-### 020_check-sysfs.sh
-
-`/sys` hierarchy: `/sys/kernel`, `/sys/block`, `/sys/class/net` presence.
-Skip: sysfs not mounted.
-
-### 030_check-dmesg.sh
-
-dmesg output: kernel version string present, no early oops/panic lines.
-
-### 040_check-devnodes.sh
-
-`/dev` nodes: null, zero, console, urandom character devices present and correct type.
-
-### 050_check-kernel.sh
-
-Kernel version format in `/proc/version`, UTS fields, `/proc/sys/kernel` readability.
-
-### 060_check-tmpfs.sh
-
-Single-line tmpfs write/read round-trip via a temp file.
-Skip: tmpfs not in `/proc/mounts`.
-
-### 070_check-proc-interrupts.sh
-
-`/proc/interrupts` readable and non-empty (at least one interrupt line).
-Skip: not readable.
-
-### 080_check-slabinfo.sh
-
-`/proc/slabinfo` readable (requires `CONFIG_SLUB_DEBUG` or `CONFIG_SLAB_DEBUG`).
-Skip gracefully when not available (tinyconfig/allnoconfig).
-
-### 090_check-clocksource.sh
-
-Active clocksource registered in dmesg (pattern: `Switched to clocksource`,
-`clocksource.*registered`, `registered.*clocksource`, `using clocksource`).
-Skip: dmesg not readable.
-
-### 100_network-loopback.sh
-
-Bring up `lo` via `ip link set lo up` (or `ifconfig lo up`), verify `127.0.0.1` assigned,
-`ping -c1 -W2 127.0.0.1`.
-Skip: `/proc/net` and `/sys/class/net` both absent (CONFIG_NET off).
-**Kernel paths:** CONFIG_NET, CONFIG_INET, loopback driver, ICMP echo.
-
-### 110_tmpfs-stress.sh
-
-Write 1 MiB of zeros to tmpfs, verify size (1048576 bytes), read back, rm.
-Then allocate 20 small files and delete them (inode allocation path).
-Skip: tmpfs not mounted.
-**Kernel paths:** page cache, slab allocator, VFS write path, inode allocation.
-
-### 120_rng.sh
-
-Read 512 bytes from `/dev/urandom`, verify count. Read 4096 bytes (one page), verify count.
-Check `/dev/random` present.
-Skip: `/dev/urandom` not a character device.
-**Kernel paths:** CRNG output path, character device layer.
-
-### 130_fork-exec.sh
-
-Single fork+exec+wait (`sh -c 'exit 0'`), exit-code propagation (exit 42),
-20 sequential fork/exec cycles, subprocess stdout capture, background child + `wait`.
-Always runs (fork/exec is always available if init reached).
-**Kernel paths:** process creation, CoW, exec, PID allocator, SIGCHLD, scheduler wakeup.
-
-### 140_sysctl.sh
-
-Read `kernel.pid_max` (> 0), `kernel.hostname` (non-empty), write/restore `kernel.hostname`,
-read `kernel.panic` (numeric), read `vm.swappiness` (≤ 200).
-Skip: `/proc/sys` not present.
-**Kernel paths:** sysctl interface, kernel parameter subsystem.
+Next available slot: **200_** — 21 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
-## Per-Config Coverage
+## Config Coverage (typical)
 
-| Test | defconfig | tinyconfig | allnoconfig | rand500config | randdefconfig |
+| Group | defconfig | tinyconfig | allnoconfig | rand500 | randdef |
 |---|---|---|---|---|---|
-| 001_smoke | PASS | PASS | PASS | PASS | PASS |
-| 010–050 | PASS | skip/PASS | skip/PASS | varies | PASS |
-| 060 tmpfs | PASS | PASS | PASS | PASS | PASS |
-| 070–090 | PASS | skip | skip | varies | PASS |
+| 001–050 | PASS | PASS/skip | PASS/skip | varies | PASS |
+| 060–090 | PASS | skip | skip | varies | PASS |
 | 100 network | PASS | skip | skip | varies | PASS |
-| 110 tmpfs-stress | PASS | PASS | PASS | PASS | PASS |
-| 120 rng | PASS | PASS | PASS | PASS | PASS |
-| 130 fork-exec | PASS | PASS | PASS | PASS | PASS |
+| 110–130 | PASS | PASS | PASS | PASS | PASS |
 | 140 sysctl | PASS | skip | skip | varies | PASS |
+| 150–190 | PASS | PASS/skip | PASS/skip | varies | PASS |
 
-`varies` = depends on which 500 options were randomly sampled.
+`varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 
 ---
 
 ## How to Add a Test
 
-1. Create `tests/custom/NNN_name.sh` — next available slot is **150_**
-2. Leave gaps: 010, 020, … so new tests can be inserted without renaming
-3. Make executable: `chmod +x tests/custom/150_name.sh`
-4. Pattern:
+1. Create `tests/custom/200_name.sh` (next slot) — make executable: `chmod +x`
+2. Pattern:
 ```sh
 #!/bin/sh
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
-# Guard: skip if prerequisite absent
-if [ ! -f /some/file ]; then
-    skip "prerequisite missing"
-    exit 0
-fi
-
-[ -r /path ] && ok "path readable" || fail "path not readable"
-
-[ $_fails -eq 0 ] || exit 1
+[ -r /some/file ] || { skip "not available"; exit 0; }
+[ -r /path ] && ok "readable" || fail "not readable"
+[ $fails -eq 0 ] || exit 1
 ```
-5. Update `memory/test-inventory.md` with the new entry
-6. Update DESIGN.md example test count in the summary.txt sample
+3. Avoid Toybox sh pitfalls — see `memory/code-quality.md`
+4. Update this file and `CLAUDE.md` Key files table

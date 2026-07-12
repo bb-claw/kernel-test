@@ -38,6 +38,7 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/report.sh` | Collate results; write `summary.html`, `summary.txt`, and `summary.mail.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table; `summary.mail.txt` contains only the preamble lines; `summary.html` shows an Overall pass/fail badge and a linked file-list section; config MISMATCH sets `OVERALL=FAIL`; `FAILED_TESTS` from `vm.status` appears in the Notes column (text: `failed: name1, name2`; HTML: red-highlighted); exits with code 1 when `OVERALL=FAIL` |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
 | `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
+| `tests/custom/001_print-dmesg.sh` | Full dmesg dump to serial console — runs early so kernel messages appear before other tests; always passes |
 | `tests/custom/010_check-proc.sh` | `/proc` content: cpuinfo, meminfo, uptime, cmdline, filesystems |
 | `tests/custom/020_check-sysfs.sh` | `/sys` hierarchy: kernel, block, class presence |
 | `tests/custom/030_check-dmesg.sh` | dmesg output: kernel version string, no early oops/panic |
@@ -106,12 +107,72 @@ in `configs/<profile>.config`; if present, it is appended to `.config` after the
 kernel config target runs and `make olddefconfig` resolves dependencies. If absent,
 the kernel config target's output is used as-is.
 
+## Branch workflow
+
+All changes go through a pull request — no direct commits to `main`.
+
+**Branch naming** — `<type>/<kebab-description>`:
+- `feat/190-scheduler-test`
+- `fix/180-timer-i386-sleep`
+- `docs/update-readme-clone-url`
+- `chore/branch-workflow`
+
+**Commit messages** — conventional commits, enforced by `.githooks/commit-msg`:
+```
+<type>[(<scope>)]: <description>
+```
+Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
+
+**Merging strategy** — always **merge commits** (GitHub "Create a merge commit"):
+- Never squash or rebase; the branch history is the record of how the work evolved
+- PR title = the merge commit subject, so it must also follow conventional commit format
+- Branch protection on `main`: PRs required, force-push disabled
+
+**PR checklist** (in `.github/PULL_REQUEST_TEMPLATE.md`):
+- What changed (one sentence)
+- Type checkbox
+- Test run checkbox (`make all NO_FETCH=1` on affected configs)
+- Toybox sh pitfalls acknowledged
+
+**Before opening a PR**, at minimum run:
+```sh
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+```
+For new or changed tests, run the full suite:
+```sh
+make all NO_FETCH=1 ARCHS="x86_64 i386"
+```
+
+## Memory file update triggers
+
+Keep `memory/*.md` in sync with the code. The pre-push hook enforces coverage for test
+scripts; the table below covers everything else.
+
+| When you… | Update these memory files |
+|---|---|
+| Add a test script | `memory/test-inventory.md` (new row in table, update next slot) · `memory/project.md` (test count + directory listing) · `CLAUDE.md` Key files table (new row) |
+| Remove a test script | `memory/test-inventory.md` (remove row) · `memory/project.md` (test count) · `CLAUDE.md` Key files table (remove row) |
+| Add or remove a config profile | `memory/config-profiles.md` · `memory/project.md` (profile count) |
+| Change a Makefile variable (default, name, purpose) | `memory/workflows.md` |
+| Change build, fetch, or test pipeline behaviour | `memory/workflows.md` · `memory/project.md` |
+| Discover a new Toybox sh bug or workaround | `memory/code-quality.md` (Toybox pitfalls list) |
+| Change a git hook or quality gate | `memory/code-quality.md` (hooks table) |
+| Change architecture or fundamental design | `memory/project.md` |
+
+The pre-push hook enforces:
+- Every `tests/custom/*.sh` and `tests/001_smoke.sh` name must appear in `memory/test-inventory.md`
+- Every `memory/*.md` (except `MEMORY.md`) must be ≤ 150 lines
+
+The pre-commit hook enforces:
+- When a new test script is staged, `memory/test-inventory.md` must also be staged
+
 ## What NOT to do
 
 - Do not introduce Python, Go, or any non-shell dependency without explicit user approval
 - Do not require root for the build steps; only QEMU may need it (use KVM group membership)
 - Do not hardcode paths — use `KERNEL_TREE`, `BUILD_DIR`, `REPORT_DIR` variables
 - Do not commit build artifacts, ccache, or reports — all are gitignored
+- Do not commit directly to `main` — always open a PR from a feature branch
 
 ## Fetching kernels
 

@@ -44,6 +44,60 @@ else
     done
 fi
 
+# ── 3. Test script coverage in memory/test-inventory.md ──────────────────────
+# Every tracked test script must have its name appear in the inventory.
+# This catches tests added in a prior commit that were never documented.
+
+INVENTORY="$REPO_ROOT/memory/test-inventory.md"
+undoc=()
+while IFS= read -r f; do
+    name=$(basename "$f" .sh)
+    grep -q "$name" "$INVENTORY" 2>/dev/null || undoc+=("$name")
+done < <(git ls-files 'tests/custom/*.sh' 'tests/001_smoke.sh')
+if [[ ${#undoc[@]} -eq 0 ]]; then
+    n=$(git ls-files 'tests/custom/*.sh' 'tests/001_smoke.sh' | wc -l | tr -d ' ')
+    ok "test-inventory coverage ($n test scripts documented)"
+else
+    for name in "${undoc[@]}"; do
+        fail "undocumented test: $name — add entry to memory/test-inventory.md"
+    done
+fi
+
+# ── 4. Design doc (feat/* and fix/* branches) ────────────────────────────────
+# Every feat/ and fix/ branch must have docs/<slug>-plan.md before the first push.
+
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+case "$BRANCH" in
+    feat/*|fix/*)
+        SLUG="${BRANCH#*/}"
+        PLAN="docs/${SLUG}-plan.md"
+        if [[ -f "$REPO_ROOT/$PLAN" ]]; then
+            ok "design doc: $PLAN"
+        else
+            fail "design doc missing: $PLAN  (create from docs/plan-template.md)"
+        fi
+        ;;
+    *)
+        # chore, docs, refactor — design doc is convention, not enforced
+        ;;
+esac
+
+# ── 5. Memory file sizes ──────────────────────────────────────────────────────
+# memory/*.md (except MEMORY.md index) must stay ≤ 150 lines.
+
+mem_over=()
+while IFS= read -r f; do
+    lines=$(wc -l < "$f")
+    [[ $lines -le 150 ]] || mem_over+=("${f#$REPO_ROOT/}:${lines}")
+done < <(find "$REPO_ROOT/memory" -name '*.md' ! -name 'MEMORY.md' 2>/dev/null | sort)
+if [[ ${#mem_over[@]} -eq 0 ]]; then
+    ok "memory file sizes (all ≤ 150 lines)"
+else
+    for entry in "${mem_over[@]}"; do
+        fail "memory file too long: ${entry%:*} (${entry##*:} lines, limit 150)"
+    done
+fi
+
 # ── Result ────────────────────────────────────────────────────────────────────
 
 if [[ $rc -eq 0 ]]; then
