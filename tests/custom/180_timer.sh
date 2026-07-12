@@ -1,0 +1,64 @@
+#!/bin/sh
+# Timer and clock subsystem: uptime, epoch sanity, monotonic advance, hrtimers.
+# Exercises kernel timekeeping: ktime, jiffies, hrtimer infrastructure, nanosleep.
+
+fails=0
+ok()   { printf 'ok: %s\n' "$*"; }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
+skip() { printf 'skip: %s\n' "$*"; }
+
+# /proc/uptime — kernel uptime since boot (requires CONFIG_PROC_FS)
+if [ -r /proc/uptime ]; then
+    uptime_s=$(cut -d' ' -f1 /proc/uptime)
+    if [ -n "$uptime_s" ]; then
+        ok "/proc/uptime readable: ${uptime_s}s"
+    else
+        fail "/proc/uptime: empty value"
+    fi
+else
+    skip "/proc/uptime not available"
+fi
+
+# Epoch sanity — gettimeofday/clock_gettime must return a date after 2020-01-01
+# (1577836800).  An obviously wrong clock (0, negative, pre-2020) is a kernel bug.
+epoch=$(date +%s 2>/dev/null || true)
+if [ -n "$epoch" ] && [ "$epoch" -gt 1577836800 ] 2>/dev/null; then
+    ok "clock epoch sane: $epoch ($(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo ?))"
+else
+    fail "clock epoch looks wrong: '${epoch:-empty}'"
+fi
+
+# Uptime advances — read /proc/uptime integer-seconds before and after a 1 s sleep;
+# confirms jiffies/hrtimers are ticking and nanosleep delivers the wakeup.
+if [ -r /proc/uptime ]; then
+    before=$(cut -d'.' -f1 /proc/uptime)
+    sleep 1
+    after=$(cut -d'.' -f1 /proc/uptime)
+    if [ "$after" -gt "$before" ] 2>/dev/null; then
+        ok "/proc/uptime advances after 1 s sleep: ${before}s → ${after}s"
+    else
+        fail "/proc/uptime did not advance (before=${before} after=${after})"
+    fi
+else
+    skip "/proc/uptime advance check: not available"
+fi
+
+# sleep 0 — zero-duration nanosleep must succeed immediately
+if sleep 0; then
+    ok "sleep 0: zero-duration nanosleep exits successfully"
+else
+    fail "sleep 0 failed"
+fi
+
+# /proc/timer_list — hrtimer and tick_device infrastructure (CONFIG_POSIX_TIMERS)
+if [ -r /proc/timer_list ]; then
+    if grep -qE 'jiffies|tick_device|clockevents|timer_bases' /proc/timer_list 2>/dev/null; then
+        ok "/proc/timer_list: hrtimer infrastructure present"
+    else
+        fail "/proc/timer_list: unexpected or empty content"
+    fi
+else
+    skip "/proc/timer_list not available (CONFIG_POSIX_TIMERS may be disabled)"
+fi
+
+[ $fails -eq 0 ] || exit 1
