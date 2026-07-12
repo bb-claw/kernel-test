@@ -37,9 +37,9 @@ else
 fi
 
 # Large data through pipe — exceeds the default 64 KiB kernel pipe buffer,
-# forcing the writer to block and the reader to wake it; tests the full
-# pipe blocking/wakeup path in the kernel
-bytes=$(dd if=/dev/zero bs=4096 count=256 2>/dev/null | wc -c)
+# forcing the writer to block and the reader to wake it.
+# head -c instead of dd: Toybox 0.8.9 dd does not parse key=value options.
+bytes=$(head -c 1048576 /dev/zero | wc -c)
 if [ "$bytes" -eq 1048576 ]; then
     ok "1 MiB through pipe intact ($bytes bytes)"
 else
