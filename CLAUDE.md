@@ -17,7 +17,7 @@ The goal is systematic community verification of each -rc kernel.
 - **Architectures:** `x86_64` and `i386` (default); `arm64` opt-in via `ARCHS="x86_64 i386 arm64"` (requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`, installed by `make bootstrap`)
 - **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
   - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `rand500config`, `randdefconfig`, `localconfig`
-  - Build-only (no VM boot): `allmodconfig` (image too large), `randconfig` (unpredictable boot)
+  - Build-only (no VM boot): `allmodconfig` (boot impractical: sanitizers + built-in self-tests take 100+ s, modules not in initramfs), `randconfig` (unpredictable boot)
   - `kunitconfig` — uses `defconfig` as base + `configs/kunitconfig.config` fragment (CONFIG_KUNIT + core test suites); not a kernel make target, special-cased in `build.sh`; KUnit emits KTAP to serial console; `vm.sh` strips ANSI color codes then parses `ok`/`not ok` lines and records KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
   - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
   - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes

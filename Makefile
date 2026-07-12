@@ -39,7 +39,7 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
     || echo unknown)
 
 # Configs that are built but not booted:
-#   allmodconfig — kernel too large for the minimal initramfs
+#   allmodconfig — boot impractical: sanitizers + built-in self-tests take 100+ s; modules not in initramfs
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
 # tinyconfig, allnoconfig, defconfig, and rand500config are bootable via configs/<name>.config fragments.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig
@@ -188,7 +188,7 @@ initramfs:
 	exit $$rc
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
-# BUILD_ONLY_CONFIGS are excluded (currently: allmodconfig).
+# BUILD_ONLY_CONFIGS are excluded (allmodconfig, randconfig).
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach a,$(ARCHS),build/initramfs-$(a).cpio.gz)

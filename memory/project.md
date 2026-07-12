@@ -15,7 +15,8 @@ make all
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
-  └─ lib/report.sh       aggregate status files → summary.html + summary.txt
+  └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline
+  └─ lib/diff.sh         compare two report dirs for per-test regressions/fixes; invoked by report.sh + make diff
 ```
 
 All user-facing commands go through `make`. Makefile exports env vars; lib scripts
@@ -48,7 +49,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh common.sh checkout.sh install.sh
+├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
@@ -69,6 +70,14 @@ build/<config>-<arch>/
   .config             final resolved kernel config
   vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, KUNIT_PASS, KUNIT_FAIL, FAILED_TESTS (space-sep list)
   dmesg.txt           serial console output
+```
+
+Report dir per run (`reports/<date>_<version>/`):
+```
+  summary.txt / summary.html / summary.mail.txt
+  vmstatus-<config>-<arch>.txt   copy of vm.status — used by lib/diff.sh for cross-run comparison
+  diff-prev.txt                  auto-diff vs previous run (if vmstatus files exist)
+  diff-baseline.txt              auto-diff vs pinned baseline (if reports/baseline symlink set)
   rand-sampled.config rand500config only: the 500 sampled =y lines
   randdef-disabled.config randdefconfig only: the 300 randomly disabled lines
 ```
