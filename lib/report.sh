@@ -246,7 +246,7 @@ HTML="$RUN_DIR/summary.html"
   .fail { background: #f8d7da; color: #721c24; font-weight: bold; }
   .skip { background: #fff3cd; color: #856404; }
   .unk  { color: #888; }
-  td a  { color: inherit; text-decoration: none; border-bottom: 1px dotted #888; }
+  td a  { color: #0066cc; text-decoration: underline; }
 </style>
 </head>
 <body>
