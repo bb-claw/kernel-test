@@ -58,6 +58,11 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `tests/custom/180_timer.sh` | Timer/clock subsystem: `/proc/uptime` readable and advancing, epoch sanity via `date +%s`, `sleep 0` nanosleep, `/proc/timer_list` hrtimer infrastructure |
 | `tests/custom/190_scheduler.sh` | CFS scheduler: `/proc/loadavg` format, `nice -n 10` and `nice -n -5` (setpriority syscall), `/proc/self/status` context switch counters, `/proc/schedstat` per-CPU stats |
+| `tests/custom/200_inotify.sh` | inotify subsystem: `/proc/sys/fs/inotify` limit knobs (max_queued_events, max_user_instances, max_user_watches) |
+| `tests/custom/210_futex.sh` | Futex: `/proc/sys/kernel/futex_private_hash_size` (kernel 6.x+, CONFIG_FUTEX); `/proc/sys/kernel/sem` |
+| `tests/custom/220_proc-net.sh` | /proc/net: `/proc/net/dev` interface table, `/proc/net/sockstat` socket counters, `/proc/net/protocols` |
+| `tests/custom/230_bind-mount.sh` | Bind mounts: `mount --bind` on initramfs rootfs dirs, alias file visibility, `/proc/mounts` entry, umount cleanup |
+| `tests/custom/240_cgroups.sh` | cgroups v2: `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts; new test script → `memory/test-inventory.md` must also be staged |
 | `.githooks/commit-msg` | Commit-msg hook: enforces conventional commit format `<type>[(<scope>)]: <desc>` |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts; test-inventory coverage; design doc required on `feat/*`/`fix/*` branches; memory file sizes (≤ 150 lines); `awk` banned in VM test scripts |

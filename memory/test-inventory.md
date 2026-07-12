@@ -38,8 +38,13 @@ and run in filename-sorted order by `/init`. Protocol:
 | `170_pipe` | Basic pipe data flow, 3-process pipeline, exit-code, 1 MiB transfer, 10 sequential writes |
 | `180_timer` | `/proc/uptime` readable + advancing, epoch sanity via `date +%s`, `sleep 0`, `/proc/timer_list` |
 | `190_scheduler` | `/proc/loadavg` format, `nice -n ±N` (setpriority), context switch counters, `/proc/schedstat` |
+| `200_inotify` | `/proc/sys/fs/inotify/max_{queued_events,user_instances,user_watches}` (CONFIG_INOTIFY_USER) |
+| `210_futex` | `/proc/sys/kernel/futex_private_hash_size` (CONFIG_FUTEX, kernel 6.x+); `/proc/sys/kernel/sem` |
+| `220_proc-net` | `/proc/net/dev`, `/proc/net/sockstat`, `/proc/net/protocols`, `/proc/net/if_inet6` |
+| `230_bind-mount` | `mount --bind` rootfs dirs; file visible at alias; `/proc/mounts` entry; umount cleanup |
+| `240_cgroups` | `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` (v2 only) |
 
-Next available slot: **200_** — 21 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **250_** — 26 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
