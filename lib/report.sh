@@ -80,14 +80,15 @@ for config in $CONFIGS; do
             tests_total=$(read_status "$out/vm.status" TESTS_TOTAL)
             kunit_pass=$(read_status  "$out/vm.status" KUNIT_PASS)
             kunit_fail=$(read_status  "$out/vm.status" KUNIT_FAIL)
-            fail_reason=$(read_status "$out/vm.status" FAIL_REASON)
-            vm_start=$(read_status    "$out/vm.status" START_TIME)
+            fail_reason=$(read_status    "$out/vm.status" FAIL_REASON)
+            failed_tests=$(read_status  "$out/vm.status" FAILED_TESTS)
+            vm_start=$(read_status      "$out/vm.status" START_TIME)
             vm_dur=$(read_status      "$out/vm.status" DURATION)
             started=$(fmt_time "$vm_start")
             duration=$(fmt_dur  "$vm_dur")
         else
             boot='?'; tests_pass='?'; tests_fail='0'; tests_total='?'
-            kunit_pass='0'; kunit_fail='0'; fail_reason=''
+            kunit_pass='0'; kunit_fail='0'; fail_reason=''; failed_tests=''
             started='?'; duration='?'
         fi
 
@@ -121,7 +122,7 @@ for config in $CONFIGS; do
         [[ $config_verify != MISMATCH ]] || OVERALL=FAIL
         CONFIG_ROWS+=("$config|$arch|${config_sha256:-unknown}|$config_file|$config_verify")
 
-        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason")
+        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason|${failed_tests:-}")
     done
 done
 
@@ -183,7 +184,7 @@ TXT="$RUN_DIR/summary.txt"
         ------ ---- ----- ---- ----- ------- --- -----
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
         if [[ $tp == '-' ]]; then
             tests_col='—'
         else
@@ -195,8 +196,10 @@ TXT="$RUN_DIR/summary.txt"
                 tests_col="${tp}/${tt}"
             fi
         fi
+        notes="${fr}"
+        [[ -n $ftests ]] && notes="${notes:+$notes | }failed: ${ftests// /, }"
         printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
-            "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$fr"
+            "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$notes"
     done
 
     printf '\nConfig fingerprints (sha256):\n'
@@ -265,7 +268,7 @@ overall_cls=$( [[ $OVERALL == PASS ]] && echo pass || echo fail )
 HTMLHEAD
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
 
         bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
         bt_cls=$(  [[ $bt  == PASS ]] && echo pass || { [[ $bt  == FAIL ]] && echo fail || { [[ $bt == build-only ]] && echo skip || echo unk; }; } )
@@ -289,6 +292,10 @@ HTMLHEAD
             [[ -n $notes_content ]] && notes_content="${notes_content} "
             notes_content="${notes_content}<a href=\"${qemu_log}\">[qemu]</a>"
         }
+        if [[ -n $ftests ]]; then
+            [[ -n $notes_content ]] && notes_content="${notes_content} "
+            notes_content="${notes_content}<span class=\"fail\">failed: ${ftests// /, }</span>"
+        fi
 
         if [[ $tp == '-' ]]; then
             tests_cell='<td>—</td>'
@@ -326,7 +333,7 @@ HTMLHEAD
     printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">All report files</h2>\n'
     printf '<table>\n<tr><th>Config</th><th>Arch</th><th>dmesg</th><th>build log</th><th>QEMU log</th><th>kconfig</th><th>Extras</th></tr>\n'
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
         _dmesg="dmesg-${cfg}-${arc}.txt"
         _blog="build-${cfg}-${arc}.log"
         _qlog="qemu-${cfg}-${arc}.log"

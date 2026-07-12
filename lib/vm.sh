@@ -98,6 +98,10 @@ if [[ -s $DMESG_FILE ]]; then
     PASS_COUNT=${PASS_COUNT:-0}
     FAIL_COUNT=${FAIL_COUNT:-0}
     TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
+    # Space-separated list of failed test names for reporting
+    FAILED_TESTS=$(grep "^< TEST FAIL:" "$DMESG_FILE" 2>/dev/null \
+        | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
+    FAILED_TESTS=${FAILED_TESTS:-}
 
     # Count KUnit KTAP results.
     # Individual test lines are indented (4+ spaces after the timestamp);
@@ -146,7 +150,8 @@ fi
     printf 'KUNIT_FAIL=%d\n'  "$KUNIT_FAIL"
     printf 'START_TIME=%s\n'  "$VM_START_TIME"
     printf 'DURATION=%d\n'    "$(( $(date -u +%s) - VM_START_EPOCH ))"
-    [[ -n $FAIL_REASON ]] && printf 'FAIL_REASON=%s\n' "$FAIL_REASON"
+    [[ -n $FAIL_REASON    ]] && printf 'FAIL_REASON=%s\n'    "$FAIL_REASON"
+    [[ -n $FAILED_TESTS   ]] && printf 'FAILED_TESTS=%s\n'   "$FAILED_TESTS"
 } > "$STATUS_FILE"
 
 # ── Report result ─────────────────────────────────────────────────────────────
@@ -169,6 +174,9 @@ if [[ $BOOT_STATUS == PASS ]]; then
         else
             warn "PARTIAL  $CONFIG / $ARCH — booted, but ${KUNIT_FAIL} kunit test(s) failed"
         fi
+        for _ft in $FAILED_TESTS; do
+            warn "  FAIL: $_ft"
+        done
         exit 1
     fi
 else
