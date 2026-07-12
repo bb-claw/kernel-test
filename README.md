@@ -155,7 +155,8 @@ kernel-test/
 │   │   ├── 140_sysctl.sh
 │   │   ├── 150_mmap.sh
 │   │   ├── 160_signal.sh
-│   │   └── 170_pipe.sh
+│   │   ├── 170_pipe.sh
+│   │   └── 180_timer.sh
 │   └── hardware/
 │       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/
@@ -293,13 +294,13 @@ prefixes for per-assertion output. The `/init` runner wraps each script with str
 markers that `vm.sh` counts:
 
 ```
-> TEST RUN: 180_my-test
+> TEST RUN: 190_my-test
 ok: something worked
 FAIL: something broke
-< TEST FAIL: 180_my-test
+< TEST FAIL: 190_my-test
 ```
 
-Example: `tests/custom/180_my-test.sh`
+Example: `tests/custom/190_my-test.sh`
 ```sh
 #!/bin/sh
 fails=0
