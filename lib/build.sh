@@ -148,10 +148,16 @@ elif [[ $CONFIG == kunitconfig ]]; then
 elif [[ $CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.
-    [[ $ARCH == x86_64 ]] || \
+    if [[ $ARCH != x86_64 ]]; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=0\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$KERNEL_TREE" > "$STATUS_FILE"
         die "localconfig is only supported for x86_64 (sources /proc/config.gz from the running host kernel)"
-    [[ -r /proc/config.gz ]] || \
+    fi
+    if [[ ! -r /proc/config.gz ]]; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=0\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$KERNEL_TREE" > "$STATUS_FILE"
         die "localconfig requires /proc/config.gz — enable CONFIG_IKCONFIG_PROC in your running kernel"
+    fi
     zcat /proc/config.gz > "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
