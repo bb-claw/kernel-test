@@ -39,7 +39,7 @@ fi
 # /proc/self/status — context switch counters written by the scheduler
 for field in voluntary_ctxt_switches nonvoluntary_ctxt_switches; do
     if grep -q "^${field}:" /proc/self/status 2>/dev/null; then
-        val=$(grep "^${field}:" /proc/self/status | awk '{print $2}')
+        val=$(grep "^${field}:" /proc/self/status | cut -f2)
         if [ -n "$val" ]; then
             ok "/proc/self/status: $field = $val"
         else

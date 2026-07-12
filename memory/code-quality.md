@@ -8,7 +8,7 @@
 |---|---|---|
 | `pre-commit` | every commit | shellcheck on staged `.sh` files; executable bit on staged `tests/**/*.sh`; guard against staged `build/` `cache/` `reports/` |
 | `commit-msg` | every commit | conventional commit format: `<type>[(<scope>)]: <desc>` |
-| `pre-push` | every push | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh`; design doc check on `feat/*`/`fix/*` branches; memory file size (≤ 150 lines) |
+| `pre-push` | every push | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh`; test-inventory coverage; design doc on `feat/*`/`fix/*` branches; memory file size (≤ 150 lines); `awk` ban in VM test scripts |
 
 Skip in emergencies only: `git commit --no-verify` / `git push --no-verify`
 
@@ -56,6 +56,8 @@ Examples:
 - **`sleep N` on i386** → Toybox i686 sleep exits non-zero; guard with `if sleep N; then ... else skip ...; fi`
 - **`$(( ))` in while loops** → OOM in 512 MB VM; use `for i in 1 2 3 ... 20` instead
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
+- **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
+- **`tr`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `sed 's/old/new/g'` for character substitution or `grep -o` for character filtering.
 
 ---
 
