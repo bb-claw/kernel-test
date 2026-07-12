@@ -25,6 +25,7 @@ GCC           ?= gcc
 REPORT_DIR    ?= reports
 V             ?= 0
 NO_FETCH      ?= 0
+NO_BUILD      ?= 0
 TOYBOX_VERSION ?= 0.8.9
 
 # ── Internal variables ─────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ endif
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH
+export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE
 export TOYBOX_VERSION
 
@@ -162,6 +163,9 @@ endif
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
 # allmodconfig is included here (build only, not booted).
 build:
+ifeq ($(NO_BUILD),1)
+	@echo "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
+else
 	@echo "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
 	for config in $(CONFIGS); do \
@@ -171,6 +175,7 @@ build:
 		done; \
 	done; \
 	exit $$rc
+endif
 
 # Build one initramfs per arch (shared across config variants).
 initramfs:
@@ -276,6 +281,7 @@ Variables (current values):
   REPORT_DIR          = $(REPORT_DIR)
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
+  NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686})
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
@@ -297,6 +303,9 @@ Common workflows:
 
   # Quick single-arch test (report always written even on failure)
   make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
+
+  # Fast iteration on test scripts — skip rebuild, repack initramfs and re-run tests
+  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 
   # New mainline rc — pin exact version, then test (report always written)
   make checkout TAG=v7.2-rc3 

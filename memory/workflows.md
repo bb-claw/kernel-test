@@ -13,6 +13,7 @@
 | `TIMEOUT` | `60` | `TIMEOUT=120` |
 | `BUILD_TIMEOUT` | `1200` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
 | `NO_FETCH` | `0` | `NO_FETCH=1` |
+| `NO_BUILD` | `0` | `NO_BUILD=1` |
 | `V` | `0` | `V=1` |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
@@ -54,11 +55,14 @@ make all NO_FETCH=1 STABLE_RELEASE=7.1
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 ```
 
-### Re-run tests on already-built kernels
+### Fast iteration on test scripts (skip kernel rebuild)
 
 ```sh
-make initramfs test report NO_FETCH=1 CONFIGS=defconfig
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 ```
+
+Skips the build step, repacks the initramfs (< 1 s), boots and tests.
+Use when only test scripts changed — kernel artifacts reused from prior run.
 
 ### Verbose build output
 
