@@ -8,7 +8,7 @@ back to the Linux kernel community.
 
 1. Fetches the latest `-rc` tag from Linus's upstream tree (or a stable point release)
 2. Builds the kernel under seven configuration profiles: `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`
-3. Constructs a minimal BusyBox initramfs (cpio)
+3. Constructs a minimal Toybox initramfs (cpio)
 4. Boots each bootable kernel variant in QEMU/KVM for both `x86_64` and `i386`
 5. Runs numbered test scripts inside the VM in order; each test emits structured pass/fail output
 6. Writes a pass/fail report as a local HTML/text file — always written even on build or test failure
@@ -131,7 +131,7 @@ kernel-test/
 │   ├── fetch.sh          # Fetch latest -rc tag from upstream
 │   ├── checkout.sh       # Fetch and checkout a specific tag or commit
 │   ├── build.sh          # Kernel build (ccache, out-of-tree O=)
-│   ├── initramfs.sh      # Build BusyBox cpio initramfs + inject tests
+│   ├── initramfs.sh      # Build Toybox cpio initramfs + inject tests
 │   ├── vm.sh             # QEMU/KVM launch and serial console capture
 │   ├── report.sh         # Aggregate results into HTML/text report
 │   ├── install.sh        # Install kernel to /boot (Arch/Manjaro): modules, dkms autoinstall, mkinitcpio, GRUB
@@ -175,7 +175,7 @@ kernel-test/
 | `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit |
 | `make info` | Show current tag/commit and kernel Makefile version |
 | `make build` | Build kernels for all configs × archs |
-| `make initramfs` | Assemble the BusyBox cpio initramfs |
+| `make initramfs` | Assemble the Toybox cpio initramfs |
 | `make test` | Boot VMs and run tests |
 | `make report` | Generate the HTML/text report from last test results |
 | `make install` | Install built kernel to `/boot`; update mkinitcpio + GRUB (Arch/Manjaro, needs sudo) |
