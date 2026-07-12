@@ -98,7 +98,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## How to add a test
 
-1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `200_my-test.sh`)
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `250_my-test.sh`)
    — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
 2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
 3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM
@@ -142,11 +142,11 @@ Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
 
 **Before opening a PR**, at minimum run:
 ```sh
-make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 ```
 For any change touching `tests/`, run the full suite:
 ```sh
-make all NO_FETCH=1 ARCHS="x86_64 i386"
+make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 ```
 
 ## Memory file update triggers
@@ -239,12 +239,12 @@ make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
 make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
 # Fast iteration on test scripts — skip kernel rebuild, repack initramfs and re-run
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 
 # Test rand500config only (tinyconfig + 500 random options, bootable)
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
 
-# Include arm64 (requires aarch64-linux-gnu-gcc and qemu-system-aarch64; TCG mode)
+# All three arches (arm64 uses TCG; requires aarch64-linux-gnu-gcc + qemu-system-aarch64)
 make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
 # Verbose mode
