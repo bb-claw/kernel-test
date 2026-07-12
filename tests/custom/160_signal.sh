@@ -3,10 +3,12 @@
 # Exercises kernel do_send_sig and per-thread signal state.
 # Toybox sh 0.8.9 limitations:
 #   - 'trap' is not a builtin — signal trapping is impossible
-#   - 'kill -N pid' with numeric N (other than 0) silently no-ops
+#   - shell builtin 'kill' only handles signal 0 reliably; all other signals
+#     (numeric or name) silently no-op from the builtin
+#   - shell builtin 'kill -0 $other_pid' may always return 1 (broken poll)
 # Workarounds:
-#   - Use signal names (-TERM, -KILL, -USR1) instead of numbers
-#   - Detect death via kill -0 poll rather than wait exit code
+#   - Use /bin/kill (external Toybox kill applet) which works correctly
+#   - Keep sleep short (5 s) so any missed cleanup blocks for at most 5 s
 #   - Skip tests where signal delivery remains unverifiable
 
 fails=0
@@ -14,32 +16,34 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
-# kill -0: signal 0 tests process existence without sending a signal
+# kill -0: signal 0 tests process existence without sending a signal.
+# Shell builtin kill -0 for self ($$) is confirmed working in Toybox sh 0.8.9.
 if kill -0 $$ 2>/dev/null; then
     ok "kill -0 self (process existence check)"
 else
     fail "kill -0 self failed"
 fi
 
-# Reusable: send signal name to bg process, poll kill -0 to detect death.
-# Uses sleep 60 so natural exit cannot fake a kill within the poll window.
+# Reusable: send signal name to bg process via /bin/kill (external applet),
+# poll /bin/kill -0 to detect death.  Uses sleep 5 so natural exit cannot
+# fake a kill within the poll window; limits worst-case cleanup delay to 5 s.
 # Sets 'killed' to 1 if process dies, 0 if still alive after 20 checks.
 # Callers must reap with 'wait $bg_pid 2>/dev/null || true' on success.
 _signal_test() {
     sig="$1"
-    sh -c 'sleep 60' &
+    sh -c 'sleep 5' &
     bg_pid=$!
-    kill "$sig" "$bg_pid" 2>/dev/null || true
+    /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0
     # shellcheck disable=SC2034
     for p_i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        if ! kill -0 "$bg_pid" 2>/dev/null; then killed=1; break; fi
+        if ! /bin/kill -0 "$bg_pid" 2>/dev/null; then killed=1; break; fi
         true
     done
     if [ "$killed" -eq 0 ]; then
         # Process survived — attempt cleanup but do NOT wait: if -KILL also
-        # no-ops in this sh, waiting would block until sleep 60 expires.
-        kill -KILL "$bg_pid" 2>/dev/null || true
+        # fails, waiting would block until sleep 5 expires.
+        /bin/kill -KILL "$bg_pid" 2>/dev/null || true
     fi
 }
 
@@ -49,7 +53,7 @@ if [ "$killed" -eq 1 ]; then
     wait "$bg_pid" 2>/dev/null || true
     ok "SIGTERM (-TERM) terminates background process"
 else
-    skip "SIGTERM delivery unverifiable (kill -TERM may not work in this sh)"
+    skip "SIGTERM delivery unverifiable (/bin/kill -TERM may not work here)"
 fi
 
 # SIGKILL — unblockable; kernel must enforce termination
@@ -58,7 +62,7 @@ if [ "$killed" -eq 1 ]; then
     wait "$bg_pid" 2>/dev/null || true
     ok "SIGKILL (-KILL) terminates background process"
 else
-    skip "SIGKILL delivery unverifiable (kill -KILL may not work in this sh)"
+    skip "SIGKILL delivery unverifiable (/bin/kill -KILL may not work here)"
 fi
 
 # SIGUSR1 — user-defined signal, default action terminate
@@ -67,7 +71,7 @@ if [ "$killed" -eq 1 ]; then
     wait "$bg_pid" 2>/dev/null || true
     ok "SIGUSR1 (-USR1) terminates background process"
 else
-    skip "SIGUSR1 delivery unverifiable (kill -USR1 may not work in this sh)"
+    skip "SIGUSR1 delivery unverifiable (/bin/kill -USR1 may not work here)"
 fi
 
 # /proc/self/status signal mask fields — kernel tracks per-thread signal state
