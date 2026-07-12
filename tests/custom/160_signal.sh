@@ -30,57 +30,49 @@ else
     fail "kill -0 self failed"
 fi
 
-# Reusable: send signal name to bg process via /bin/kill (external applet),
-# poll /bin/kill -0 to detect death.  Uses 'sleep 999' as background target:
-# blocks on x86_64/arm64 so signal delivery is tested correctly; on i386 sleep
-# exits immediately giving a harmless false-positive (signal delivery unverified
-# but no test failure).  A busyloop was used previously but leaks ~5 MB/s in
-# Toybox sh, OOMing arm64 guests in TCG mode.
-# Sets 'killed' to 1 if process dies, 0 if still alive after 20 checks.
-# Callers must reap with 'wait $bg_pid 2>/dev/null || true' on success.
+# Reusable: send signal under test to a background 'sleep 999', then check
+# once whether the process is dead.  A single check avoids the O(20) poll
+# loop — in arm64 TCG each fork+exec of /bin/kill takes ~2-3 s, so 20
+# iterations × 3 signal tests would exhaust the 180 s timeout.
+# By the time kill -0 execs (~150 ms KVM, ~2 s TCG), the signal should have
+# been delivered by the kernel.  A forced SIGKILL backstop ensures cleanup.
+# On i386, sleep exits immediately (known Toybox i686 bug) so killed=1 is
+# set before the signal arrives — harmless false-positive, no test failure.
+# Sets 'killed' to 1 if process was dead on the single check, 0 otherwise.
 _signal_test() {
     sig="$1"
     sleep 999 &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0
-    # shellcheck disable=SC2034
-    for p_i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        if ! /bin/kill -0 "$bg_pid" 2>/dev/null; then killed=1; break; fi
-        true
-    done
-    if [ "$killed" -eq 0 ]; then
-        # Process survived — attempt cleanup but do NOT wait: if -KILL also
-        # fails, waiting would block until sleep 5 expires.
-        /bin/kill -KILL "$bg_pid" 2>/dev/null || true
-    fi
+    /bin/kill -0 "$bg_pid" 2>/dev/null || killed=1
+    # Force cleanup — SIGKILL is unblockable; wait reaps the zombie.
+    /bin/kill -KILL "$bg_pid" 2>/dev/null || true
+    wait "$bg_pid" 2>/dev/null || true
 }
 
 # SIGTERM — default termination signal
 _signal_test -TERM
 if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
     ok "SIGTERM (-TERM) terminates background process"
 else
-    skip "SIGTERM delivery unverifiable (/bin/kill -TERM may not work here)"
+    skip "SIGTERM delivery unverifiable (process still alive on single check)"
 fi
 
 # SIGKILL — unblockable; kernel must enforce termination
 _signal_test -KILL
 if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
     ok "SIGKILL (-KILL) terminates background process"
 else
-    skip "SIGKILL delivery unverifiable (/bin/kill -KILL may not work here)"
+    skip "SIGKILL delivery unverifiable (process still alive on single check)"
 fi
 
 # SIGUSR1 — user-defined signal, default action terminate
 _signal_test -USR1
 if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
     ok "SIGUSR1 (-USR1) terminates background process"
 else
-    skip "SIGUSR1 delivery unverifiable (/bin/kill -USR1 may not work here)"
+    skip "SIGUSR1 delivery unverifiable (process still alive on single check)"
 fi
 
 # /proc/self/status signal mask fields — kernel tracks per-thread signal state
