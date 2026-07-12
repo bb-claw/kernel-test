@@ -68,6 +68,22 @@ Bootability fragments (`tinyconfig`, `allnoconfig`, `rand500config`,
 `olddefconfig` discards options not selectable on the current arch, so
 adding PL011 options is harmless on x86 and essential on arm64.
 
+### arm64 VM uses 3× timeout and 1 G RAM
+
+Two issues observed on the first tinyconfig/arm64 boot:
+
+1. **Timeout**: TCG software emulation is ~5× slower than KVM. 17/21 tests ran in
+   60 s; the remaining 4 were cut off. `VM_TIMEOUT = TIMEOUT × 3` (default 180 s).
+
+2. **OOM during signal busyloop**: `160_signal` spawns `sh -c 'while true; do true;
+   done' &`. On arm64/virt with 512 M, this process hit the OOM killer at ~485 MiB
+   anon-rss. Root cause: arm64 address-space / COW fault behaviour means a newly
+   forked sh process touches a large fraction of the parent's mapped pages in a tight
+   loop. Increasing VM memory to 1 G gives sufficient headroom.
+
+Both adjustments are applied automatically in vm.sh when `ARCH == arm64` and do
+not affect x86 boot times or memory allocation.
+
 ### `localconfig` is x86_64-only
 
 `localconfig` sources `/proc/config.gz` from the running host kernel (a Manjaro

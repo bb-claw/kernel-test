@@ -72,19 +72,35 @@ case "$ARCH" in
         ;;
 esac
 
+# ── Arch-specific VM settings ─────────────────────────────────────────────────
+# arm64 in TCG mode is ~5× slower than KVM; multiply timeout to ensure all
+# tests complete.  Also allocate more RAM: the signal busyloop COW-faults a
+# large portion of the guest address space on arm64, OOMing in 512 M.
+
+case "$ARCH" in
+    arm64)
+        VM_TIMEOUT=$(( TIMEOUT * 3 ))
+        VM_MEM=1G
+        ;;
+    *)
+        VM_TIMEOUT=$TIMEOUT
+        VM_MEM=512M
+        ;;
+esac
+
 # ── Boot the kernel ───────────────────────────────────────────────────────────
 
-info "Booting $CONFIG / $ARCH (timeout: ${TIMEOUT}s)"
+info "Booting $CONFIG / $ARCH (timeout: ${VM_TIMEOUT}s)"
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
 
 QEMU_EXIT=0
-timeout "$TIMEOUT" "$QEMU" \
+timeout "$VM_TIMEOUT" "$QEMU" \
     "${KVM_FLAGS[@]}" \
     "${QEMU_CPU_FLAGS[@]}" \
     -M "$QEMU_MACHINE" \
-    -m 512M \
+    -m "$VM_MEM" \
     -display none \
     -no-reboot \
     -kernel "$KERNEL_IMAGE" \
@@ -158,7 +174,7 @@ else
     elif [[ $OOPS -eq 1 ]]; then
         FAIL_REASON=$(grep -m1 "Oops:"        "$DMESG_FILE" 2>/dev/null || echo "Oops")
     elif [[ $QEMU_EXIT -eq 124 ]]; then
-        FAIL_REASON="Timeout after ${TIMEOUT}s — kernel did not reach init"
+        FAIL_REASON="Timeout after ${VM_TIMEOUT}s — kernel did not reach init"
     else
         FAIL_REASON="Did not reach init (QEMU exit ${QEMU_EXIT})"
     fi
