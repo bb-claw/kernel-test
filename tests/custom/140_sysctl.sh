@@ -2,9 +2,9 @@
 # Read and write /proc/sys entries — exercises the sysctl interface and the
 # kernel parameter subsystem.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if [ ! -d /proc/sys ]; then
@@ -75,4 +75,4 @@ else
     skip "vm.swappiness not readable"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

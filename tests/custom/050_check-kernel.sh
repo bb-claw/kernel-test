@@ -2,9 +2,9 @@
 # Verify kernel identity and sysctl tunables exposed via /proc/sys/kernel.
 # Skipped when procfs is not available.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 info() { printf 'info: %s\n' "$*"; }
 
@@ -88,4 +88,4 @@ if [ -r "$SYSCTL/arch" ] || [ -r /proc/cpuinfo ]; then
     esac
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

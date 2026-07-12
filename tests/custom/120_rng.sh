@@ -2,9 +2,9 @@
 # Read from /dev/urandom — tests the kernel CRNG (random subsystem).
 # Verifies the character device is present and returns the expected byte count.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if [ ! -c /dev/urandom ]; then
@@ -35,4 +35,4 @@ else
     skip "/dev/random not present"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

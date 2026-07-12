@@ -2,9 +2,9 @@
 # Test loopback network — exercises CONFIG_NET, CONFIG_INET, loopback driver,
 # and ICMP echo end-to-end.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if [ ! -d /proc/net ] && [ ! -d /sys/class/net ]; then
@@ -37,4 +37,4 @@ else
     fail "ping 127.0.0.1 failed"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

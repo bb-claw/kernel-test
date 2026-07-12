@@ -4,9 +4,9 @@
 #   bash ~/git/kernel-test/tests/hardware/verify.sh
 # Exit: 0 = all checks pass, 1 = one or more failures
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n'   "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails+1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails+1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # ── Kernel identity ───────────────────────────────────────────────────────────
@@ -159,9 +159,9 @@ fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
-if [[ $_fails -eq 0 ]]; then
+if [[ $fails -eq 0 ]]; then
     printf 'PASS: all hardware checks passed (%s)\n' "$KVER"
 else
-    printf 'FAIL: %d check(s) failed (%s)\n' "$_fails" "$KVER"
+    printf 'FAIL: %d check(s) failed (%s)\n' "$fails" "$KVER"
 fi
-[[ $_fails -eq 0 ]] || exit 1
+[[ $fails -eq 0 ]] || exit 1

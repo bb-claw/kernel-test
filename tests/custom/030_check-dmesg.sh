@@ -2,9 +2,9 @@
 # Scan the kernel ring buffer for serious errors and collect statistics.
 # WARNINGs are reported but do not cause test failure — only BUG/Oops do.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 info() { printf 'info: %s\n' "$*"; }
 
@@ -59,4 +59,4 @@ else
     fail "kernel version line not found in dmesg"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

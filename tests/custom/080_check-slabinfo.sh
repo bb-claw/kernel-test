@@ -1,9 +1,9 @@
 #!/bin/sh
 # Verify /proc/slabinfo is present and populated.
 # Exercises the slab allocator (Clang allocation token changes in 7.2).
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if [ ! -r /proc/slabinfo ]; then
@@ -18,4 +18,4 @@ else
     fail "/proc/slabinfo exists but has too few entries ($line_count lines)"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

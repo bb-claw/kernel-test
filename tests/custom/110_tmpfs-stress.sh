@@ -3,9 +3,9 @@
 # Exercises the page cache, slab allocator, and VFS write path more heavily
 # than a single-line write.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if ! grep -q 'tmpfs' /proc/mounts 2>/dev/null; then
@@ -52,4 +52,4 @@ for fn in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19; do
 done
 
 rm -f "$TESTFILE"
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

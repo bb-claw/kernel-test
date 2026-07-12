@@ -39,11 +39,23 @@ fi
 # Large data through pipe — exceeds the default 64 KiB kernel pipe buffer,
 # forcing the writer to block and the reader to wake it.
 # head -c instead of dd: Toybox 0.8.9 dd does not parse key=value options.
-bytes=$(head -c 1048576 /dev/zero | wc -c)
-if [ "$bytes" -eq 1048576 ]; then
-    ok "1 MiB through pipe intact ($bytes bytes)"
+# /dev/zero absent on tinyconfig; fall back to /dev/urandom, then skip.
+if [ -e /dev/zero ]; then
+    _large_src=/dev/zero
+elif [ -e /dev/urandom ]; then
+    _large_src=/dev/urandom
 else
-    fail "pipe data loss: expected 1048576 bytes, got $bytes"
+    _large_src=
+fi
+if [ -n "$_large_src" ]; then
+    bytes=$(head -c 1048576 "$_large_src" | wc -c)
+    if [ "$bytes" -eq 1048576 ]; then
+        ok "1 MiB through pipe intact ($bytes bytes)"
+    else
+        fail "pipe data loss: expected 1048576 bytes, got $bytes"
+    fi
+else
+    skip "1 MiB pipe test: no /dev/zero or /dev/urandom on this kernel"
 fi
 
 # Many sequential writes: ordering and completeness under multiple flushes

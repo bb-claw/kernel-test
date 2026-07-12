@@ -2,9 +2,9 @@
 # Fork and exec subprocesses — exercises the scheduler, process creation,
 # copy-on-write, and exec path.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # Single fork+exec+wait
@@ -51,4 +51,4 @@ else
     fail "background child wait failed (rc=$rc)"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

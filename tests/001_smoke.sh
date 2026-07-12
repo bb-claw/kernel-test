@@ -2,9 +2,9 @@
 # Smoke test — the bare minimum that must work for any config that reaches init.
 # Failure here means the kernel or initramfs is fundamentally broken.
 
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # Shell is functional
@@ -39,4 +39,4 @@ else
     skip "/sys/kernel not present (CONFIG_SYSFS may be off)"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1

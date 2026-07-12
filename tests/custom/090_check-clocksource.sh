@@ -1,9 +1,9 @@
 #!/bin/sh
 # Verify a clocksource was registered at boot.
 # Catches regressions in the timer subsystem init path.
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if ! command -v dmesg >/dev/null 2>&1; then
@@ -18,4 +18,4 @@ else
     fail "no active clocksource found in dmesg"
 fi
 
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1
