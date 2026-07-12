@@ -365,3 +365,4 @@ for crow in "${CONFIG_ROWS[@]}"; do
 done
 printf '\nOverall result: %s  (duration: %s)\n' "$OVERALL" "$OVERALL_DURATION"
 cat "$TXT"
+[[ $OVERALL == PASS ]] || exit 1
