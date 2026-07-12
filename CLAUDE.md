@@ -58,8 +58,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `tests/custom/180_timer.sh` | Timer/clock subsystem: `/proc/uptime` readable and advancing, epoch sanity via `date +%s`, `sleep 0` nanosleep, `/proc/timer_list` hrtimer infrastructure |
 | `tests/custom/190_scheduler.sh` | CFS scheduler: `/proc/loadavg` format, `nice -n 10` and `nice -n -5` (setpriority syscall), `/proc/self/status` context switch counters, `/proc/schedstat` per-CPU stats |
-| `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
-| `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
+| `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts; new test script → `memory/test-inventory.md` must also be staged |
+| `.githooks/commit-msg` | Commit-msg hook: enforces conventional commit format `<type>[(<scope>)]: <desc>` |
+| `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts; test-inventory coverage; design doc required on `feat/*`/`fix/*` branches; memory file sizes (≤ 150 lines); `awk` banned in VM test scripts |
 | `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; refreshes `CONFIG_SHA256` in `build.status` after `olddefconfig`; warns if no `vm.status` exists (kernel untested) or if last VM boot was not PASS; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
@@ -70,7 +71,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## Conventions
 
-- Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); `pre-commit` checks staged files (shellcheck, executable bit, artifact guard); `pre-push` sweeps all tracked files
+- Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); `pre-commit` checks staged files (shellcheck, executable bit, artifact guard, inventory sync); `commit-msg` enforces conventional commit format; `pre-push` sweeps all tracked files (shellcheck, executable bit, inventory coverage, design doc, memory sizes, `awk` ban in VM tests)
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
@@ -162,6 +163,7 @@ scripts; the table below covers everything else.
 The pre-push hook enforces:
 - Every `tests/custom/*.sh` and `tests/001_smoke.sh` name must appear in `memory/test-inventory.md`
 - Every `memory/*.md` (except `MEMORY.md`) must be ≤ 150 lines
+- No `awk` calls in VM test scripts (`tests/custom/*.sh`, `tests/001_smoke.sh`) — `awk` is not in the prebuilt Toybox binary; use `grep | cut` instead
 
 The pre-commit hook enforces:
 - When a new test script is staged, `memory/test-inventory.md` must also be staged
