@@ -105,7 +105,7 @@ fi
 
 awk_hits=()
 while IFS= read -r f; do
-    grep -qn '\bawk\b' "$REPO_ROOT/$f" && awk_hits+=("$f")
+    grep -v '^\s*#' "$REPO_ROOT/$f" | grep -q '\bawk\b' && awk_hits+=("$f")
 done < <(git ls-files 'tests/custom/*.sh' 'tests/001_smoke.sh')
 if [[ ${#awk_hits[@]} -eq 0 ]]; then
     ok "no awk in VM test scripts"
