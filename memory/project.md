@@ -14,7 +14,7 @@ make all
   └─ lib/fetch.sh        discover + fetch latest tag (ls-remote, --depth=1)
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
-  └─ lib/vm.sh           QEMU/KVM boot, capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
+  └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt
 ```
 
@@ -37,7 +37,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 ## Current State (2026-07-12)
 
-- **Architectures:** x86_64 + i386 — both run full 21/21 tests via Toybox (x86_64: toybox-x86_64, i386: toybox-i686)
+- **Architectures:** x86_64 + i386 (default, KVM); arm64 opt-in (`ARCHS="x86_64 i386 arm64"`, TCG, requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 8 (defconfig tinyconfig allnoconfig kunitconfig allmodconfig randconfig rand500config randdefconfig)
 - **Tests:** 21 total (1 smoke + 20 custom; see test-inventory.md); next slot: 200_
 - **Kernel tree:** `~/git/linux-stable` (contains both mainline rc and stable point release tags)

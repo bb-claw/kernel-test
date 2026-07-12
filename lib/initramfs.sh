@@ -16,8 +16,9 @@ OUTPUT="$BUILD_DIR/initramfs-$ARCH.cpio.gz"
 # Map kernel arch name → Toybox binary name (matches landley.net download names).
 
 case "$ARCH" in
-    x86_64) TOYBOX_ARCH=x86_64 ;;
-    i386)   TOYBOX_ARCH=i686   ;;
+    x86_64) TOYBOX_ARCH=x86_64  ;;
+    i386)   TOYBOX_ARCH=i686    ;;
+    arm64)  TOYBOX_ARCH=aarch64 ;;
     *)      die "Unsupported arch for initramfs: $ARCH (no Toybox binary mapping)" ;;
 esac
 

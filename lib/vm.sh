@@ -22,12 +22,23 @@ case "$ARCH" in
     x86_64)
         QEMU=qemu-system-x86_64
         QEMU_MACHINE=q35
-        BZIMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        CONSOLE=ttyS0
+        QEMU_CPU_FLAGS=()
         ;;
     i386)
         QEMU=qemu-system-i386
         QEMU_MACHINE=pc
-        BZIMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        CONSOLE=ttyS0
+        QEMU_CPU_FLAGS=()
+        ;;
+    arm64)
+        QEMU=qemu-system-aarch64
+        QEMU_MACHINE=virt
+        KERNEL_IMAGE="$OUT_DIR/arch/arm64/boot/Image"
+        CONSOLE=ttyAMA0
+        QEMU_CPU_FLAGS=(-cpu cortex-a57)
         ;;
     *)
         die "Unsupported arch: $ARCH"
@@ -37,20 +48,29 @@ esac
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 
 command -v "$QEMU" &>/dev/null  || die "$QEMU not found in PATH"
-[[ -f $BZIMAGE ]]               || die "bzImage not found: $BZIMAGE (did 'make build' succeed?)"
+[[ -f $KERNEL_IMAGE ]]          || die "Kernel image not found: $KERNEL_IMAGE (did 'make build' succeed?)"
 [[ -f $INITRAMFS ]]             || die "initramfs not found: $INITRAMFS (did 'make initramfs' succeed?)"
 
 mkdir -p "$OUT_DIR"
 : > "$DMESG_FILE"
 
 # ── KVM availability ──────────────────────────────────────────────────────────
+# KVM only accelerates VMs whose ISA matches the host. arm64 guests on an x86
+# host must use TCG (software emulation); KVM is skipped unconditionally.
 
 KVM_FLAGS=()
-if [[ -r /dev/kvm ]]; then
-    KVM_FLAGS=(-enable-kvm)
-else
-    warn "KVM not available — running in TCG mode (expect slow boot)"
-fi
+case "$ARCH" in
+    x86_64|i386)
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm)
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+        fi
+        ;;
+    arm64)
+        warn "arm64: KVM not used on x86 host — running in TCG mode (expect slow boot)"
+        ;;
+esac
 
 # ── Boot the kernel ───────────────────────────────────────────────────────────
 
@@ -62,13 +82,14 @@ VM_START_EPOCH=$(date -u +%s)
 QEMU_EXIT=0
 timeout "$TIMEOUT" "$QEMU" \
     "${KVM_FLAGS[@]}" \
+    "${QEMU_CPU_FLAGS[@]}" \
     -M "$QEMU_MACHINE" \
     -m 512M \
     -display none \
     -no-reboot \
-    -kernel "$BZIMAGE" \
+    -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS" \
-    -append "console=ttyS0 panic=5 quiet" \
+    -append "console=$CONSOLE panic=5 quiet" \
     -serial "file:$DMESG_FILE" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?

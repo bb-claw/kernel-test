@@ -282,7 +282,7 @@ Variables (current values):
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
   NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)
-  TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686})
+  TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -309,6 +309,9 @@ Common workflows:
 
   # Run KUnit tests only (kunit:N/N shown in report Tests column)
   make all NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitconfig ARCHS="x86_64 i386"
+
+  # Include arm64 (requires aarch64-linux-gnu-gcc and qemu-system-aarch64; TCG mode)
+  make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
   # New mainline rc — pin exact version, then test (report always written)
   make checkout TAG=v7.2-rc3 

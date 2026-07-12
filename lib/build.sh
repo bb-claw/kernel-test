@@ -12,6 +12,29 @@ require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
 GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
 
+# ── Architecture-specific settings ───────────────────────────────────────────
+
+case "$ARCH" in
+    x86_64)
+        CROSS_COMPILE=''
+        KERNEL_IMAGE_NAME=bzImage
+        KERNEL_CC="$GCC"
+        ;;
+    i386)
+        CROSS_COMPILE=''
+        KERNEL_IMAGE_NAME=bzImage
+        KERNEL_CC="$GCC"
+        ;;
+    arm64)
+        CROSS_COMPILE='aarch64-linux-gnu-'
+        KERNEL_IMAGE_NAME=Image
+        KERNEL_CC="${CROSS_COMPILE}gcc"
+        ;;
+    *)
+        die "Unsupported arch: $ARCH"
+        ;;
+esac
+
 # Catch an empty/missing working tree early with a clear message
 [[ -f "$KERNEL_TREE/Makefile" ]] || \
     die "Kernel Makefile not found in '$KERNEL_TREE' — run 'make fetch' first, " \
@@ -59,11 +82,12 @@ kmake() {
         -C "$KERNEL_TREE"
         O="$PWD/$OUT_DIR"
         ARCH="$ARCH"
-        CC="ccache $GCC"
+        CC="ccache $KERNEL_CC"
         HOSTCC="ccache $GCC"
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP"
         "$@"
     )
+    [[ -n $CROSS_COMPILE ]] && make_args+=( CROSS_COMPILE="$CROSS_COMPILE" )
     if [[ ${V:-0} == 1 ]]; then
         "${pfx[@]}" make "${make_args[@]}" 2>&1 | tee -a "$LOG_FILE"
     else
@@ -123,7 +147,9 @@ elif [[ $CONFIG == kunitconfig ]]; then
     fi
 elif [[ $CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
-    # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz).
+    # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.
+    [[ $ARCH == x86_64 ]] || \
+        die "localconfig is only supported for x86_64 (sources /proc/config.gz from the running host kernel)"
     [[ -r /proc/config.gz ]] || \
         die "localconfig requires /proc/config.gz — enable CONFIG_IKCONFIG_PROC in your running kernel"
     zcat /proc/config.gz > "$PWD/$OUT_DIR/.config"
@@ -160,12 +186,12 @@ info "Config SHA256: $CONFIG_SHA256 — $CONFIG / $ARCH"
 # For build-only configs (allmodconfig, randconfig) the goal is catching
 # compilation errors; bzImage covers the core kernel.
 if [[ $BUILD_TIMEOUT -gt 0 ]]; then
-    info "Building bzImage ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH"
+    info "Building $KERNEL_IMAGE_NAME ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH"
 else
-    info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
+    info "Building $KERNEL_IMAGE_NAME ($NPROC jobs) — $CONFIG / $ARCH"
 fi
 BUILD_EXIT=0
-kmake --timed -j"$NPROC" bzImage || BUILD_EXIT=$?
+kmake --timed -j"$NPROC" "$KERNEL_IMAGE_NAME" || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then
     if [[ $BUILD_EXIT -eq 124 ]]; then
         printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \

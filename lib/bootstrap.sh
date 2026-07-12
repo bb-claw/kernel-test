@@ -33,8 +33,8 @@ install_packages() {
                 sudo pacman -S --needed --noconfirm gcc-multilib
             fi
             sudo pacman -S --needed --noconfirm \
-                gcc-multilib make ccache \
-                qemu-system-x86 \
+                gcc-multilib aarch64-linux-gnu-gcc make ccache \
+                qemu-system-x86 qemu-system-aarch64 \
                 cpio git \
                 bc flex bison libelf pahole
             ;;
@@ -42,24 +42,24 @@ install_packages() {
         apt)
             sudo apt-get update -qq
             sudo apt-get install -y \
-                gcc gcc-multilib make ccache \
-                qemu-system-x86 \
+                gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
+                qemu-system-x86 qemu-system-arm \
                 cpio git \
                 bc flex bison libelf-dev dwarves
             ;;
 
         dnf)
             sudo dnf install -y \
-                gcc gcc-multilib make ccache \
-                qemu-system-x86 \
+                gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
+                qemu-system-x86 qemu-system-aarch64 \
                 cpio git \
                 bc flex bison elfutils-libelf-devel dwarves
             ;;
 
         zypper)
             sudo zypper install -y \
-                gcc gcc-multilib make ccache \
-                qemu-x86 \
+                gcc gcc-multilib cross-aarch64-linux-gnu-gcc make ccache \
+                qemu-x86 qemu-arm \
                 cpio git \
                 bc flex bison libelf-devel dwarves
             ;;
@@ -81,7 +81,7 @@ TOYBOX_BASE_URL="https://www.landley.net/toybox/downloads/binaries/${TOYBOX_VERS
 
 download_toybox() {
     mkdir -p "$CACHE_DIR"
-    local -a arches=(x86_64 i686)
+    local -a arches=(x86_64 i686 aarch64)
     for ta in "${arches[@]}"; do
         local dest="$CACHE_DIR/toybox-${ta}"
         if [[ -f $dest && -x $dest ]]; then
@@ -106,7 +106,7 @@ download_toybox() {
 
 check_toybox() {
     local ok=1
-    for ta in x86_64 i686; do
+    for ta in x86_64 i686 aarch64; do
         local dest="$CACHE_DIR/toybox-${ta}"
         if [[ -f $dest && -x $dest ]]; then
             info "toybox-${ta}: OK  ($dest)"
@@ -153,9 +153,18 @@ else
     warn "Continuing with x86_64 only: make ARCHS=x86_64"
 fi
 
+# ── aarch64-linux-gnu-gcc sanity check (arm64 kernel builds) ─────────────────
+
+if command -v aarch64-linux-gnu-gcc &>/dev/null; then
+    info "aarch64-linux-gnu-gcc: OK (arm64 cross-compilation supported)"
+else
+    warn "aarch64-linux-gnu-gcc not found — arm64 kernel builds will not work"
+    warn "arm64 is opt-in: use ARCHS=\"x86_64 i386 arm64\" to include it"
+fi
+
 # ── Verify all required tools are present ────────────────────────────────────
 
-REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 cpio git bc flex bison)
+REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 qemu-system-aarch64 cpio git bc flex bison)
 missing=0
 info "Checking required tools:"
 for cmd in "${REQUIRED[@]}"; do
