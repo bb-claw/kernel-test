@@ -98,6 +98,23 @@ else
     done
 fi
 
+# ── 6. No awk in VM test scripts ─────────────────────────────────────────────
+# awk is not compiled into the prebuilt Toybox binary; it silently skips on
+# stripped configs (field absent → grep finds nothing → exec path never reached)
+# but fails on full configs where the field exists.  Use grep|cut instead.
+
+awk_hits=()
+while IFS= read -r f; do
+    grep -qn '\bawk\b' "$REPO_ROOT/$f" && awk_hits+=("$f")
+done < <(git ls-files 'tests/custom/*.sh' 'tests/001_smoke.sh')
+if [[ ${#awk_hits[@]} -eq 0 ]]; then
+    ok "no awk in VM test scripts"
+else
+    for f in "${awk_hits[@]}"; do
+        fail "awk used in VM test script: $f  (use 'grep | cut' instead — awk not in Toybox)"
+    done
+fi
+
 # ── Result ────────────────────────────────────────────────────────────────────
 
 if [[ $rc -eq 0 ]]; then
