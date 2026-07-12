@@ -42,7 +42,7 @@ fi
 # Sets 'killed' to 1 if process was dead on the single check, 0 otherwise.
 _signal_test() {
     sig="$1"
-    sh -c 'while :; do :; done' &
+    ( while :; do :; done ) &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0
