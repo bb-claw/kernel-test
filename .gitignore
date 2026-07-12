@@ -10,6 +10,12 @@ reports/
 # Claude Code local settings (contains user-specific paths and permissions)
 .claude/
 
+# Scratch / ad-hoc output files
+*.out
+todos
+lsmod.arch
+resume.sh
+
 # Editor temporaries
 *.swp
 *.swo
