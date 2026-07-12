@@ -34,8 +34,8 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write |
 | `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686}` to `cache/` |
-| `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops |
-| `lib/report.sh` | Collate results; write `summary.html`, `summary.txt`, and `summary.mail.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table; `summary.mail.txt` contains only the preamble lines (ready to paste as email header/body intro without the table) |
+| `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops; extracts `FAILED_TESTS` (space-separated list of failed test names from `< TEST FAIL:` markers) into `vm.status`; prints each failed name on its own `WARN` line under the PARTIAL message |
+| `lib/report.sh` | Collate results; write `summary.html`, `summary.txt`, and `summary.mail.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table; `summary.mail.txt` contains only the preamble lines; `summary.html` shows an Overall pass/fail badge and a linked file-list section; config MISMATCH sets `OVERALL=FAIL`; `FAILED_TESTS` from `vm.status` appears in the Notes column (text: `failed: name1, name2`; HTML: red-highlighted); exits with code 1 when `OVERALL=FAIL` |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
 | `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
 | `tests/custom/010_check-proc.sh` | `/proc` content: cpuinfo, meminfo, uptime, cmdline, filesystems |
@@ -57,7 +57,7 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
-| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
+| `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; refreshes `CONFIG_SHA256` in `build.status` after `olddefconfig`; warns if no `vm.status` exists (kernel untested) or if last VM boot was not PASS; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
@@ -80,7 +80,7 @@ The goal is systematic community verification of each -rc kernel.
 - Lib scripts are invoked as subprocesses by the Makefile (not sourced), so they must not rely on shell state from each other
 - VM serial output is captured live to `build/<config>-<arch>/dmesg.txt` and copied to `reports/<date>_<time>_<version>/dmesg-<config>-<arch>.txt` by the report step
 - Test output protocol inside the VM: `/init` emits `> TEST RUN: <name>` before each script and `< TEST PASS: <name>` / `< TEST FAIL: <name>` after; `vm.sh` counts those markers for TESTS_PASS/TESTS_FAIL
-- Report `OVERALL` is `FAIL` when any build status is non-PASS, any boot fails, any shell test fails (`TESTS_FAIL > 0`), or any KUnit test fails (`KUNIT_FAIL > 0`)
+- Report `OVERALL` is `FAIL` when any build status is non-PASS, any boot fails, any shell test fails (`TESTS_FAIL > 0`), any KUnit test fails (`KUNIT_FAIL > 0`), or any config fingerprint check shows `MISMATCH`; `report.sh` exits 1 when `OVERALL=FAIL` so `make` and CI detect the failure
 - KUnit KTAP output: `vm.sh` detects `KTAP version` or `# Subtest:` in dmesg, then counts indented `ok`/`not ok` lines (`{4,}` spaces after timestamp); non-indented suite summaries are excluded to avoid double-counting; results stored as KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
 - Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error
 - Never write to the kernel source tree; all build artifacts go under `build/`

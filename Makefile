@@ -246,8 +246,8 @@ Targets:
   build        Build kernels for all CONFIGS × ARCHS
   initramfs    Assemble Toybox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
-  report       Generate HTML and plain-text report from last test run
-  install      Install built kernel to /boot; olddefconfig + dkms autoinstall + mkinitcpio + GRUB (needs sudo, x86_64 only)
+  report       Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
+  install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message

@@ -315,8 +315,8 @@ skip() { printf 'skip: %s\n' "$*"; }
 
 After each run, `reports/<date>_<time>_<kernel>/` contains:
 
-- `summary.html` — pass/fail table per config × architecture × test
-- `summary.txt` — plain-text version with LKML preamble + full results table
+- `summary.html` — pass/fail table per config × architecture × test; Overall pass/fail badge; linked file index; failed test names highlighted in red in the Notes column
+- `summary.txt` — plain-text version with LKML preamble + full results table; failed test names listed in Notes column
 - `summary.mail.txt` — preamble only (Subject line + metadata); paste as email intro without the table
 - `dmesg-<config>-<arch>.txt` — full kernel serial output per variant
 - `kconfig-<config>-<arch>.config` — exact `.config` used for that build
@@ -325,7 +325,9 @@ After each run, `reports/<date>_<time>_<kernel>/` contains:
 - `build-<config>-<arch>.log` — build log (all configs; useful for spotting warnings on passing builds)
 
 The report is always written — even when build or test steps fail — so there is always
-an artifact to inspect after a run.
+an artifact to inspect after a run. `report.sh` exits with code 1 when `OVERALL=FAIL`
+(any build failure, boot failure, test failure, or config fingerprint mismatch), so
+`make` and CI correctly surface the failure.
 
 ## Community Contribution
 
