@@ -156,7 +156,8 @@ kernel-test/
 │   │   ├── 150_mmap.sh
 │   │   ├── 160_signal.sh
 │   │   ├── 170_pipe.sh
-│   │   └── 180_timer.sh
+│   │   ├── 180_timer.sh
+│   │   └── 190_scheduler.sh
 │   └── hardware/
 │       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/

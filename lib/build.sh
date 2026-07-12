@@ -24,6 +24,7 @@ NPROC=$(nproc 2>/dev/null || echo 1)
 
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
+rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 

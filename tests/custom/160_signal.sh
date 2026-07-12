@@ -6,9 +6,12 @@
 #   - shell builtin 'kill' only handles signal 0 reliably; all other signals
 #     (numeric or name) silently no-op from the builtin
 #   - shell builtin 'kill -0 $other_pid' may always return 1 (broken poll)
+#   - 'sleep N' exits non-zero on Toybox i686 (any duration) — cannot be used
+#     as a reliable long-running background target on i386
 # Workarounds:
 #   - Use /bin/kill (external Toybox kill applet) which works correctly
-#   - Keep sleep short (5 s) so any missed cleanup blocks for at most 5 s
+#   - Use a busyloop as background target — genuinely long-running on all archs,
+#     killable by any signal, no natural timeout to race against
 #   - Skip tests where signal delivery remains unverifiable
 
 fails=0
@@ -25,13 +28,13 @@ else
 fi
 
 # Reusable: send signal name to bg process via /bin/kill (external applet),
-# poll /bin/kill -0 to detect death.  Uses sleep 5 so natural exit cannot
-# fake a kill within the poll window; limits worst-case cleanup delay to 5 s.
+# poll /bin/kill -0 to detect death.  Uses a busyloop so natural exit cannot
+# fake a kill on any arch (Toybox i686 sleep exits immediately — unusable).
 # Sets 'killed' to 1 if process dies, 0 if still alive after 20 checks.
 # Callers must reap with 'wait $bg_pid 2>/dev/null || true' on success.
 _signal_test() {
     sig="$1"
-    sh -c 'sleep 5' &
+    sh -c 'while true; do true; done' &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0

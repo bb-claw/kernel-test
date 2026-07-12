@@ -32,7 +32,7 @@ The goal is systematic community verification of each -rc kernel.
 | `Makefile` | Main entry point; defines all targets and variables; calls lib scripts |
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
-| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write |
+| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write; deletes `vm.status` at start of each build so a failed build never shows stale test results in the report |
 | `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686}` to `cache/` |
 | `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops; extracts `FAILED_TESTS` (space-separated list of failed test names from `< TEST FAIL:` markers) into `vm.status`; prints each failed name on its own `WARN` line under the PARTIAL message |
 | `lib/report.sh` | Collate results; write `summary.html`, `summary.txt`, and `summary.mail.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table; `summary.mail.txt` contains only the preamble lines; `summary.html` shows an Overall pass/fail badge and a linked file-list section; config MISMATCH sets `OVERALL=FAIL`; `FAILED_TESTS` from `vm.status` appears in the Notes column (text: `failed: name1, name2`; HTML: red-highlighted); exits with code 1 when `OVERALL=FAIL` |
@@ -56,6 +56,7 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/160_signal.sh` | Signal delivery: `kill -0` process-existence, SIGTERM/SIGKILL/SIGUSR1 via `/bin/kill` + poll, `/proc/self/status` SigBlk/SigIgn/SigCgt mask fields |
 | `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `tests/custom/180_timer.sh` | Timer/clock subsystem: `/proc/uptime` readable and advancing, epoch sanity via `date +%s`, `sleep 0` nanosleep, `/proc/timer_list` hrtimer infrastructure |
+| `tests/custom/190_scheduler.sh` | CFS scheduler: `/proc/loadavg` format, `nice -n 10` and `nice -n -5` (setpriority syscall), `/proc/self/status` context switch counters, `/proc/schedstat` per-CPU stats |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
 | `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; refreshes `CONFIG_SHA256` in `build.status` after `olddefconfig`; warns if no `vm.status` exists (kernel untested) or if last VM boot was not PASS; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
@@ -90,7 +91,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## How to add a test
 
-1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `190_my-test.sh`)
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `200_my-test.sh`)
    — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
 2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
 3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM
