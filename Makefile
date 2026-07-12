@@ -307,6 +307,9 @@ Common workflows:
   # Fast iteration on test scripts — skip rebuild, repack initramfs and re-run tests
   make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 
+  # Run KUnit tests only (kunit:N/N shown in report Tests column)
+  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitconfig ARCHS="x86_64 i386"
+
   # New mainline rc — pin exact version, then test (report always written)
   make checkout TAG=v7.2-rc3 
   make all NO_FETCH=1 

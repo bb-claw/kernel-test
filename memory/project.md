@@ -14,7 +14,7 @@ make all
   └─ lib/fetch.sh        discover + fetch latest tag (ls-remote, --depth=1)
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
-  └─ lib/vm.sh           QEMU/KVM boot, capture serial, count TEST PASS/FAIL
+  └─ lib/vm.sh           QEMU/KVM boot, capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt
 ```
 
@@ -67,7 +67,7 @@ build/<config>-<arch>/
   build.status        STATUS=PASS|FAIL|TIMEOUT, START_TIME, DURATION, CONFIG_SHA256, KERNEL_TREE
   build.log           full make output
   .config             final resolved kernel config
-  vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, FAILED_TESTS (space-sep list)
+  vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, KUNIT_PASS, KUNIT_FAIL, FAILED_TESTS (space-sep list)
   dmesg.txt           serial console output
   rand-sampled.config rand500config only: the 500 sampled =y lines
   randdef-disabled.config randdefconfig only: the 300 randomly disabled lines
