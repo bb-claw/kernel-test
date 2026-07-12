@@ -121,6 +121,7 @@ FAIL_COUNT=0
 TESTS_TOTAL=0
 KUNIT_PASS=0
 KUNIT_FAIL=0
+FAILED_TESTS=''
 
 if [[ -s $DMESG_FILE ]]; then
     grep -q  "BOOT_OK:"   "$DMESG_FILE" 2>/dev/null && BOOT_OK=1   || true

@@ -110,6 +110,8 @@ for config in $CONFIGS; do
             cp "$out/rand-sampled.config" "$RUN_DIR/rand-sampled-${config}-${arch}.config"
         [[ -f "$out/randdef-disabled.config" ]] && \
             cp "$out/randdef-disabled.config" "$RUN_DIR/randdef-disabled-${config}-${arch}.config"
+        [[ -f "$out/vm.status" ]] && \
+            cp "$out/vm.status" "$RUN_DIR/vmstatus-${config}-${arch}.txt"
 
         # Verify stored config matches build-time fingerprint
         config_file="kconfig-${config}-${arch}.config"
@@ -375,4 +377,35 @@ for crow in "${CONFIG_ROWS[@]}"; do
 done
 printf '\nOverall result: %s  (duration: %s)\n' "$OVERALL" "$OVERALL_DURATION"
 cat "$TXT"
+
+# ── Regression diff ───────────────────────────────────────────────────────────
+
+_DIFF="$(dirname "$0")/diff.sh"
+
+# Auto-diff vs previous run (second-to-last dir by sort order)
+mapfile -t _prev_runs < <(find "$REPORT_DIR" -maxdepth 1 -mindepth 1 -type d \
+    ! -name baseline | sort)
+_prev=''
+for _d in "${_prev_runs[@]}"; do
+    [[ $(basename "$_d") == $(basename "$RUN_DIR") ]] && continue
+    _prev="$_d"
+done
+if [[ -n $_prev ]]; then
+    printf '\n'
+    info "Diff vs previous run ($(basename "$_prev")):"
+    "$_DIFF" "$_prev" "$RUN_DIR" "$RUN_DIR/diff-prev.txt" || true
+fi
+
+# Also diff vs pinned baseline when set
+if [[ -L "$REPORT_DIR/baseline" ]]; then
+    _base=$(readlink -f "$REPORT_DIR/baseline" 2>/dev/null || true)
+    _base="${_base%/}"
+    _curr=$(readlink -f "$RUN_DIR" 2>/dev/null || echo "$RUN_DIR")
+    if [[ -n $_base && -d $_base && $_base != "$_curr" ]]; then
+        printf '\n'
+        info "Diff vs baseline ($(basename "$_base")):"
+        "$_DIFF" "$_base" "$RUN_DIR" "$RUN_DIR/diff-baseline.txt" || true
+    fi
+fi
+
 [[ $OVERALL == PASS ]] || exit 1
