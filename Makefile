@@ -72,7 +72,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report install clean distclean bootstrap hooks info checkout help
+.PHONY: all fetch build initramfs test report diff baseline install clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -212,6 +212,29 @@ report:
 	@echo "[report] Writing to $(REPORT_DIR)/"
 	$(Q)lib/report.sh
 
+# Compare two report directories for behavioral changes (regressions / fixes).
+# Usage: make diff [OLD=reports/...dir...] [NEW=reports/...dir...]
+# Without arguments, compares the two most recent runs automatically.
+OLD ?=
+NEW ?=
+diff:
+	$(Q)if [[ -z "$(OLD)" && -z "$(NEW)" ]]; then \
+	    lib/diff.sh; \
+	elif [[ -n "$(OLD)" && -n "$(NEW)" ]]; then \
+	    lib/diff.sh "$(OLD)" "$(NEW)"; \
+	else \
+	    echo "ERROR: diff requires both OLD= and NEW=, or neither" >&2; exit 1; \
+	fi
+
+# Pin the latest report dir as the regression baseline.
+# Subsequent 'make all' runs will also diff against this baseline.
+baseline:
+	$(Q)latest=$$(find "$(REPORT_DIR)" -maxdepth 1 -mindepth 1 -type d ! -name baseline \
+	    | sort | tail -1); \
+	[[ -n $$latest ]] || { echo "ERROR: no runs found in $(REPORT_DIR)/ — run make all first" >&2; exit 1; }; \
+	ln -sfn "$$(basename $$latest)" "$(REPORT_DIR)/baseline"; \
+	echo "[baseline] Pinned: $$latest → $(REPORT_DIR)/baseline"
+
 # Install built kernel(s) to /boot and update mkinitcpio + GRUB.
 # Designed for daily-driver use with CONFIGS=localconfig ARCHS=x86_64.
 # Runs olddefconfig (handles version-change config drift), builds modules
@@ -252,6 +275,8 @@ Targets:
   initramfs    Assemble Toybox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
   report       Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
+  diff         Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
+  baseline     Pin the latest report dir as the regression baseline; auto-diff will compare against it
   install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
@@ -344,6 +369,15 @@ Common workflows:
 
   # Verbose output for debugging
   make V=1 KERNEL_TREE=~/git/linux-stable
+
+  # Regression diff between two rc runs (auto-detects latest two)
+  make diff
+
+  # Diff two specific runs
+  make diff OLD=reports/2026-07-12_v7.2-rc1 NEW=reports/2026-07-12_v7.2-rc2
+
+  # Pin current results as baseline; future runs will auto-diff against it
+  make baseline
 endef
 export HELP_TEXT
 
