@@ -118,6 +118,7 @@ for config in $CONFIGS; do
         else
             config_verify='?'
         fi
+        [[ $config_verify != MISMATCH ]] || OVERALL=FAIL
         CONFIG_ROWS+=("$config|$arch|${config_sha256:-unknown}|$config_file|$config_verify")
 
         ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason")
@@ -228,6 +229,7 @@ MAIL="$RUN_DIR/summary.mail.txt"
 # ── summary.html ──────────────────────────────────────────────────────────────
 
 HTML="$RUN_DIR/summary.html"
+overall_cls=$( [[ $OVERALL == PASS ]] && echo pass || echo fail )
 {
     cat << HTMLHEAD
 <!DOCTYPE html>
@@ -256,7 +258,7 @@ HTML="$RUN_DIR/summary.html"
 <p>Host: $HOST_ARCH | $CPU_MODEL | $RAM</p>
 <p>Started: $RUN_STAMP</p>
 <p>Duration: $OVERALL_DURATION</p>
-<p>Overall: <strong>$OVERALL</strong></p>
+<p><span class="$overall_cls" style="padding:.25em .6em;border-radius:3px">Overall: <strong>$OVERALL</strong></span></p>
 <p>Files: <a href="summary.txt">summary.txt</a> | <a href="summary.mail.txt">summary.mail.txt</a></p>
 <table>
 <tr><th>Config</th><th>Arch</th><th>Build</th><th>Boot</th><th>Tests</th><th>Started</th><th>Dur</th><th>Notes</th></tr>

@@ -109,8 +109,8 @@ elif [[ $CONFIG == randdefconfig ]]; then
     # The fragment (step 1b) forces heavy subsystems off and re-pins bootability options,
     # so olddefconfig resolves any cascading conflicts safely.
     grep '^CONFIG_[A-Z0-9_]*=[ym]$' "$PWD/$OUT_DIR/.config" | shuf -n 300 \
-        | sed 's/=[ym]$/=n/' \
-        | tee "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
+        | sed 's/=[ym]$/=n/' > "$OUT_DIR/randdef-disabled.config"
+    cat "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
 elif [[ $CONFIG == kunitconfig ]]; then
     # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
     # 'kunitconfig' is not a kernel make target — use defconfig as the base.

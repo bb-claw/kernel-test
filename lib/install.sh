@@ -22,6 +22,15 @@ STATUS_FILE="$OUT_DIR/build.status"
 grep -q '^STATUS=PASS' "$STATUS_FILE" || \
     die "Build did not pass for $CONFIG/$ARCH ($(grep '^STATUS=' "$STATUS_FILE" || echo STATUS=UNKNOWN)) — see $OUT_DIR/build.log"
 
+VM_STATUS_FILE="$OUT_DIR/vm.status"
+if [[ ! -f $VM_STATUS_FILE ]]; then
+    warn "No VM test results for $CONFIG/$ARCH — kernel has not been tested; installing anyway"
+else
+    vm_boot=$(grep '^BOOT=' "$VM_STATUS_FILE" | cut -d= -f2- || true)
+    [[ $vm_boot == PASS ]] || \
+        warn "Last VM boot result was '$vm_boot' for $CONFIG/$ARCH — installing anyway"
+fi
+
 # Use the kernel tree recorded at build time so 'make install' works without
 # re-specifying STABLE_RELEASE or KERNEL_TREE on the command line.
 BUILT_TREE=$(grep '^KERNEL_TREE=' "$STATUS_FILE" | cut -d= -f2-)
