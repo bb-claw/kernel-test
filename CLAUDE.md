@@ -106,12 +106,49 @@ in `configs/<profile>.config`; if present, it is appended to `.config` after the
 kernel config target runs and `make olddefconfig` resolves dependencies. If absent,
 the kernel config target's output is used as-is.
 
+## Branch workflow
+
+All changes go through a pull request — no direct commits to `main`.
+
+**Branch naming** — `<type>/<kebab-description>`:
+- `feat/190-scheduler-test`
+- `fix/180-timer-i386-sleep`
+- `docs/update-readme-clone-url`
+- `chore/branch-workflow`
+
+**Commit messages** — conventional commits, enforced by `.githooks/commit-msg`:
+```
+<type>[(<scope>)]: <description>
+```
+Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
+
+**Merging strategy** — always **merge commits** (GitHub "Create a merge commit"):
+- Never squash or rebase; the branch history is the record of how the work evolved
+- PR title = the merge commit subject, so it must also follow conventional commit format
+- Branch protection on `main`: PRs required, force-push disabled
+
+**PR checklist** (in `.github/PULL_REQUEST_TEMPLATE.md`):
+- What changed (one sentence)
+- Type checkbox
+- Test run checkbox (`make all NO_FETCH=1` on affected configs)
+- Toybox sh pitfalls acknowledged
+
+**Before opening a PR**, at minimum run:
+```sh
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+```
+For new or changed tests, run the full suite:
+```sh
+make all NO_FETCH=1 ARCHS="x86_64 i386"
+```
+
 ## What NOT to do
 
 - Do not introduce Python, Go, or any non-shell dependency without explicit user approval
 - Do not require root for the build steps; only QEMU may need it (use KVM group membership)
 - Do not hardcode paths — use `KERNEL_TREE`, `BUILD_DIR`, `REPORT_DIR` variables
 - Do not commit build artifacts, ccache, or reports — all are gitignored
+- Do not commit directly to `main` — always open a PR from a feature branch
 
 ## Fetching kernels
 

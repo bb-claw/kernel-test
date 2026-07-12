@@ -99,7 +99,7 @@ bootstrap:
 
 hooks:
 	@git config core.hooksPath .githooks
-	@echo "[hooks] Git hooks activated (.githooks/pre-push)"
+	@echo "[hooks] Git hooks activated (pre-commit, commit-msg, pre-push)"
 
 # ── Kernel tree inspection ────────────────────────────────────────────────────
 
