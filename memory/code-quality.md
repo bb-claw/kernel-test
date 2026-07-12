@@ -57,6 +57,7 @@ Examples:
 - **`$(( ))` in while loops** → OOM in 512 MB VM; use `for i in 1 2 3 ... 20` instead
 - **`while true; do true; done` busyloop** → `true` is a Toybox applet (external cmd); each iteration forks+execs, zombie accumulation fills all guest RAM (485 MiB in 512M, 977 MiB in 1G VM). Use `while :; do :; done` — `:` is a special builtin, no fork per iteration, CPU-bound so signals are delivered in TCG.
 - **`sleep N &` target in arm64 QEMU TCG** → blocking `nanosleep` cannot receive signals in TCG mode; `wait $pid` hangs until VM timeout. Use CPU-busy `:` busyloop instead.
+- **any `fork()` in arm64 QEMU TCG** → child immediately faults in parent's full COW RSS (~1G anon-rss); OOM-killed; affects `sh -c '...' &`, `( ... ) &` subshell, and exec variants. Fix: detect `aarch64` via `uname -m` and skip tests that need background processes.
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
 - **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
 - **`tr`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `sed 's/old/new/g'` for character substitution or `grep -o` for character filtering.

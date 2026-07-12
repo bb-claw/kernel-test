@@ -70,19 +70,28 @@ adding PL011 options is harmless on x86 and essential on arm64.
 
 ### arm64 VM uses 3× timeout and 1 G RAM
 
-Two issues observed on the first tinyconfig/arm64 boot:
+One issue observed on the first tinyconfig/arm64 boot:
 
 1. **Timeout**: TCG software emulation is ~5× slower than KVM. 17/21 tests ran in
    60 s; the remaining 4 were cut off. `VM_TIMEOUT = TIMEOUT × 3` (default 180 s).
 
-2. **OOM during signal busyloop**: `160_signal` spawns `sh -c 'while true; do true;
-   done' &`. On arm64/virt with 512 M, this process hit the OOM killer at ~485 MiB
-   anon-rss. Root cause: arm64 address-space / COW fault behaviour means a newly
-   forked sh process touches a large fraction of the parent's mapped pages in a tight
-   loop. Increasing VM memory to 1 G gives sufficient headroom.
-
 Both adjustments are applied automatically in vm.sh when `ARCH == arm64` and do
 not affect x86 boot times or memory allocation.
+
+### `160_signal` busyloop tests skipped on aarch64
+
+`fork()` on the arm64 tinyconfig kernel in QEMU TCG causes the child process to
+fault in the parent shell's full COW RSS immediately (~1 GB anon-rss). This was
+reproduced with every spawning strategy: `sh -c '...' &`, `( ... ) &` subshell,
+`sleep &`, and `exec` variants. The OOM killer terminates the child, but three
+OOM events back-to-back exhaust the 180 s timeout.
+
+Workaround in `160_signal.sh`: detect `aarch64` via `uname -m` and skip the
+three busyloop-based signal delivery tests (`SIGTERM`, `SIGKILL`, `SIGUSR1`).
+The `kill -0 $$` existence check and `/proc/self/status` field checks are
+unaffected and run on all architectures. 1 G RAM is still allocated for arm64
+(it has other beneficial effects: more headroom for kernel heap and page tables
+during the non-signal tests).
 
 ### `localconfig` is x86_64-only
 
