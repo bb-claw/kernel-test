@@ -139,7 +139,7 @@ Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
 ```sh
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 ```
-For new or changed tests, run the full suite:
+For any change touching `tests/`, run the full suite:
 ```sh
 make all NO_FETCH=1 ARCHS="x86_64 i386"
 ```
