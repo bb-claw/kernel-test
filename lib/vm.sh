@@ -22,12 +22,23 @@ case "$ARCH" in
     x86_64)
         QEMU=qemu-system-x86_64
         QEMU_MACHINE=q35
-        BZIMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        CONSOLE=ttyS0
+        QEMU_CPU_FLAGS=()
         ;;
     i386)
         QEMU=qemu-system-i386
         QEMU_MACHINE=pc
-        BZIMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
+        CONSOLE=ttyS0
+        QEMU_CPU_FLAGS=()
+        ;;
+    arm64)
+        QEMU=qemu-system-aarch64
+        QEMU_MACHINE=virt
+        KERNEL_IMAGE="$OUT_DIR/arch/arm64/boot/Image"
+        CONSOLE=ttyAMA0
+        QEMU_CPU_FLAGS=(-cpu cortex-a57)
         ;;
     *)
         die "Unsupported arch: $ARCH"
@@ -37,38 +48,64 @@ esac
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 
 command -v "$QEMU" &>/dev/null  || die "$QEMU not found in PATH"
-[[ -f $BZIMAGE ]]               || die "bzImage not found: $BZIMAGE (did 'make build' succeed?)"
+[[ -f $KERNEL_IMAGE ]]          || die "Kernel image not found: $KERNEL_IMAGE (did 'make build' succeed?)"
 [[ -f $INITRAMFS ]]             || die "initramfs not found: $INITRAMFS (did 'make initramfs' succeed?)"
 
 mkdir -p "$OUT_DIR"
 : > "$DMESG_FILE"
 
 # ── KVM availability ──────────────────────────────────────────────────────────
+# KVM only accelerates VMs whose ISA matches the host. arm64 guests on an x86
+# host must use TCG (software emulation); KVM is skipped unconditionally.
 
 KVM_FLAGS=()
-if [[ -r /dev/kvm ]]; then
-    KVM_FLAGS=(-enable-kvm)
-else
-    warn "KVM not available — running in TCG mode (expect slow boot)"
-fi
+case "$ARCH" in
+    x86_64|i386)
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm)
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+        fi
+        ;;
+    arm64)
+        warn "arm64: KVM not used on x86 host — running in TCG mode (expect slow boot)"
+        ;;
+esac
+
+# ── Arch-specific VM settings ─────────────────────────────────────────────────
+# arm64 in TCG mode is ~5× slower than KVM; multiply timeout to ensure all
+# tests complete.  Also allocate more RAM: the signal busyloop COW-faults a
+# large portion of the guest address space on arm64, OOMing in 512 M.
+
+case "$ARCH" in
+    arm64)
+        VM_TIMEOUT=$(( TIMEOUT * 2 ))
+        VM_MEM=1G
+        ;;
+    *)
+        VM_TIMEOUT=$TIMEOUT
+        VM_MEM=512M
+        ;;
+esac
 
 # ── Boot the kernel ───────────────────────────────────────────────────────────
 
-info "Booting $CONFIG / $ARCH (timeout: ${TIMEOUT}s)"
+info "Booting $CONFIG / $ARCH (timeout: ${VM_TIMEOUT}s)"
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
 
 QEMU_EXIT=0
-timeout "$TIMEOUT" "$QEMU" \
+timeout "$VM_TIMEOUT" "$QEMU" \
     "${KVM_FLAGS[@]}" \
+    "${QEMU_CPU_FLAGS[@]}" \
     -M "$QEMU_MACHINE" \
-    -m 512M \
+    -m "$VM_MEM" \
     -display none \
     -no-reboot \
-    -kernel "$BZIMAGE" \
+    -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS" \
-    -append "console=ttyS0 panic=5 quiet" \
+    -append "console=$CONSOLE panic=5 quiet" \
     -serial "file:$DMESG_FILE" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?
@@ -137,7 +174,7 @@ else
     elif [[ $OOPS -eq 1 ]]; then
         FAIL_REASON=$(grep -m1 "Oops:"        "$DMESG_FILE" 2>/dev/null || echo "Oops")
     elif [[ $QEMU_EXIT -eq 124 ]]; then
-        FAIL_REASON="Timeout after ${TIMEOUT}s — kernel did not reach init"
+        FAIL_REASON="Timeout after ${VM_TIMEOUT}s — kernel did not reach init"
     else
         FAIL_REASON="Did not reach init (QEMU exit ${QEMU_EXIT})"
     fi

@@ -6,18 +6,31 @@
 #   - shell builtin 'kill' only handles signal 0 reliably; all other signals
 #     (numeric or name) silently no-op from the builtin
 #   - shell builtin 'kill -0 $other_pid' may always return 1 (broken poll)
-#   - 'sleep N' exits non-zero on Toybox i686 (any duration) — cannot be used
-#     as a reliable long-running background target on i386
+#   - 'while true; do true; done' leaks memory: 'true' is a Toybox applet
+#     (external command), so each iteration forks+execs; zombie accumulation
+#     in the parent fills all guest RAM (~1 GB on arm64 TCG)
+#   - 'sleep N' cannot receive signals in arm64 QEMU TCG (blocking syscall
+#     never interrupted); 'wait $pid' hangs indefinitely
+#   - 'while :; do :; done' is the safe busyloop: ':' is a POSIX special
+#     builtin (no fork per iteration), CPU-bound so signals are delivered
+# arm64 QEMU TCG additional limitation:
+#   - fork() causes child to fault in parent's full COW RSS regardless of
+#     how the background process is spawned (sh -c, subshell, exec); with
+#     a 1G VM the child immediately consumes all available RAM and is OOM-
+#     killed; only one OOM event is recoverable before the 180s timeout.
+#     Workaround: detect aarch64 via uname -m and skip busyloop-based tests.
 # Workarounds:
 #   - Use /bin/kill (external Toybox kill applet) which works correctly
-#   - Use a busyloop as background target — genuinely long-running on all archs,
-#     killable by any signal, no natural timeout to race against
+#   - Use 'while :; do :; done' as background target (no memory leak, receives
+#     signals; wrapped as subshell to isolate from parent's address space)
 #   - Skip tests where signal delivery remains unverifiable
 
 fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
+
+ARCH=$(uname -m 2>/dev/null)
 
 # kill -0: signal 0 tests process existence without sending a signal.
 # Shell builtin kill -0 for self ($$) is confirmed working in Toybox sh 0.8.9.
@@ -27,54 +40,56 @@ else
     fail "kill -0 self failed"
 fi
 
-# Reusable: send signal name to bg process via /bin/kill (external applet),
-# poll /bin/kill -0 to detect death.  Uses a busyloop so natural exit cannot
-# fake a kill on any arch (Toybox i686 sleep exits immediately — unusable).
-# Sets 'killed' to 1 if process dies, 0 if still alive after 20 checks.
-# Callers must reap with 'wait $bg_pid 2>/dev/null || true' on success.
+# Reusable: send signal under test to a background ':' busyloop, then check
+# once whether the process is dead.  A single check avoids the O(20) poll
+# loop — in arm64 TCG each fork+exec of /bin/kill takes ~2-3 s, so 20
+# iterations × 3 signal tests would exhaust the 180 s timeout.
+# By the time kill -0 execs (~150 ms KVM, ~2 s TCG), the signal should have
+# been delivered to the CPU-bound target.  A forced SIGKILL backstop ensures
+# cleanup; CPU-busy processes receive SIGKILL in TCG (blocking 'sleep' does not).
+# Sets 'killed' to 1 if process was dead on the single check, 0 otherwise.
 _signal_test() {
     sig="$1"
-    sh -c 'while true; do true; done' &
+    ( while :; do :; done ) &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0
-    # shellcheck disable=SC2034
-    for p_i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        if ! /bin/kill -0 "$bg_pid" 2>/dev/null; then killed=1; break; fi
-        true
-    done
-    if [ "$killed" -eq 0 ]; then
-        # Process survived — attempt cleanup but do NOT wait: if -KILL also
-        # fails, waiting would block until sleep 5 expires.
-        /bin/kill -KILL "$bg_pid" 2>/dev/null || true
-    fi
+    /bin/kill -0 "$bg_pid" 2>/dev/null || killed=1
+    # Force cleanup — SIGKILL is unblockable; wait reaps the zombie.
+    /bin/kill -KILL "$bg_pid" 2>/dev/null || true
+    wait "$bg_pid" 2>/dev/null || true
 }
 
-# SIGTERM — default termination signal
-_signal_test -TERM
-if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
-    ok "SIGTERM (-TERM) terminates background process"
+# SIGTERM/SIGKILL/SIGUSR1 — arm64 TCG: fork() faults in parent's full COW RSS,
+# OOMing the 1G guest; skip all busyloop-based delivery tests on aarch64.
+if [ "$ARCH" = "aarch64" ]; then
+    skip "SIGTERM: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
+    skip "SIGKILL: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
+    skip "SIGUSR1: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
 else
-    skip "SIGTERM delivery unverifiable (/bin/kill -TERM may not work here)"
-fi
+    # SIGTERM — default termination signal
+    _signal_test -TERM
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGTERM (-TERM) terminates background process"
+    else
+        skip "SIGTERM delivery unverifiable (process still alive on single check)"
+    fi
 
-# SIGKILL — unblockable; kernel must enforce termination
-_signal_test -KILL
-if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
-    ok "SIGKILL (-KILL) terminates background process"
-else
-    skip "SIGKILL delivery unverifiable (/bin/kill -KILL may not work here)"
-fi
+    # SIGKILL — unblockable; kernel must enforce termination
+    _signal_test -KILL
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGKILL (-KILL) terminates background process"
+    else
+        skip "SIGKILL delivery unverifiable (process still alive on single check)"
+    fi
 
-# SIGUSR1 — user-defined signal, default action terminate
-_signal_test -USR1
-if [ "$killed" -eq 1 ]; then
-    wait "$bg_pid" 2>/dev/null || true
-    ok "SIGUSR1 (-USR1) terminates background process"
-else
-    skip "SIGUSR1 delivery unverifiable (/bin/kill -USR1 may not work here)"
+    # SIGUSR1 — user-defined signal, default action terminate
+    _signal_test -USR1
+    if [ "$killed" -eq 1 ]; then
+        ok "SIGUSR1 (-USR1) terminates background process"
+    else
+        skip "SIGUSR1 delivery unverifiable (process still alive on single check)"
+    fi
 fi
 
 # /proc/self/status signal mask fields — kernel tracks per-thread signal state

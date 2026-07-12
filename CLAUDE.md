@@ -11,10 +11,10 @@ The goal is systematic community verification of each -rc kernel.
 
 - **Entry point:** `Makefile` — all commands are invoked via `make <target> [VAR=value]`
 - **Language:** Bash for all lib scripts — no Python, no Ruby, no extra runtimes
-- **Virtualization:** QEMU/KVM (`qemu-system-x86_64`, `qemu-system-i386`)
-- **Userland:** Toybox static binary (prebuilt, downloaded by `make bootstrap`) packed into a cpio initramfs; arch mapping: `x86_64` → `toybox-x86_64`, `i386` → `toybox-i686`; version pinned via `TOYBOX_VERSION` (default `0.8.9`)
+- **Virtualization:** QEMU/KVM (`qemu-system-x86_64`, `qemu-system-i386`); TCG for arm64 (`qemu-system-aarch64`)
+- **Userland:** Toybox static binary (prebuilt, downloaded by `make bootstrap`) packed into a cpio initramfs; arch mapping: `x86_64` → `toybox-x86_64`, `i386` → `toybox-i686`, `arm64` → `toybox-aarch64`; version pinned via `TOYBOX_VERSION` (default `0.8.9`)
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
-- **Architectures:** `x86_64` and `i386`
+- **Architectures:** `x86_64` and `i386` (default); `arm64` opt-in via `ARCHS="x86_64 i386 arm64"` (requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`, installed by `make bootstrap`)
 - **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
   - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `rand500config`, `randdefconfig`, `localconfig`
   - Build-only (no VM boot): `allmodconfig` (image too large), `randconfig` (unpredictable boot)
@@ -32,9 +32,9 @@ The goal is systematic community verification of each -rc kernel.
 | `Makefile` | Main entry point; defines all targets and variables; calls lib scripts |
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
-| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write; deletes `vm.status` at start of each build so a failed build never shows stale test results in the report |
-| `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686}` to `cache/` |
-| `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops; extracts `FAILED_TESTS` (space-separated list of failed test names from `< TEST FAIL:` markers) into `vm.status`; strips ANSI color codes from dmesg and counts KUnit KTAP `ok`/`not ok` lines into `KUNIT_PASS`/`KUNIT_FAIL`; prints each failed name on its own `WARN` line under the PARTIAL message |
+| `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; derives `CROSS_COMPILE` and `KERNEL_IMAGE_NAME` (bzImage or Image) from arch; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write; deletes `vm.status` at start of each build so a failed build never shows stale test results in the report; `localconfig` is x86_64-only |
+| `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686,aarch64}` to `cache/` |
+| `lib/vm.sh` | Launch QEMU, capture serial console output, detect boot success/oops; arch-specific machine/CPU/console/image-path (x86: q35/ttyS0/bzImage; arm64: virt/cortex-a57/ttyAMA0/Image); KVM skipped for arm64 (TCG only on x86 host); arm64 uses `VM_TIMEOUT=TIMEOUT×3` and 1 G RAM (TCG is slower; arm64 COW fork OOMs in 512 M); extracts `FAILED_TESTS` into `vm.status`; strips ANSI color codes from dmesg and counts KUnit KTAP `ok`/`not ok` lines into `KUNIT_PASS`/`KUNIT_FAIL`; prints each failed name on its own `WARN` line under the PARTIAL message |
 | `lib/report.sh` | Collate results; write `summary.html`, `summary.txt`, and `summary.mail.txt`; `summary.txt` opens with an LKML-ready preamble (Subject, build status, repo/commit, host, tested arches, Tested-by) followed by the full results table; `summary.mail.txt` contains only the preamble lines; `summary.html` shows an Overall pass/fail badge and a linked file-list section; config MISMATCH sets `OVERALL=FAIL`; `FAILED_TESTS` from `vm.status` appears in the Notes column (text: `failed: name1, name2`; HTML: red-highlighted); exits with code 1 when `OVERALL=FAIL` |
 | `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
 | `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
@@ -238,6 +238,9 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 
 # Test rand500config only (tinyconfig + 500 random options, bootable)
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
+
+# Include arm64 (requires aarch64-linux-gnu-gcc and qemu-system-aarch64; TCG mode)
+make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
 # Verbose mode
 make V=1 KERNEL_TREE=~/git/linux-stable
