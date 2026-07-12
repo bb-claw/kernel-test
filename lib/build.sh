@@ -36,6 +36,7 @@ info "Kernel: $TREE_TAG ($TREE_COMMIT) — $TREE_URL"
 info "Tree:   $KERNEL_TREE"
 
 # ccache: point at our local cache dir and expose via CC/HOSTCC
+# shellcheck disable=SC2153  # CACHE_DIR is exported by the Makefile, not set here
 export CCACHE_DIR="$PWD/$CACHE_DIR"
 mkdir -p "$CCACHE_DIR"
 
@@ -157,9 +158,11 @@ info "Config SHA256: $CONFIG_SHA256 — $CONFIG / $ARCH"
 # Step 2: build bzImage
 # For build-only configs (allmodconfig, randconfig) the goal is catching
 # compilation errors; bzImage covers the core kernel.
-[[ $BUILD_TIMEOUT -gt 0 ]] \
-    && info "Building bzImage ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH" \
-    || info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
+if [[ $BUILD_TIMEOUT -gt 0 ]]; then
+    info "Building bzImage ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH"
+else
+    info "Building bzImage ($NPROC jobs) — $CONFIG / $ARCH"
+fi
 BUILD_EXIT=0
 kmake --timed -j"$NPROC" bzImage || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then

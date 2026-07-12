@@ -194,7 +194,7 @@ setup_hooks() {
 }
 
 REPO_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || true)
-[[ -n $REPO_ROOT ]] && setup_hooks || warn "Not inside a git repo — skipping hook setup"
+if [[ -n $REPO_ROOT ]]; then setup_hooks; else warn "Not inside a git repo — skipping hook setup"; fi
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 

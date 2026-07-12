@@ -129,7 +129,7 @@ else
     fail "ideapad-laptop: not found in sysfs or dmesg"
 fi
 
-CONS=$(ls /sys/bus/platform/devices/*/conservation_mode 2>/dev/null | head -1)
+CONS=$(find /sys/bus/platform/devices -name conservation_mode 2>/dev/null | head -1)
 if [[ -n $CONS ]]; then
     ok "ideapad-laptop: conservation_mode node at $CONS"
 else

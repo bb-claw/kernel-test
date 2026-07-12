@@ -270,7 +270,9 @@ HTMLHEAD
     for row in "${ROWS[@]}"; do
         IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
 
+        # shellcheck disable=SC2015  # echo always succeeds; A && echo x || echo y is safe
         bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
+        # shellcheck disable=SC2015
         bt_cls=$(  [[ $bt  == PASS ]] && echo pass || { [[ $bt  == FAIL ]] && echo fail || { [[ $bt == build-only ]] && echo skip || echo unk; }; } )
 
         # Artifact links (relative paths — HTML lives in same dir)
@@ -318,6 +320,7 @@ HTMLHEAD
     printf '<table>\n<tr><th>Config</th><th>Arch</th><th>SHA256</th><th>Verified</th><th>File</th><th>Extras</th></tr>\n'
     for crow in "${CONFIG_ROWS[@]}"; do
         IFS='|' read -r cfg arc sha file ok <<< "$crow"
+        # shellcheck disable=SC2015  # echo always succeeds; safe
         ok_cls=$( [[ $ok == OK ]] && echo pass || { [[ $ok == MISMATCH ]] && echo fail || echo unk; } )
         [[ -f "$RUN_DIR/$file" ]] && file_cell="<a href=\"${file}\">${file}</a>" || file_cell="$file"
         extras=''
