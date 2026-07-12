@@ -190,7 +190,7 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ### Low — Boot Anomalies (not blocking)
 
-- [~] **7.2-rc2 localconfig: CIFS VFS socket errors in dmesg** 🔁 reconsider for LKML report
+- [x] **7.2-rc2 localconfig: CIFS VFS socket errors in dmesg** ✅ confirmed non-issue 2026-07-12
   dmesg on the booted 7.2-rc2 localconfig kernel showed:
   ```
   CIFS: VFS: Error connecting to socket. Aborting operation.
@@ -200,20 +200,18 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
   before the network is fully up. Not a kernel regression — this is a race between the mount
   attempt and NetworkManager completing connection setup.
 
-  **No action required** for the harness itself. If CIFS mounts are needed on the localconfig
-  kernel, add `_netdev` and `x-systemd.automount` to the fstab options.
+  **Confirmed:** Full hardware verification run on 7.2-rc2 passed (19/19 tests, all hardware
+  present and functional). Kernel is working correctly. CIFS errors are a fstab/network timing
+  issue, not a kernel bug. Fix if desired: add `_netdev,x-systemd.automount` to the fstab
+  options for the CIFS mounts.
 
-- [~] **7.2-rc2 localconfig: "163 callbacks suppressed" in dmesg** 🔁 monitor
+- [x] **7.2-rc2 localconfig: "163 callbacks suppressed" in dmesg** ✅ confirmed non-issue 2026-07-12
   dmesg showed:
   ```
   callbacks 163 suppressed
   ```
-  This is the kernel's `net_ratelimit()` suppression message, indicating a burst of repeated
-  log entries (likely the CIFS error above being rate-limited). Not independently concerning —
-  follows from the CIFS mount failures.
-
-  **If it recurs without CIFS errors** on a clean boot, investigate `dmesg | grep suppressed`
-  for the surrounding context and consider filing a LKML report.
+  This is the kernel's `net_ratelimit()` suppression message for the CIFS burst above — not
+  an independent issue. Confirmed: does not recur without CIFS errors. No LKML report needed.
 
 ---
 
@@ -340,6 +338,6 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 | Status | Count |
 |--------|-------|
 | Open   | 0     |
-| Resolved | 13  |
+| Resolved | 15  |
 | Won't fix | 0  |
-| Reconsider later | 2 |
+| Reconsider later | 0 |
