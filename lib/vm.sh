@@ -104,12 +104,17 @@ if [[ -s $DMESG_FILE ]]; then
     FAILED_TESTS=${FAILED_TESTS:-}
 
     # Count KUnit KTAP results.
-    # Individual test lines are indented (4+ spaces after the timestamp);
-    # top-level suite summary lines have no indent — excluded to avoid double-counting.
-    # Only attempt parsing when KTAP output is present.
+    # The kernel emits KTAP lines with ANSI color codes (\e[32m prefix, \e[0m after
+    # the timestamp) and without KTAP indentation — printk flattens the hierarchy.
+    # Strip ANSI codes and \r before matching; the {4,} indent filter is removed
+    # because all ok/not ok lines are flat after stripping.
+    # Suite summary lines (one per suite) are included in the count — they mirror
+    # the pass/fail state of their tests and are few relative to the total.
     if grep -qE 'KTAP version|# Subtest:' "$DMESG_FILE" 2>/dev/null; then
-        KUNIT_PASS=$(grep -cE '^\[[ 0-9.]+\] {4,}ok [0-9]+'     "$DMESG_FILE" 2>/dev/null || true)
-        KUNIT_FAIL=$(grep -cE '^\[[ 0-9.]+\] {4,}not ok [0-9]+' "$DMESG_FILE" 2>/dev/null || true)
+        KUNIT_PASS=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$DMESG_FILE" \
+            | grep -cE '^\[[ 0-9.]+\] ok [0-9]+'     || true)
+        KUNIT_FAIL=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$DMESG_FILE" \
+            | grep -cE '^\[[ 0-9.]+\] not ok [0-9]+' || true)
         KUNIT_PASS=${KUNIT_PASS:-0}
         KUNIT_FAIL=${KUNIT_FAIL:-0}
     fi
