@@ -42,7 +42,7 @@ sudo apt install gcc gcc-multilib make ccache qemu-system-x86 busybox-static cpi
 # Clone the stable kernel tree (contains both mainline rc and stable release tags)
 git clone --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git ~/git/linux-stable
 
-git clone https://github.com/YOUR_USERNAME/kernel-test.git
+git clone https://github.com/bb-claw/kernel-test.git
 cd kernel-test
 make bootstrap                          # install build deps (needs sudo, once) + activate git hooks
 
