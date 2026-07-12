@@ -305,12 +305,13 @@ Common workflows:
   make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
   # Fast iteration on test scripts — skip rebuild, repack initramfs and re-run tests
-  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 
   # Run KUnit tests only (kunit:N/N shown in report Tests column)
-  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitconfig ARCHS="x86_64 i386"
+  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitconfig ARCHS="x86_64 i386 arm64"
 
-  # Include arm64 (requires aarch64-linux-gnu-gcc and qemu-system-aarch64; TCG mode)
+  # arm64 uses TCG (no KVM on x86 host); requires aarch64-linux-gnu-gcc + qemu-system-aarch64
+  # Install both with: make bootstrap  (then arm64 works in all ARCHS= invocations above)
   make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
   # New mainline rc — pin exact version, then test (report always written)

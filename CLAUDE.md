@@ -58,6 +58,11 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `tests/custom/180_timer.sh` | Timer/clock subsystem: `/proc/uptime` readable and advancing, epoch sanity via `date +%s`, `sleep 0` nanosleep, `/proc/timer_list` hrtimer infrastructure |
 | `tests/custom/190_scheduler.sh` | CFS scheduler: `/proc/loadavg` format, `nice -n 10` and `nice -n -5` (setpriority syscall), `/proc/self/status` context switch counters, `/proc/schedstat` per-CPU stats |
+| `tests/custom/200_inotify.sh` | inotify subsystem: `/proc/sys/fs/inotify` limit knobs (max_queued_events, max_user_instances, max_user_watches) |
+| `tests/custom/210_futex.sh` | Futex: `/proc/sys/kernel/futex_private_hash_size` (kernel 6.x+, CONFIG_FUTEX); `/proc/sys/kernel/sem` |
+| `tests/custom/220_proc-net.sh` | /proc/net: `/proc/net/dev` interface table, `/proc/net/sockstat` socket counters, `/proc/net/protocols` |
+| `tests/custom/230_bind-mount.sh` | Bind mounts: `mount --bind` on initramfs rootfs dirs, alias file visibility, `/proc/mounts` entry, umount cleanup |
+| `tests/custom/240_cgroups.sh` | cgroups v2: `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts; new test script → `memory/test-inventory.md` must also be staged |
 | `.githooks/commit-msg` | Commit-msg hook: enforces conventional commit format `<type>[(<scope>)]: <desc>` |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts; test-inventory coverage; design doc required on `feat/*`/`fix/*` branches; memory file sizes (≤ 150 lines); `awk` banned in VM test scripts |
@@ -93,7 +98,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## How to add a test
 
-1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `200_my-test.sh`)
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `250_my-test.sh`)
    — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
 2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
 3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM
@@ -137,11 +142,11 @@ Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
 
 **Before opening a PR**, at minimum run:
 ```sh
-make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 ```
 For any change touching `tests/`, run the full suite:
 ```sh
-make all NO_FETCH=1 ARCHS="x86_64 i386"
+make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 ```
 
 ## Memory file update triggers
@@ -234,12 +239,12 @@ make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
 make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
 # Fast iteration on test scripts — skip kernel rebuild, repack initramfs and re-run
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 
 # Test rand500config only (tinyconfig + 500 random options, bootable)
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
 
-# Include arm64 (requires aarch64-linux-gnu-gcc and qemu-system-aarch64; TCG mode)
+# All three arches (arm64 uses TCG; requires aarch64-linux-gnu-gcc + qemu-system-aarch64)
 make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
 # Verbose mode

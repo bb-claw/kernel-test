@@ -39,7 +39,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 - **Architectures:** x86_64 + i386 (default, KVM); arm64 opt-in (`ARCHS="x86_64 i386 arm64"`, TCG, requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 8 (defconfig tinyconfig allnoconfig kunitconfig allmodconfig randconfig rand500config randdefconfig)
-- **Tests:** 21 total (1 smoke + 20 custom; see test-inventory.md); next slot: 200_
+- **Tests:** 26 total (1 smoke + 25 custom; see test-inventory.md); next slot: 250_
 - **Kernel tree:** `~/git/linux-stable` (contains both mainline rc and stable point release tags)
 - **Current kernel:** v7.2-rc2
 
@@ -51,7 +51,7 @@ kernel-test/
 ├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh common.sh checkout.sh install.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   └── custom/     001_print-dmesg + 010_ … 190_ (20 scripts)
+│   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
 ├── configs/        *.config fragments applied post-config
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context
