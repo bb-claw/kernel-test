@@ -303,7 +303,7 @@ Common workflows:
   make all NO_FETCH=1 
 
   # Build and install daily-driver kernel (Manjaro base config + laptop hardware fragment)
-  # BUILD_TIMEOUT=0 disables the 600s limit — localconfig is larger than defconfig
+  # BUILD_TIMEOUT=0 disables the timeout — use for localconfig (larger than defconfig)
   make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
   make install            CONFIGS=localconfig ARCHS=x86_64
 
