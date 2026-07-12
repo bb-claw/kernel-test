@@ -209,10 +209,10 @@ TXT="$RUN_DIR/summary.txt"
     printf '\nReport dir: %s/\n' "$RUN_DIR"
 } > "$TXT"
 
-# ── summary.mail ──────────────────────────────────────────────────────────────
+# ── summary.mail.txt ──────────────────────────────────────────────────────────────
 # Email-ready preamble only — paste as the body of an LKML report mail.
 
-MAIL="$RUN_DIR/summary.mail"
+MAIL="$RUN_DIR/summary.mail.txt"
 {
     printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
     printf 'build and booted: %s\n' "$OVERALL"
@@ -257,6 +257,7 @@ HTML="$RUN_DIR/summary.html"
 <p>Started: $RUN_STAMP</p>
 <p>Duration: $OVERALL_DURATION</p>
 <p>Overall: <strong>$OVERALL</strong></p>
+<p>Files: <a href="summary.txt">summary.txt</a> | <a href="summary.mail.txt">summary.mail.txt</a></p>
 <table>
 <tr><th>Config</th><th>Arch</th><th>Build</th><th>Boot</th><th>Tests</th><th>Started</th><th>Dur</th><th>Notes</th></tr>
 HTMLHEAD
@@ -305,13 +306,19 @@ HTMLHEAD
     done
 
     printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">Config fingerprints (sha256)</h2>\n'
-    printf '<table>\n<tr><th>Config</th><th>Arch</th><th>SHA256</th><th>Verified</th><th>File</th></tr>\n'
+    printf '<table>\n<tr><th>Config</th><th>Arch</th><th>SHA256</th><th>Verified</th><th>File</th><th>Extras</th></tr>\n'
     for crow in "${CONFIG_ROWS[@]}"; do
         IFS='|' read -r cfg arc sha file ok <<< "$crow"
         ok_cls=$( [[ $ok == OK ]] && echo pass || { [[ $ok == MISMATCH ]] && echo fail || echo unk; } )
         [[ -f "$RUN_DIR/$file" ]] && file_cell="<a href=\"${file}\">${file}</a>" || file_cell="$file"
-        printf '<tr><td>%s</td><td>%s</td><td style="font-size:.85em">%s</td><td class="%s">%s</td><td>%s</td></tr>\n' \
-            "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file_cell"
+        extras=''
+        rand_file="rand-sampled-${cfg}-${arc}.config"
+        randdef_file="randdef-disabled-${cfg}-${arc}.config"
+        [[ -f "$RUN_DIR/$rand_file"    ]] && extras="${extras:+$extras }<a href=\"${rand_file}\">rand-sampled</a>"
+        [[ -f "$RUN_DIR/$randdef_file" ]] && extras="${extras:+$extras }<a href=\"${randdef_file}\">randdef-disabled</a>"
+        [[ -z $extras ]] && extras='—'
+        printf '<tr><td>%s</td><td>%s</td><td style="font-size:.85em">%s</td><td class="%s">%s</td><td>%s</td><td>%s</td></tr>\n' \
+            "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file_cell" "$extras"
     done
 
     cat << HTMLFOOT
@@ -324,7 +331,7 @@ HTMLFOOT
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 info "Report written: $RUN_DIR/"
-info "  summary.mail — $MAIL"
+info "  summary.mail.txt — $MAIL"
 info "  summary.txt  — $TXT"
 info "  summary.html — $HTML"
 for crow in "${CONFIG_ROWS[@]}"; do

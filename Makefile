@@ -209,8 +209,9 @@ report:
 
 # Install built kernel(s) to /boot and update mkinitcpio + GRUB.
 # Designed for daily-driver use with CONFIGS=localconfig ARCHS=x86_64.
-# Builds modules (fast — reuses ccache), runs dkms autoinstall for out-of-tree
-# modules (nvidia, vbox, …), then needs sudo for /boot writes.
+# Runs olddefconfig (handles version-change config drift), builds modules
+# (fast — reuses ccache), runs dkms autoinstall for out-of-tree modules
+# (nvidia, vbox, …), then needs sudo for /boot writes.
 install:
 	@echo "[install] Config: $(CONFIGS) | Arch: $(ARCHS)"
 	$(Q)for config in $(CONFIGS); do \
@@ -246,7 +247,7 @@ Targets:
   initramfs    Assemble Toybox cpio initramfs for each arch
   test         Boot each (config, arch) in QEMU/KVM and run tests
   report       Generate HTML and plain-text report from last test run
-  install      Install built kernel to /boot; dkms autoinstall + mkinitcpio + GRUB (needs sudo, x86_64 only)
+  install      Install built kernel to /boot; olddefconfig + dkms autoinstall + mkinitcpio + GRUB (needs sudo, x86_64 only)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message

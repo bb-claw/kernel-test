@@ -313,7 +313,8 @@ skip() { printf 'skip: %s\n' "$*"; }
 After each run, `reports/<date>_<time>_<kernel>/` contains:
 
 - `summary.html` — pass/fail table per config × architecture × test
-- `summary.txt` — plain-text version for mailing list submission
+- `summary.txt` — plain-text version with LKML preamble + full results table
+- `summary.mail.txt` — preamble only (Subject line + metadata); paste as email intro without the table
 - `dmesg-<config>-<arch>.txt` — full kernel serial output per variant
 - `kconfig-<config>-<arch>.config` — exact `.config` used for that build
 - `rand-sampled-<config>-<arch>.config` — the 500 sampled lines (rand500config only)
@@ -326,7 +327,8 @@ an artifact to inspect after a run.
 ## Community Contribution
 
 Test reports can be sent to the Linux kernel mailing list (LKML) or relevant subsystem
-lists. Use `summary.txt` as the body — it is generated ready to paste into an email.
+lists. Use `summary.txt` as the body — it contains the full preamble + results table.
+For a standalone email intro without the table, use `summary.mail.txt`.
 
 The preamble format:
 
