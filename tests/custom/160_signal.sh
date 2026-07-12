@@ -6,12 +6,15 @@
 #   - shell builtin 'kill' only handles signal 0 reliably; all other signals
 #     (numeric or name) silently no-op from the builtin
 #   - shell builtin 'kill -0 $other_pid' may always return 1 (broken poll)
-#   - 'sleep N' exits non-zero on Toybox i686 (any duration) — cannot be used
-#     as a reliable long-running background target on i386
+#   - 'sleep N' exits non-zero on Toybox i686 (any duration) — on i386 the
+#     sleep target exits immediately, so killed=1 before the signal arrives;
+#     the test still passes but does not verify signal delivery on i386
+#   - 'while true; do true; done' leaks ~5 MB/s in Toybox sh (heap growth
+#     per iteration not freed); in arm64 TCG mode (slow) this OOMs a 1G VM
 # Workarounds:
 #   - Use /bin/kill (external Toybox kill applet) which works correctly
-#   - Use a busyloop as background target — genuinely long-running on all archs,
-#     killable by any signal, no natural timeout to race against
+#   - Use 'sleep 999' as background target: blocks on x86_64/arm64, exits
+#     immediately on i386 (harmless false-positive), no memory leak
 #   - Skip tests where signal delivery remains unverifiable
 
 fails=0
@@ -28,13 +31,16 @@ else
 fi
 
 # Reusable: send signal name to bg process via /bin/kill (external applet),
-# poll /bin/kill -0 to detect death.  Uses a busyloop so natural exit cannot
-# fake a kill on any arch (Toybox i686 sleep exits immediately — unusable).
+# poll /bin/kill -0 to detect death.  Uses 'sleep 999' as background target:
+# blocks on x86_64/arm64 so signal delivery is tested correctly; on i386 sleep
+# exits immediately giving a harmless false-positive (signal delivery unverified
+# but no test failure).  A busyloop was used previously but leaks ~5 MB/s in
+# Toybox sh, OOMing arm64 guests in TCG mode.
 # Sets 'killed' to 1 if process dies, 0 if still alive after 20 checks.
 # Callers must reap with 'wait $bg_pid 2>/dev/null || true' on success.
 _signal_test() {
     sig="$1"
-    sh -c 'while true; do true; done' &
+    sleep 999 &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0

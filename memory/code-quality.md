@@ -55,6 +55,7 @@ Examples:
 - **`kill` builtin** → only `kill -0 $$` works; use `/bin/kill` for all other signals
 - **`sleep N` on i386** → Toybox i686 sleep exits non-zero; guard with `if sleep N; then ... else skip ...; fi`
 - **`$(( ))` in while loops** → OOM in 512 MB VM; use `for i in 1 2 3 ... 20` instead
+- **`while true; do true; done` busyloop** → Toybox sh leaks ~5 MB/s per iteration; fills guest RAM in ~100 s on arm64 TCG. Use `sleep 999 &` as a long-running background target instead (i386 sleep exits immediately — harmless false-positive).
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
 - **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
 - **`tr`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `sed 's/old/new/g'` for character substitution or `grep -o` for character filtering.
