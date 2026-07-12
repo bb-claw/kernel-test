@@ -6,15 +6,17 @@
 #   - shell builtin 'kill' only handles signal 0 reliably; all other signals
 #     (numeric or name) silently no-op from the builtin
 #   - shell builtin 'kill -0 $other_pid' may always return 1 (broken poll)
-#   - 'sleep N' exits non-zero on Toybox i686 (any duration) — on i386 the
-#     sleep target exits immediately, so killed=1 before the signal arrives;
-#     the test still passes but does not verify signal delivery on i386
-#   - 'while true; do true; done' leaks ~5 MB/s in Toybox sh (heap growth
-#     per iteration not freed); in arm64 TCG mode (slow) this OOMs a 1G VM
+#   - 'while true; do true; done' leaks memory: 'true' is a Toybox applet
+#     (external command), so each iteration forks+execs; zombie accumulation
+#     in the parent fills all guest RAM (~1 GB on arm64 TCG)
+#   - 'sleep N' cannot receive signals in arm64 QEMU TCG (blocking syscall
+#     never interrupted); 'wait $pid' hangs indefinitely
+#   - 'while :; do :; done' is the safe busyloop: ':' is a POSIX special
+#     builtin (no fork per iteration), CPU-bound so signals are delivered
 # Workarounds:
 #   - Use /bin/kill (external Toybox kill applet) which works correctly
-#   - Use 'sleep 999' as background target: blocks on x86_64/arm64, exits
-#     immediately on i386 (harmless false-positive), no memory leak
+#   - Use 'while :; do :; done' as background target (no memory leak, receives
+#     signals; wrapped in 'sh -c' to isolate from parent's address space)
 #   - Skip tests where signal delivery remains unverifiable
 
 fails=0
@@ -30,18 +32,17 @@ else
     fail "kill -0 self failed"
 fi
 
-# Reusable: send signal under test to a background 'sleep 999', then check
+# Reusable: send signal under test to a background ':' busyloop, then check
 # once whether the process is dead.  A single check avoids the O(20) poll
 # loop — in arm64 TCG each fork+exec of /bin/kill takes ~2-3 s, so 20
 # iterations × 3 signal tests would exhaust the 180 s timeout.
 # By the time kill -0 execs (~150 ms KVM, ~2 s TCG), the signal should have
-# been delivered by the kernel.  A forced SIGKILL backstop ensures cleanup.
-# On i386, sleep exits immediately (known Toybox i686 bug) so killed=1 is
-# set before the signal arrives — harmless false-positive, no test failure.
+# been delivered to the CPU-bound target.  A forced SIGKILL backstop ensures
+# cleanup; CPU-busy processes receive SIGKILL in TCG (blocking 'sleep' does not).
 # Sets 'killed' to 1 if process was dead on the single check, 0 otherwise.
 _signal_test() {
     sig="$1"
-    sleep 999 &
+    sh -c 'while :; do :; done' &
     bg_pid=$!
     /bin/kill "$sig" "$bg_pid" 2>/dev/null || true
     killed=0
