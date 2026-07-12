@@ -52,6 +52,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/120_rng.sh` | `/dev/urandom` read at 512 B and 4096 B (CRNG output path) |
 | `tests/custom/130_fork-exec.sh` | fork/exec, exit-code propagation, 20 sequential forks, SIGCHLD |
 | `tests/custom/140_sysctl.sh` | `/proc/sys` read + write/restore of `kernel.hostname`, `pid_max`, etc. |
+| `tests/custom/150_mmap.sh` | VMA table via `/proc/self/maps`: readable, count > 2, `[stack]` present, anonymous mappings, fork/exec stability; `/proc/meminfo` AnonPages/PageTables |
+| `tests/custom/160_signal.sh` | Signal delivery: `kill -0` process-existence, SIGTERM/SIGKILL/SIGUSR1 via `/bin/kill` + poll, `/proc/self/status` SigBlk/SigIgn/SigCgt mask fields |
+| `tests/custom/170_pipe.sh` | Pipe I/O: basic data flow, 3-process pipeline, exit-code propagation, 1 MiB large transfer, 10 sequential writes |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts |
 | `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
@@ -86,7 +89,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## How to add a test
 
-1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `150_my-test.sh`)
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `180_my-test.sh`)
    — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
 2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
 3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM

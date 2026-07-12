@@ -152,7 +152,10 @@ kernel-test/
 │   │   ├── 110_tmpfs-stress.sh
 │   │   ├── 120_rng.sh
 │   │   ├── 130_fork-exec.sh
-│   │   └── 140_sysctl.sh
+│   │   ├── 140_sysctl.sh
+│   │   ├── 150_mmap.sh
+│   │   ├── 160_signal.sh
+│   │   └── 170_pipe.sh
 │   └── hardware/
 │       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/
@@ -290,22 +293,22 @@ prefixes for per-assertion output. The `/init` runner wraps each script with str
 markers that `vm.sh` counts:
 
 ```
-> TEST RUN: 150_my-test
+> TEST RUN: 180_my-test
 ok: something worked
 FAIL: something broke
-< TEST FAIL: 150_my-test
+< TEST FAIL: 180_my-test
 ```
 
-Example: `tests/custom/150_my-test.sh`
+Example: `tests/custom/180_my-test.sh`
 ```sh
 #!/bin/sh
-_fails=0
+fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
-fail() { printf 'FAIL: %s\n' "$*"; _fails=$((_fails+1)); }
+fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails+1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 [ -r /proc/version ] && ok "/proc/version readable" || fail "/proc/version missing"
-[ $_fails -eq 0 ] || exit 1
+[ $fails -eq 0 ] || exit 1
 ```
 
 ## Report Format
