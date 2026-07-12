@@ -18,6 +18,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | Script | What it exercises |
 |---|---|
 | `001_smoke` | Shell arithmetic, `/dev/null`, `/proc/version`, `/sys/kernel` |
+| `001_print-dmesg` | Diagnostic dmesg dump — always passes; useful for post-failure inspection |
 | `010_check-proc` | `/proc`: cpuinfo, meminfo, uptime, cmdline, filesystems |
 | `020_check-sysfs` | `/sys`: kernel, block, class/net hierarchy |
 | `030_check-dmesg` | dmesg: kernel version string, no early oops/panic |
@@ -38,7 +39,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | `180_timer` | `/proc/uptime` readable + advancing, epoch sanity via `date +%s`, `sleep 0`, `/proc/timer_list` |
 | `190_scheduler` | `/proc/loadavg` format, `nice -n ±N` (setpriority), context switch counters, `/proc/schedstat` |
 
-Next available slot: **200_**
+Next available slot: **200_** — 21 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 

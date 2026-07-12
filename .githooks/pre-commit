@@ -57,6 +57,22 @@ else
     fi
 fi
 
+# ── 4. Test script → memory/test-inventory.md ────────────────────────────────
+# When a new test script is added, memory/test-inventory.md must also be staged.
+
+mapfile -t NEW_TESTS < <(
+    git diff --cached --name-status --diff-filter=A \
+        -- 'tests/custom/*.sh' 'tests/001_smoke.sh' \
+        | awk '{print $2}'
+)
+if [[ ${#NEW_TESTS[@]} -gt 0 ]]; then
+    if printf '%s\n' "${STAGED[@]}" | grep -q 'memory/test-inventory.md'; then
+        ok "test-inventory.md staged alongside new test(s)"
+    else
+        fail "new test script(s) staged without updating memory/test-inventory.md: ${NEW_TESTS[*]}"
+    fi
+fi
+
 # ── Result ────────────────────────────────────────────────────────────────────
 if [[ $rc -eq 0 ]]; then
     printf '[pre-commit] all checks passed\n'

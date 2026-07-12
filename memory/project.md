@@ -51,7 +51,7 @@ kernel-test/
 ├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh common.sh checkout.sh install.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   └── custom/     010_ … 190_ (20 scripts)
+│   └── custom/     001_print-dmesg + 010_ … 190_ (20 scripts)
 ├── configs/        *.config fragments applied post-config
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context

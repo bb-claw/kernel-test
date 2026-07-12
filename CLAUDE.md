@@ -142,6 +142,29 @@ For new or changed tests, run the full suite:
 make all NO_FETCH=1 ARCHS="x86_64 i386"
 ```
 
+## Memory file update triggers
+
+Keep `memory/*.md` in sync with the code. The pre-push hook enforces coverage for test
+scripts; the table below covers everything else.
+
+| When you… | Update these memory files |
+|---|---|
+| Add a test script | `memory/test-inventory.md` (new row in table, update next slot) · `memory/project.md` (test count + directory listing) |
+| Remove a test script | `memory/test-inventory.md` (remove row) · `memory/project.md` (test count) |
+| Add or remove a config profile | `memory/config-profiles.md` · `memory/project.md` (profile count) |
+| Change a Makefile variable (default, name, purpose) | `memory/workflows.md` |
+| Change build, fetch, or test pipeline behaviour | `memory/workflows.md` · `memory/project.md` |
+| Discover a new Toybox sh bug or workaround | `memory/code-quality.md` (Toybox pitfalls list) |
+| Change a git hook or quality gate | `memory/code-quality.md` (hooks table) |
+| Change architecture or fundamental design | `memory/project.md` |
+
+The pre-push hook enforces:
+- Every `tests/custom/*.sh` and `tests/001_smoke.sh` name must appear in `memory/test-inventory.md`
+- Every `memory/*.md` (except `MEMORY.md`) must be ≤ 150 lines
+
+The pre-commit hook enforces:
+- When a new test script is staged, `memory/test-inventory.md` must also be staged
+
 ## What NOT to do
 
 - Do not introduce Python, Go, or any non-shell dependency without explicit user approval
