@@ -1,67 +1,61 @@
 #!/bin/sh
-# Signal delivery: trap, kill, SIGCHLD.
-# Exercises kernel signal delivery path (sigaction, do_signal, SIGCHLD).
-# Uses numeric signal numbers — Toybox sh 0.8.9 trap cannot resolve signal
-# names (TERM, USR1, CHLD) and fails with 'No such file or directory'.
-# Linux x86/x86_64/i386: SIGTERM=15, SIGUSR1=10, SIGCHLD=17.
+# Signal delivery: kill syscall, signal termination, process state.
+# Exercises kernel do_send_sig, signal_wake_up, and per-thread signal tracking.
+# Does not use 'trap' — Toybox sh 0.8.9 treats it as an external command
+# (not a builtin) and fails with 'No such file or directory'.
 
 fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
-# SIGTERM (15) to self — trap must fire before the next command runs
-got_term=0
-trap 'got_term=1' 15
-kill -15 $$
-trap - 15
-if [ "$got_term" -eq 1 ]; then
-    ok "SIGTERM (15) delivered to self (trap)"
-else
-    fail "SIGTERM not delivered to self"
-fi
-
-# SIGUSR1 (10) to self
-got_usr1=0
-# shellcheck disable=SC2172
-trap 'got_usr1=1' 10
-kill -10 $$
-trap - 10
-if [ "$got_usr1" -eq 1 ]; then
-    ok "SIGUSR1 (10) delivered to self"
-else
-    fail "SIGUSR1 not delivered to self"
-fi
-
-# kill -0: existence check — no signal sent, just permission/existence check
+# kill -0: signal 0 tests permission and process existence without sending a signal
 if kill -0 $$ 2>/dev/null; then
     ok "kill -0 self (process existence check)"
 else
     fail "kill -0 self failed"
 fi
 
-# SIGTERM (15) kills background process — rc must be non-zero
+# SIGTERM (15) to background process — default action is terminate
 sh -c 'sleep 5' &
 bg_pid=$!
 kill -15 "$bg_pid" 2>/dev/null
 wait "$bg_pid"; rc=$?
 if [ "$rc" -ne 0 ]; then
-    ok "SIGTERM killed background process (rc=$rc)"
+    ok "SIGTERM (15) terminates background process (rc=$rc)"
 else
-    fail "background process survived SIGTERM (rc=$rc)"
+    fail "background process survived SIGTERM"
 fi
 
-# SIGCHLD (17) on child exit — skip if sh does not expose signal 17 traps
-got_chld=0
-# shellcheck disable=SC2172
-trap 'got_chld=1' 17
-sh -c 'exit 0' &
-wait $!
-trap - 17
-if [ "$got_chld" -eq 1 ]; then
-    ok "SIGCHLD (17) delivered on child exit"
+# SIGKILL (9) is unblockable — kernel must enforce termination
+sh -c 'sleep 5' &
+bg_pid=$!
+kill -9 "$bg_pid" 2>/dev/null
+wait "$bg_pid"; rc=$?
+if [ "$rc" -ne 0 ]; then
+    ok "SIGKILL (9) terminates background process (rc=$rc)"
 else
-    skip "SIGCHLD trap not fired (sh may not expose signal 17)"
+    fail "background process survived SIGKILL"
 fi
+
+# SIGUSR1 (10) to background process — user-defined signal, default action terminate
+sh -c 'sleep 5' &
+bg_pid=$!
+kill -10 "$bg_pid" 2>/dev/null
+wait "$bg_pid"; rc=$?
+if [ "$rc" -ne 0 ]; then
+    ok "SIGUSR1 (10) terminates background process (rc=$rc)"
+else
+    fail "background process survived SIGUSR1"
+fi
+
+# /proc/self/status signal mask fields — kernel tracks per-thread signal state
+for field in SigBlk SigIgn SigCgt; do
+    if grep -q "^${field}:" /proc/self/status 2>/dev/null; then
+        ok "/proc/self/status: $field present"
+    else
+        skip "/proc/self/status: $field not available"
+    fi
+done
 
 [ $fails -eq 0 ] || exit 1
