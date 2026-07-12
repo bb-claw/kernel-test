@@ -37,9 +37,9 @@ _signal_test() {
         true
     done
     if [ "$killed" -eq 0 ]; then
-        # Process survived — clean up and skip
-        kill -9 "$bg_pid" 2>/dev/null || true
-        wait "$bg_pid" 2>/dev/null || true
+        # Process survived — attempt cleanup but do NOT wait: if -KILL also
+        # no-ops in this sh, waiting would block until sleep 60 expires.
+        kill -KILL "$bg_pid" 2>/dev/null || true
     fi
 }
 
