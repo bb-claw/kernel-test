@@ -54,6 +54,12 @@ make -C "$KERNEL_TREE" \
     HOSTCC="ccache $GCC" \
     olddefconfig
 
+# Update the stored sha256 so report.sh does not flag a false MISMATCH.
+# olddefconfig may add new-option defaults or drop stale symbols, changing .config.
+NEW_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
+sed -i "s/^CONFIG_SHA256=.*/CONFIG_SHA256=$NEW_SHA256/" "$STATUS_FILE"
+info "Config SHA256 updated: $NEW_SHA256"
+
 # ── Step 2: build modules ─────────────────────────────────────────────────────
 info "Building modules ($NPROC jobs)..."
 make -C "$KERNEL_TREE" \
