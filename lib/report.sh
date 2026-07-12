@@ -321,6 +321,29 @@ HTMLHEAD
             "$cfg" "$arc" "$sha" "$ok_cls" "$ok" "$file_cell" "$extras"
     done
 
+    printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">All report files</h2>\n'
+    printf '<table>\n<tr><th>Config</th><th>Arch</th><th>dmesg</th><th>build log</th><th>QEMU log</th><th>kconfig</th><th>Extras</th></tr>\n'
+    for row in "${ROWS[@]}"; do
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr <<< "$row"
+        _dmesg="dmesg-${cfg}-${arc}.txt"
+        _blog="build-${cfg}-${arc}.log"
+        _qlog="qemu-${cfg}-${arc}.log"
+        _kconf="kconfig-${cfg}-${arc}.config"
+        _rands="rand-sampled-${cfg}-${arc}.config"
+        _randdef="randdef-disabled-${cfg}-${arc}.config"
+        _lnk() { local f="$1" l="${2:-$1}"; [[ -f "$RUN_DIR/$f" ]] && printf '<a href="%s">%s</a>' "$f" "$l" || printf '—'; }
+        dmesg_c=$(_lnk "$_dmesg" dmesg)
+        blog_c=$(_lnk "$_blog" build.log)
+        qlog_c=$(_lnk "$_qlog" qemu.log)
+        kconf_c=$(_lnk "$_kconf" kconfig)
+        extras=''
+        [[ -f "$RUN_DIR/$_rands"   ]] && extras="${extras:+$extras }<a href=\"${_rands}\">rand-sampled</a>"
+        [[ -f "$RUN_DIR/$_randdef" ]] && extras="${extras:+$extras }<a href=\"${_randdef}\">randdef-disabled</a>"
+        [[ -z $extras ]] && extras='—'
+        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n' \
+            "$cfg" "$arc" "$dmesg_c" "$blog_c" "$qlog_c" "$kconf_c" "$extras"
+    done
+
     cat << HTMLFOOT
 </table>
 </body>
