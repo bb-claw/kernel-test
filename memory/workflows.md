@@ -58,11 +58,29 @@ make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
 ### Fast iteration on test scripts (skip kernel rebuild)
 
 ```sh
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
 ```
 
 Skips the build step, repacks the initramfs (< 1 s), boots and tests.
 Use when only test scripts changed — kernel artifacts reused from prior run.
+arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
+
+### Regression diff between two rc runs
+
+```sh
+# Auto-detect latest two runs
+make diff
+
+# Compare specific runs
+make diff OLD=reports/2026-07-12_v7.2-rc1 NEW=reports/2026-07-12_v7.2-rc2
+
+# Pin current results as baseline; future make all runs also diff against it
+make baseline
+```
+
+`lib/diff.sh` compares per-test name: `PASS→FAIL` = regression, `FAIL→PASS` = fix.
+Auto-diff vs previous run and vs pinned baseline runs at the end of every `make all`.
+Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the report dir.
 
 ### Verbose build output
 
