@@ -82,7 +82,7 @@ case "$BRANCH" in
         ;;
 esac
 
-# ── 4. Memory file sizes ──────────────────────────────────────────────────────
+# ── 5. Memory file sizes ──────────────────────────────────────────────────────
 # memory/*.md (except MEMORY.md index) must stay ≤ 150 lines.
 
 mem_over=()

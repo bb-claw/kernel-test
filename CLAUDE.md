@@ -150,8 +150,8 @@ scripts; the table below covers everything else.
 
 | When you… | Update these memory files |
 |---|---|
-| Add a test script | `memory/test-inventory.md` (new row in table, update next slot) · `memory/project.md` (test count + directory listing) |
-| Remove a test script | `memory/test-inventory.md` (remove row) · `memory/project.md` (test count) |
+| Add a test script | `memory/test-inventory.md` (new row in table, update next slot) · `memory/project.md` (test count + directory listing) · `CLAUDE.md` Key files table (new row) |
+| Remove a test script | `memory/test-inventory.md` (remove row) · `memory/project.md` (test count) · `CLAUDE.md` Key files table (remove row) |
 | Add or remove a config profile | `memory/config-profiles.md` · `memory/project.md` (profile count) |
 | Change a Makefile variable (default, name, purpose) | `memory/workflows.md` |
 | Change build, fetch, or test pipeline behaviour | `memory/workflows.md` · `memory/project.md` |
