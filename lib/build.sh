@@ -162,7 +162,11 @@ elif [[ $CONFIG == kunitrandconfig ]]; then
     trap 'rm -rf "$RAND_TMP"' EXIT
     make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
-    grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=y$' "$RAND_TMP/.config" \
+    # KUnit test options are tristates — randconfig assigns y, m, or n randomly.
+    # Force =m → =y: our initramfs cannot load modules so tests must be built-in.
+    # olddefconfig (step 1b) drops any module whose deps are unmet by defconfig.
+    grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=[ym]$' "$RAND_TMP/.config" \
+        | sed 's/=[ym]$/=y/' \
         | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
     rm -rf "$RAND_TMP"
     trap - EXIT
