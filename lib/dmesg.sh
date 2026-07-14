@@ -66,7 +66,7 @@ run_analysis() {
     critical=$(grep -iE 'oops:|kernel panic|BUG:|call trace|general protection fault|unable to handle kernel' "$F" || true)
     fwbugs=$(grep -iE '\[firmware.?bug\]|acpi bios error|acpi.*ae_not_found' "$F" || true)
     # WRMSR: deduplicate — show count + unique MSR addresses, not every line
-    wrmsr_n=$(grep -c 'unhandled wrmsr' "$F" || echo 0)
+    wrmsr_n=$(grep -c 'unhandled wrmsr' "$F" || true)
     wrmsr_msrs=$(grep -iE 'unhandled wrmsr' "$F" | grep -oE 'WRMSR\(0x[0-9a-fA-F]+\)' | sort -u | tr '\n' ' ' || true)
 
     if [[ -n "$critical" ]]; then
@@ -100,8 +100,8 @@ run_analysis() {
     fi
 
     # Wi-Fi
-    deauth_n=$(grep -c 'deauthenticated' "$F" || echo 0)
-    disc_n=$(grep -c 'Connection to AP.*lost' "$F" || echo 0)
+    deauth_n=$(grep -c 'deauthenticated' "$F" || true)
+    disc_n=$(grep -c 'Connection to AP.*lost' "$F" || true)
     wifi_err=$(grep -iE 'mt7921.*(error|fail)|invalid mac address' "$F" || true)
     if [[ -n "$wifi_err" || "$deauth_n" -gt 2 || "$disc_n" -gt 1 ]]; then
         printf 'Wi-Fi (mt7921e):\n'
