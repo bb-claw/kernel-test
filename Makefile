@@ -41,7 +41,8 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 # Configs that are built but not booted:
 #   allmodconfig — boot impractical: sanitizers + built-in self-tests take 100+ s; modules not in initramfs
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
-# tinyconfig, allnoconfig, defconfig, and rand500config are bootable via configs/<name>.config fragments.
+# kunitconfig/kunitrandconfig use defconfig base (already bootable); tinyconfig/allnoconfig/rand500config
+# need their configs/<name>.config fragments to restore the TTY/serial/initramfs options they strip.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 

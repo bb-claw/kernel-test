@@ -9,7 +9,7 @@
 | `STABLE_RELEASE` | _(none)_ | `STABLE_RELEASE=7.1` |
 | `TAG` | _(none)_ | `TAG=v7.2-rc2` (used by `make checkout` only) |
 | `ARCHS` | `x86_64 i386` | `ARCHS=x86_64` |
-| `CONFIGS` | all 8 profiles | `CONFIGS=defconfig` |
+| `CONFIGS` | all 9 profiles | `CONFIGS=defconfig` |
 | `TIMEOUT` | `60` | `TIMEOUT=120` |
 | `BUILD_TIMEOUT` | `1200` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
 | `NO_FETCH` | `0` | `NO_FETCH=1` |
@@ -65,6 +65,20 @@ Skips the build step, repacks the initramfs (< 1 s), boots and tests.
 Use when only test scripts changed — kernel artifacts reused from prior run.
 arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
 
+### KUnit randomised coverage (kunitrandconfig)
+
+```sh
+# Build: enumerates all available KUnit test modules for this arch (random set each time)
+make build NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64
+
+# Boot: run the sampled modules; kunit:N/N shown in report
+make test NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitrandconfig ARCHS=x86_64 TIMEOUT=60
+```
+
+`kunitrand-sampled.config` in the build dir records which KUNIT options were tried.
+**Rebuild required each run** to get a new random sample — `NO_BUILD=1` reuses the
+previous run's sample and defeats the randomisation.
+
 ### Regression diff between two rc runs
 
 ```sh
@@ -119,4 +133,4 @@ If tag already local, fetch is skipped entirely.
 `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout(1)`.
 Exit 124 → `STATUS=TIMEOUT` in `build.status` (distinct from `STATUS=FAIL`).
 Config step and fragment step are NOT wrapped — they are fast.
-defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine.
+defconfig/kunitconfig/kunitrandconfig x86_64 takes ~10–12 min on a 16-core machine.
