@@ -17,6 +17,7 @@ make all
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline
   └─ lib/diff.sh         compare two report dirs for per-test regressions/fixes; invoked by report.sh + make diff
+  └─ lib/dmesg.sh        host-side only: capture + analyse running kernel dmesg; make dmesg [DMESG_LABEL=]
 ```
 
 All user-facing commands go through `make`. Makefile exports env vars; lib scripts
@@ -49,13 +50,14 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh
+├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
 ├── configs/        *.config fragments applied post-config
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context
+├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
 ├── build/          gitignored; out-of-tree kernel builds + initramfs
 ├── cache/          gitignored; ccache
 └── reports/        gitignored; HTML + txt reports per run

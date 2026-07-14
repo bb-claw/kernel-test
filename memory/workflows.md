@@ -15,6 +15,7 @@
 | `NO_FETCH` | `0` | `NO_FETCH=1` |
 | `NO_BUILD` | `0` | `NO_BUILD=1` |
 | `V` | `0` | `V=1` |
+| `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -101,6 +102,17 @@ Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the re
 ```sh
 make all NO_FETCH=1 V=1 KERNEL_TREE=~/git/linux-stable
 ```
+
+### Capture and analyse host kernel dmesg
+
+```sh
+make dmesg                        # label: mainline (default)
+make dmesg DMESG_LABEL=stable     # or: longterm / linux-next
+```
+
+Writes `dmesg/<name>.txt` and `dmesg/<name>-analysis.txt`; diffs warning/error
+lines vs the previous capture for the same label; exits 1 on VERDICT=ERRORS.
+Script: `lib/dmesg.sh`; valid labels: `mainline stable longterm linux-next`.
 
 ### Check what is currently checked out
 
