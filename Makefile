@@ -27,6 +27,7 @@ V             ?= 0
 NO_FETCH      ?= 0
 NO_BUILD      ?= 0
 TOYBOX_VERSION ?= 0.8.9
+DMESG_LABEL    ?= mainline
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -73,7 +74,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report diff baseline install clean distclean bootstrap hooks info checkout help
+.PHONY: all fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -236,6 +237,11 @@ baseline:
 	ln -sfn "$$(basename $$latest)" "$(REPORT_DIR)/baseline"; \
 	echo "[baseline] Pinned: $$latest → $(REPORT_DIR)/baseline"
 
+# Capture dmesg from the running host kernel, run analysis, and diff vs previous.
+# Usage: make dmesg [DMESG_LABEL=mainline|stable|longterm|linux-next]
+dmesg:
+	$(Q)lib/dmesg.sh "$(DMESG_LABEL)"
+
 # Install built kernel(s) to /boot and update mkinitcpio + GRUB.
 # Designed for daily-driver use with CONFIGS=localconfig ARCHS=x86_64.
 # Runs olddefconfig (handles version-change config drift), builds modules
@@ -279,6 +285,7 @@ Targets:
   diff         Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
   baseline     Pin the latest report dir as the regression baseline; auto-diff will compare against it
   install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
+  dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -310,6 +317,7 @@ Variables (current values):
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
   NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
+  DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
