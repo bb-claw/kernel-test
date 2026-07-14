@@ -28,6 +28,7 @@ NO_FETCH      ?= 0
 NO_BUILD      ?= 0
 TOYBOX_VERSION ?= 0.8.9
 DMESG_LABEL    ?= mainline
+LABEL          ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -61,7 +62,7 @@ export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE
-export TOYBOX_VERSION
+export TOYBOX_VERSION LABEL
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -318,6 +319,7 @@ Variables (current values):
   NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
   DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
+  LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -380,14 +382,18 @@ Common workflows:
   # Verbose output for debugging
   make V=1 KERNEL_TREE=~/git/linux-stable
 
-  # Regression diff between two rc runs (auto-detects latest two)
+  # Regression diff — auto-detects two most recent same-label runs
   make diff
 
-  # Diff two specific runs
-  make diff OLD=reports/2026-07-12_v7.2-rc1 NEW=reports/2026-07-12_v7.2-rc2
+  # Diff two specific runs (cross-label diff also supported via explicit paths)
+  make diff OLD=reports/mainline-7.2-2026-07-12_10-00-00-v7.2-rc1 NEW=reports/mainline-7.2-2026-07-12_11-00-00-v7.2-rc2
 
   # Pin current results as baseline; future runs will auto-diff against it
   make baseline
+
+  # Rename old-format report dirs to new label-prefixed format
+  bash scripts/migrate-reports.sh          # dry-run — shows what would change
+  bash scripts/migrate-reports.sh --apply  # rename dirs + update baseline symlink
 endef
 export HELP_TEXT
 
