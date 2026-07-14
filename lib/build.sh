@@ -145,6 +145,25 @@ elif [[ $CONFIG == kunitconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
+elif [[ $CONFIG == kunitrandconfig ]]; then
+    # Enumerate every CONFIG_*KUNIT* from a fresh randconfig (full option set for
+    # this arch), append to defconfig base.  olddefconfig (step 1b) drops any
+    # module whose deps are unmet — only valid, buildable options survive.
+    if ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+    RAND_TMP=$(mktemp -d)
+    trap 'rm -rf "$RAND_TMP"' EXIT
+    make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
+        KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
+    # Force =m → =y: initramfs cannot load modules, tests must be built-in.
+    grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=[ym]$' "$RAND_TMP/.config" \
+        | sed 's/=[ym]$/=y/' \
+        | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
+    rm -rf "$RAND_TMP"
+    trap - EXIT
 elif [[ $CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.

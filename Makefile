@@ -18,7 +18,7 @@ endif
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
 ARCHS         ?= x86_64 i386
-CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig
+CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1200
 GCC           ?= gcc
@@ -41,7 +41,8 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 # Configs that are built but not booted:
 #   allmodconfig — boot impractical: sanitizers + built-in self-tests take 100+ s; modules not in initramfs
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
-# tinyconfig, allnoconfig, defconfig, and rand500config are bootable via configs/<name>.config fragments.
+# kunitconfig/kunitrandconfig use defconfig base (already bootable); tinyconfig/allnoconfig/rand500config
+# need their configs/<name>.config fragments to restore the TTY/serial/initramfs options they strip.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
@@ -283,15 +284,16 @@ Targets:
   help         Show this message
 
 Config profiles (CONFIGS=):
-  defconfig      Boot+test  Architecture default — broad baseline coverage
-  tinyconfig     Boot+test  Minimal kernel — tests lower bound of functionality
-  allnoconfig    Boot+test  Everything disabled — absolute minimum boot path
-  kunitconfig    Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  rand500config  Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
-  randdefconfig  Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
-  localconfig    Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
-  allmodconfig   Build only All options as modules — catches build-time regressions
-  randconfig     Build only Fully random config — catches compile-time regressions (BUILD_TIMEOUT capped)
+  defconfig        Boot+test  Architecture default — broad baseline coverage
+  tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
+  allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
+  kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
+  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  rand500config    Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
+  randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
+  localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
+  allmodconfig     Build only All options as modules — catches build-time regressions
+  randconfig       Build only Fully random config — catches compile-time regressions (BUILD_TIMEOUT capped)
 
 Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)

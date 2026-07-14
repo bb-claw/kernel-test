@@ -7,6 +7,8 @@
 | `defconfig` | yes | arch default | none | Broad baseline; most subsystems enabled |
 | `tinyconfig` | yes | minimal | `configs/tinyconfig.config` | Near-empty; fragment pins bootability options |
 | `allnoconfig` | yes | all-no | `configs/allnoconfig.config` | Absolute minimum boot path |
+| `kunitconfig` | yes | defconfig | `configs/kunitconfig.config` | KUnit framework + core test suites; KTAP results shown as kunit:N/N |
+| `kunitrandconfig` | yes | defconfig | `configs/kunitrandconfig.config` | All KUnit test modules available on defconfig base (enumerated from randconfig, olddefconfig drops invalid); random set per run — rebuild required each time |
 | `rand500config` | yes | tinyconfig | `configs/rand500config.config` | 500 random =y lines sampled from constrained randconfig |
 | `randdefconfig` | yes | defconfig | `configs/randdefconfig.config` | 300 random options disabled; heavy subsystems forced off |
 | `localconfig` | yes | /proc/config.gz | `configs/localconfig.config` | Daily-driver: full Manjaro config + laptop hardware fragment; `make install` deploys to /boot |
@@ -15,7 +17,7 @@
 
 Makefile variables:
 ```
-CONFIGS          = tinyconfig allnoconfig defconfig allmodconfig randconfig rand500config randdefconfig
+CONFIGS          = tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 BUILD_ONLY_CONFIGS = allmodconfig randconfig
 BOOT_CONFIGS       = (CONFIGS minus BUILD_ONLY_CONFIGS)
 ```
@@ -79,6 +81,8 @@ Excludes:
 - `CONFIG_MODULES=n` — forces all =m to =n, shrinks build surface dramatically
 - `CONFIG_DRM=n CONFIG_SOUND=n CONFIG_STAGING=n CONFIG_INFINIBAND=n CONFIG_MEDIA_SUPPORT=n` — 5+ min each when built-in
 - `CONFIG_KCOV=n CONFIG_KASAN=n CONFIG_KMSAN=n CONFIG_KCSAN=n CONFIG_KFENCE=n CONFIG_UBSAN=n` — sanitizers crash on tinyconfig base (no per-task coverage buffer, OOM on 512M VM)
+- `CONFIG_RCU_TORTURE_TEST=n CONFIG_LOCK_TORTURE_TEST=n` — spawn permanent kernel threads flooding the serial console, starving test scripts
+- `CONFIG_KUNIT=n` — on tinyconfig base kunit_try_catch fails to catch the self-test's intentional NULL dereference (PREEMPT_LAZY + i386); use kunitconfig/kunitrandconfig instead
 
 ---
 
