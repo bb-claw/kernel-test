@@ -284,16 +284,16 @@ Targets:
   help         Show this message
 
 Config profiles (CONFIGS=):
-  defconfig      Boot+test  Architecture default — broad baseline coverage
-  tinyconfig     Boot+test  Minimal kernel — tests lower bound of functionality
-  allnoconfig    Boot+test  Everything disabled — absolute minimum boot path
+  defconfig        Boot+test  Architecture default — broad baseline coverage
+  tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
+  allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
   kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
   kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
-  randdefconfig  Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
-  localconfig    Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
-  allmodconfig   Build only All options as modules — catches build-time regressions
-  randconfig     Build only Fully random config — catches compile-time regressions (BUILD_TIMEOUT capped)
+  randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
+  localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
+  allmodconfig     Build only All options as modules — catches build-time regressions
+  randconfig       Build only Fully random config — catches compile-time regressions (BUILD_TIMEOUT capped)
 
 Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)

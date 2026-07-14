@@ -146,13 +146,9 @@ elif [[ $CONFIG == kunitconfig ]]; then
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
 elif [[ $CONFIG == kunitrandconfig ]]; then
-    # kunitrandconfig: defconfig base + all KUnit test modules the kernel offers.
-    # Strategy: enumerate every CONFIG_*KUNIT*=y option from a fresh randconfig
-    # (which sets all options, exposing the full available set for this arch),
-    # then append them to the defconfig base.  The fragment (step 1b) re-pins
-    # the core KUnit suites and CONFIG_KUNIT=y.  olddefconfig (step 1b) drops
-    # any test module whose dependencies are not met by defconfig — only valid,
-    # buildable options survive.  No non-KUnit options are randomly changed.
+    # Enumerate every CONFIG_*KUNIT* from a fresh randconfig (full option set for
+    # this arch), append to defconfig base.  olddefconfig (step 1b) drops any
+    # module whose deps are unmet — only valid, buildable options survive.
     if ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -162,9 +158,7 @@ elif [[ $CONFIG == kunitrandconfig ]]; then
     trap 'rm -rf "$RAND_TMP"' EXIT
     make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
-    # KUnit test options are tristates — randconfig assigns y, m, or n randomly.
-    # Force =m → =y: our initramfs cannot load modules so tests must be built-in.
-    # olddefconfig (step 1b) drops any module whose deps are unmet by defconfig.
+    # Force =m → =y: initramfs cannot load modules, tests must be built-in.
     grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=[ym]$' "$RAND_TMP/.config" \
         | sed 's/=[ym]$/=y/' \
         | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
