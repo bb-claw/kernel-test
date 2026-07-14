@@ -62,10 +62,12 @@ run_analysis() {
     # ── Errors & Warnings ────────────────────────────────────────────────────
     printf '── Errors & Warnings ────────────────────────────────────────────────\n'
 
-    local critical fwbugs unknown
+    local critical fwbugs wrmsr_n wrmsr_msrs
     critical=$(grep -iE 'oops:|kernel panic|BUG:|call trace|general protection fault|unable to handle kernel' "$F" || true)
     fwbugs=$(grep -iE '\[firmware.?bug\]|acpi bios error|acpi.*ae_not_found' "$F" || true)
-    unknown=$(grep -iE 'amd.vi.*unknown.*option|unhandled wrmsr' "$F" || true)
+    # WRMSR: deduplicate — show count + unique MSR addresses, not every line
+    wrmsr_n=$(grep -c 'unhandled wrmsr' "$F" || echo 0)
+    wrmsr_msrs=$(grep -iE 'unhandled wrmsr' "$F" | grep -oE 'WRMSR\(0x[0-9a-fA-F]+\)' | sort -u | tr '\n' ' ' || true)
 
     if [[ -n "$critical" ]]; then
         printf 'CRITICAL:\n%s\n\n' "$critical"
@@ -75,11 +77,11 @@ run_analysis() {
         printf 'Firmware / ACPI bugs:\n%s\n\n' "$fwbugs"
         [[ "$verdict" == "CLEAN" ]] && verdict="WARNINGS"
     fi
-    if [[ -n "$unknown" ]]; then
-        printf 'Unknown / unhandled:\n%s\n\n' "$unknown"
+    if [[ "$wrmsr_n" -gt 0 ]]; then
+        printf 'KVM unhandled WRMSR: %s writes  MSRs: %s\n\n' "$wrmsr_n" "${wrmsr_msrs%% }"
         [[ "$verdict" == "CLEAN" ]] && verdict="WARNINGS"
     fi
-    [[ -z "$critical" && -z "$fwbugs" && -z "$unknown" ]] && printf 'none\n'
+    [[ -z "$critical" && -z "$fwbugs" && "$wrmsr_n" -eq 0 ]] && printf 'none\n'
 
     # ── Hardware ─────────────────────────────────────────────────────────────
     printf '\n── Hardware ─────────────────────────────────────────────────────────\n'
