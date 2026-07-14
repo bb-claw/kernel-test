@@ -145,6 +145,27 @@ elif [[ $CONFIG == kunitconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
+elif [[ $CONFIG == kunitrandconfig ]]; then
+    # kunitrandconfig: defconfig base + all KUnit test modules the kernel offers.
+    # Strategy: enumerate every CONFIG_*KUNIT*=y option from a fresh randconfig
+    # (which sets all options, exposing the full available set for this arch),
+    # then append them to the defconfig base.  The fragment (step 1b) re-pins
+    # the core KUnit suites and CONFIG_KUNIT=y.  olddefconfig (step 1b) drops
+    # any test module whose dependencies are not met by defconfig — only valid,
+    # buildable options survive.  No non-KUnit options are randomly changed.
+    if ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+    RAND_TMP=$(mktemp -d)
+    trap 'rm -rf "$RAND_TMP"' EXIT
+    make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
+        KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
+    grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=y$' "$RAND_TMP/.config" \
+        | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
+    rm -rf "$RAND_TMP"
+    trap - EXIT
 elif [[ $CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.

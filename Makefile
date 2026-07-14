@@ -18,7 +18,7 @@ endif
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
 ARCHS         ?= x86_64 i386
-CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig
+CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1200
 GCC           ?= gcc
@@ -286,8 +286,9 @@ Config profiles (CONFIGS=):
   defconfig      Boot+test  Architecture default — broad baseline coverage
   tinyconfig     Boot+test  Minimal kernel — tests lower bound of functionality
   allnoconfig    Boot+test  Everything disabled — absolute minimum boot path
-  kunitconfig    Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  rand500config  Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
+  kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
+  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  rand500config    Boot+test  tinyconfig + 500 random =y options (constrained, reproducibly bootable)
   randdefconfig  Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off
   localconfig    Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
   allmodconfig   Build only All options as modules — catches build-time regressions

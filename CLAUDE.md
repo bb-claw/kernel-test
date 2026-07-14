@@ -15,10 +15,11 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** Toybox static binary (prebuilt, downloaded by `make bootstrap`) packed into a cpio initramfs; arch mapping: `x86_64` → `toybox-x86_64`, `i386` → `toybox-i686`, `arm64` → `toybox-aarch64`; version pinned via `TOYBOX_VERSION` (default `0.8.9`)
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64` and `i386` (default); `arm64` opt-in via `ARCHS="x86_64 i386 arm64"` (requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`, installed by `make bootstrap`)
-- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
-  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `rand500config`, `randdefconfig`, `localconfig`
+- **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `kunitrandconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
+  - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `kunitrandconfig`, `rand500config`, `randdefconfig`, `localconfig`
   - Build-only (no VM boot): `allmodconfig` (boot impractical: sanitizers + built-in self-tests take 100+ s, modules not in initramfs), `randconfig` (unpredictable boot)
   - `kunitconfig` — uses `defconfig` as base + `configs/kunitconfig.config` fragment (CONFIG_KUNIT + core test suites); not a kernel make target, special-cased in `build.sh`; KUnit emits KTAP to serial console; `vm.sh` strips ANSI color codes then parses `ok`/`not ok` lines and records KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
+  - `kunitrandconfig` — uses `defconfig` as base; enumerates every `CONFIG_*KUNIT*=y` option from a fresh `randconfig` in a temp dir (exposing the full available set for this arch), appends them all to the defconfig base, applies `configs/kunitrandconfig.config` fragment (re-pins `CONFIG_KUNIT=y` + core suites), runs `olddefconfig` which drops any test module with unmet deps — only valid, buildable options survive; random set varies per run (rebuild required each time); saves `kunitrand-sampled.config` into `build/<config>-<arch>/`
   - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
   - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes
   - `localconfig` — uses `/proc/config.gz` (running Manjaro kernel) as base + `configs/localconfig.config` fragment; for daily-driver builds; `make install` deploys to `/boot` via mkinitcpio + GRUB; x86_64 only
@@ -70,9 +71,10 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/install.sh` | Install built kernel to `/boot` (Arch/Manjaro): reads `KERNEL_TREE` from `build.status` (no need to re-specify `STABLE_RELEASE` at install time); runs `olddefconfig` to resolve config drift non-interactively when kernel version changes; refreshes `CONFIG_SHA256` in `build.status` after `olddefconfig`; warns if no `vm.status` exists (kernel untested) or if last VM boot was not PASS; modules, vmlinuz, custom mkinitcpio conf (`MODULES=()`, system hooks preserved), preset, `dkms autoinstall` (out-of-tree modules e.g. nvidia/vbox), mkinitcpio, grub-mkconfig |
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
+| `configs/kunitrandconfig.config` | KUnit=y + core suites baseline; applied after random KUNIT module enumeration; olddefconfig drops modules with unmet deps |
 | `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
-| `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off) |
+| `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off, sanitizers off, RCU/lock torture tests off, KUNIT=n) |
 | `configs/localconfig.config` | Hardware fragment for Lenovo AMD Ryzen 7 5800H (NVMe, MT7921 WiFi, BT, AMD_PMC, AES-NI, BTRFS); applied on top of `/proc/config.gz` |
 
 ## Conventions
