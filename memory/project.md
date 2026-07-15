@@ -37,7 +37,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | Sanitizers + non-gzip compressors excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base; lzop/lz4/zstd etc. may not be installed → exit 127; excluding prevents false failures |
 | build.sh deletes vm.status at start | Failed builds never show stale test results from a prior run |
 
-## Current State (2026-07-12)
+## Current State (2026-07-15)
 
 - **Architectures:** x86_64 + i386 (default, KVM); arm64 opt-in (`ARCHS="x86_64 i386 arm64"`, TCG, requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
