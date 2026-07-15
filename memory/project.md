@@ -74,7 +74,7 @@ build/<config>-<arch>/
   dmesg.txt           serial console output
 ```
 
-Report dir per run (`reports/<date>_<version>/`):
+Report dir per run (`reports/<label>-<major.minor>-<date>-<version>/`, e.g. `mainline-7.2-2026-07-14_10-00-00-v7.2-rc2`):
 ```
   summary.txt / summary.html / summary.mail.txt
   vmstatus-<config>-<arch>.txt   copy of vm.status — used by lib/diff.sh for cross-run comparison

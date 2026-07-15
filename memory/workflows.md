@@ -16,6 +16,7 @@
 | `NO_BUILD` | `0` | `NO_BUILD=1` |
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
+| `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -24,101 +25,68 @@ When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STAB
 
 ## Common Workflows
 
-### Full pipeline — latest mainline rc
+### Full pipeline variants
 
 ```sh
-make KERNEL_TREE=~/git/linux-stable
+make KERNEL_TREE=~/git/linux-stable                              # latest mainline rc
+make STABLE_RELEASE=7.1                                          # latest stable vX.Y.*
+make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable        # pin specific version
+make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable               # run after pin
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"      # quick single config
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"  # fast iteration (no rebuild)
 ```
 
-### Full pipeline — specific rc version
-
-```sh
-make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
-make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
-```
-
-### Full pipeline — latest stable release
-
-```sh
-make STABLE_RELEASE=7.1
-```
-
-### Full pipeline — specific stable version
-
-```sh
-make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
-make all NO_FETCH=1 STABLE_RELEASE=7.1
-```
-
-### Single config, single arch (quick smoke)
-
-```sh
-make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"
-```
-
-### Fast iteration on test scripts (skip kernel rebuild)
-
-```sh
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
-```
-
-Skips the build step, repacks the initramfs (< 1 s), boots and tests.
-Use when only test scripts changed — kernel artifacts reused from prior run.
 arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
 
 ### KUnit randomised coverage (kunitrandconfig)
 
 ```sh
-# Build: enumerates all available KUnit test modules for this arch (random set each time)
-make build NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64
-
-# Boot: run the sampled modules; kunit:N/N shown in report
-make test NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitrandconfig ARCHS=x86_64 TIMEOUT=60
+make build NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64  # new random sample each run
+make test  NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitrandconfig ARCHS=x86_64 TIMEOUT=60
 ```
 
-`kunitrand-sampled.config` in the build dir records which KUNIT options were tried.
-**Rebuild required each run** to get a new random sample — `NO_BUILD=1` reuses the
-previous run's sample and defeats the randomisation.
+Rebuild required each run — `NO_BUILD=1` reuses previous sample, defeating randomisation.
 
-### Regression diff between two rc runs
+### Regression diff between two runs
 
 ```sh
-# Auto-detect latest two runs
+# Auto-detect latest two runs of the same label
 make diff
 
-# Compare specific runs
-make diff OLD=reports/2026-07-12_v7.2-rc1 NEW=reports/2026-07-12_v7.2-rc2
+# Compare specific runs (cross-label also works)
+make diff OLD=reports/mainline-7.2-2026-07-12_10-00-00-v7.2-rc1 NEW=reports/mainline-7.2-2026-07-12_11-00-00-v7.2-rc2
 
 # Pin current results as baseline; future make all runs also diff against it
 make baseline
 ```
 
 `lib/diff.sh` compares per-test name: `PASS→FAIL` = regression, `FAIL→PASS` = fix.
-Auto-diff vs previous run and vs pinned baseline runs at the end of every `make all`.
+Auto-detect restricts to same label as newest run (prevents spurious mainline/stable cross-diffs).
+Auto-diff vs previous same-label run and vs pinned baseline runs at end of every `make all`.
 Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the report dir.
 
-### Verbose build output
+### Migrate old report directories
 
 ```sh
-make all NO_FETCH=1 V=1 KERNEL_TREE=~/git/linux-stable
+bash scripts/migrate-reports.sh           # dry-run — shows old→new names
+bash scripts/migrate-reports.sh --apply   # rename + update baseline symlink
 ```
+
+Old format: `YYYY-MM-DD_HH-MM-SS_vX.Y-rcN` → New: `mainline-7.2-YYYY-MM-DD_HH-MM-SS-v7.2-rcN`
+Label guessed from version: `-rcN` suffix → mainline; `vX.Y.Z` three-part → stable; else mainline.
 
 ### Capture and analyse host kernel dmesg
 
 ```sh
 make dmesg                        # label: mainline (default)
 make dmesg DMESG_LABEL=stable     # or: longterm / linux-next
+make all NO_FETCH=1 V=1 KERNEL_TREE=~/git/linux-stable  # verbose build output
+make info KERNEL_TREE=~/git/linux-stable                 # show checked-out version
 ```
 
-Writes `dmesg/<name>.txt` and `dmesg/<name>-analysis.txt`; diffs warning/error
-lines vs the previous capture for the same label; exits 1 on VERDICT=ERRORS.
+Dmesg writes `dmesg/<name>.txt` and `dmesg/<name>-analysis.txt`; diffs warning/error
+lines vs previous capture for same label; exits 1 on VERDICT=ERRORS.
 Script: `lib/dmesg.sh`; valid labels: `mainline stable longterm linux-next`.
-
-### Check what is currently checked out
-
-```sh
-make info KERNEL_TREE=~/git/linux-stable
-```
 
 ---
 

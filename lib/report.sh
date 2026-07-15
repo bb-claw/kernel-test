@@ -18,10 +18,31 @@ if [[ -z $KERNEL_VERSION ]]; then
         || echo "unknown")
 fi
 
-# Directory name: YYYY-MM-DD_HH-MM-SS_<version>  (colons→dashes for fs safety)
+# ── Derive LABEL ─────────────────────────────────────────────────────────────
+
+if [[ -z ${LABEL:-} ]]; then
+    if [[ -n ${STABLE_RELEASE:-} ]]; then
+        LABEL=stable
+    elif [[ $KERNEL_TREE == *linux-next* ]]; then
+        LABEL=linux-next
+    elif [[ $KERNEL_VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        LABEL=stable
+    else
+        LABEL=mainline
+    fi
+fi
+
+# Extract major.minor for the dir name
+if [[ $KERNEL_VERSION =~ ^v([0-9]+\.[0-9]+) ]]; then
+    VERSION_SHORT="${BASH_REMATCH[1]}"
+else
+    VERSION_SHORT="$KERNEL_VERSION"
+fi
+
+# Directory name: <label>-<major.minor>-YYYY-MM-DD_HH-MM-SS-<version>
 RUN_DIR_STAMP=$(date -d "$RUN_STAMP" +%Y-%m-%d_%H-%M-%S 2>/dev/null \
     || echo "$RUN_STAMP" | sed 's/T/_/; s/://g; s/Z//')
-RUN_DIR="$REPORT_DIR/${RUN_DIR_STAMP}_${KERNEL_VERSION}"
+RUN_DIR="$REPORT_DIR/${LABEL}-${VERSION_SHORT}-${RUN_DIR_STAMP}-${KERNEL_VERSION}"
 mkdir -p "$RUN_DIR"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -164,6 +185,7 @@ TXT="$RUN_DIR/summary.txt"
     # LKML-ready header — paste into email Subject: / body as-is
     printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
     printf 'build and booted: %s\n' "$OVERALL"
+    printf 'Label:            %s\n' "$LABEL"
     printf 'Repository:       %s\n' "$REPO_URL"
     printf 'Commit:           %s\n' "$COMMIT_SHA"
     printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
@@ -173,6 +195,7 @@ TXT="$RUN_DIR/summary.txt"
     printf '\n---\n\n'
 
     printf 'Linux %s boot test report\n' "$KERNEL_VERSION"
+    printf 'Label:      %s\n' "$LABEL"
     printf 'Repository: %s\n' "$REPO_URL"
     printf 'Commit:     %s\n' "$COMMIT_SHA"
     printf 'Host:       %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
@@ -222,6 +245,7 @@ MAIL="$RUN_DIR/summary.mail.txt"
 {
     printf 'Subject: [REPORT] Linux %s boot test: %s on %s\n' "$KERNEL_VERSION" "$OVERALL" "$ARCH_LIST"
     printf 'build and booted: %s\n' "$OVERALL"
+    printf 'Label:            %s\n' "$LABEL"
     printf 'Repository:       %s\n' "$REPO_URL"
     printf 'Commit:           %s\n' "$COMMIT_SHA"
     printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
@@ -262,6 +286,7 @@ overall_cls=$( [[ $OVERALL == PASS ]] && echo pass || echo fail )
 <p>Commit: $COMMIT_SHA</p>
 <p>Host: $HOST_ARCH | $CPU_MODEL | $RAM</p>
 <p>Started: $RUN_STAMP</p>
+<p>Label: $LABEL</p>
 <p>Duration: $OVERALL_DURATION</p>
 <p><span class="$overall_cls" style="padding:.25em .6em;border-radius:3px">Overall: <strong>$OVERALL</strong></span></p>
 <p>Files: <a href="summary.txt">summary.txt</a> | <a href="summary.mail.txt">summary.mail.txt</a></p>
@@ -382,13 +407,17 @@ cat "$TXT"
 
 _DIFF="$(dirname "$0")/diff.sh"
 
-# Auto-diff vs previous run (second-to-last dir by sort order)
+# Auto-diff vs previous run — same label only
 mapfile -t _prev_runs < <(find "$REPORT_DIR" -maxdepth 1 -mindepth 1 -type d \
     ! -name baseline | sort)
+_run_base="${RUN_DIR##*/}"
 _prev=''
 for _d in "${_prev_runs[@]}"; do
-    [[ $(basename "$_d") == $(basename "$RUN_DIR") ]] && continue
-    _prev="$_d"
+    _db="${_d##*/}"
+    [[ $_db == "$_run_base" ]] && continue
+    _seg="${_db%%-*}"
+    case "$_seg" in mainline|stable|longterm|linux-next) _dlabel="$_seg" ;; *) _dlabel=mainline ;; esac
+    [[ $_dlabel == "$LABEL" ]] && _prev="$_d"
 done
 if [[ -n $_prev ]]; then
     printf '\n'

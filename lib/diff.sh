@@ -15,10 +15,19 @@ OUTPUT=''
 if [[ $# -eq 0 ]]; then
     mapfile -t _runs < <(find "$REPORT_DIR" -maxdepth 1 -mindepth 1 -type d \
         ! -name baseline | sort)
-    [[ ${#_runs[@]} -ge 2 ]] || \
-        die "Need at least 2 runs in $REPORT_DIR to diff (found ${#_runs[@]})"
-    OLD_DIR="${_runs[-2]}"
-    NEW_DIR="${_runs[-1]}"
+    [[ ${#_runs[@]} -ge 1 ]] || die "No runs found in $REPORT_DIR"
+    _newest_seg="${_runs[-1]##*/}"; _newest_seg="${_newest_seg%%-*}"
+    case "$_newest_seg" in mainline|stable|longterm|linux-next) _newest_label="$_newest_seg" ;; *) _newest_label=mainline ;; esac
+    _lruns=()
+    for _d in "${_runs[@]}"; do
+        _seg="${_d##*/}"; _seg="${_seg%%-*}"
+        case "$_seg" in mainline|stable|longterm|linux-next) ;; *) _seg=mainline ;; esac
+        [[ $_seg == "$_newest_label" ]] && _lruns+=("$_d")
+    done
+    [[ ${#_lruns[@]} -ge 2 ]] || \
+        die "Need at least 2 '$_newest_label' runs in $REPORT_DIR to diff (found ${#_lruns[@]})"
+    OLD_DIR="${_lruns[-2]}"
+    NEW_DIR="${_lruns[-1]}"
 elif [[ $# -ge 2 && $# -le 3 ]]; then
     OLD_DIR="${1%/}"
     NEW_DIR="${2%/}"
@@ -38,9 +47,18 @@ if [[ $old_count -eq 0 || $new_count -eq 0 ]]; then
     exit 0
 fi
 
-# ── Extract kernel version from dir name (everything after last underscore) ───
+# ── Extract kernel version and label from dir name ────────────────────────────
 
-_ver() { local b; b=$(basename "$1"); printf '%s' "${b##*_}"; }
+# New format: label-X.Y-YYYY-MM-DD_HH-MM-SS-version  → extract part after timestamp
+# Old format: YYYY-MM-DD_HH-MM-SS_version             → extract last underscore segment
+_ver() {
+    local b="${1##*/}"
+    if [[ $b =~ [0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}-(.+)$ ]]; then
+        printf '%s' "${BASH_REMATCH[1]}"
+    else
+        printf '%s' "${b##*_}"
+    fi
+}
 OLD_VERSION=$(_ver "$OLD_DIR")
 NEW_VERSION=$(_ver "$NEW_DIR")
 
