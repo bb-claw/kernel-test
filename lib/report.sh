@@ -6,8 +6,6 @@ set -euo pipefail
 
 require_env BUILD_DIR CONFIGS ARCHS BUILD_ONLY_CONFIGS REPORT_DIR RUN_STAMP KERNEL_TREE
 
-# LABEL may be set by the user (LABEL=longterm); otherwise auto-derived below.
-
 REPORT_GEN_EPOCH=$(date -u +%s)
 
 # ── Resolve kernel version ────────────────────────────────────────────────────
@@ -412,11 +410,11 @@ _DIFF="$(dirname "$0")/diff.sh"
 # Auto-diff vs previous run — same label only
 mapfile -t _prev_runs < <(find "$REPORT_DIR" -maxdepth 1 -mindepth 1 -type d \
     ! -name baseline | sort)
+_run_base="${RUN_DIR##*/}"
 _prev=''
 for _d in "${_prev_runs[@]}"; do
-    _db=$(basename "$_d")
-    [[ $_db == "$(basename "$RUN_DIR")" ]] && continue
-    # Extract label: first dash-segment if known, else mainline
+    _db="${_d##*/}"
+    [[ $_db == "$_run_base" ]] && continue
     _seg="${_db%%-*}"
     case "$_seg" in mainline|stable|longterm|linux-next) _dlabel="$_seg" ;; *) _dlabel=mainline ;; esac
     [[ $_dlabel == "$LABEL" ]] && _prev="$_d"

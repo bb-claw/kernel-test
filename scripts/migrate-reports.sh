@@ -33,14 +33,8 @@ while IFS= read -r d; do
     datetime="${BASH_REMATCH[1]}"
     full_version="${BASH_REMATCH[2]}"
 
-    # Guess label from version string
-    if [[ $full_version =~ -rc[0-9]+$ ]]; then
-        label=mainline
-    elif [[ $full_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        label=stable
-    else
-        label=mainline
-    fi
+    label=mainline
+    [[ $full_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && label=stable
 
     # Extract major.minor
     if [[ $full_version =~ ^v([0-9]+\.[0-9]+) ]]; then
