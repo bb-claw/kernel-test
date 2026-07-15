@@ -20,10 +20,10 @@ The goal is systematic community verification of each -rc kernel.
   - Build-only (no VM boot): `allmodconfig` (boot impractical: sanitizers + built-in self-tests take 100+ s, modules not in initramfs), `randconfig` (unpredictable boot)
   - `kunitconfig` — uses `defconfig` as base + `configs/kunitconfig.config` fragment (CONFIG_KUNIT + core test suites); not a kernel make target, special-cased in `build.sh`; KUnit emits KTAP to serial console; `vm.sh` strips ANSI color codes then parses `ok`/`not ok` lines and records KUNIT_PASS/KUNIT_FAIL in vm.status; report shows `kunit:N/N` in Tests column
   - `kunitrandconfig` — uses `defconfig` as base; enumerates every `CONFIG_*KUNIT*=y` option from a fresh `randconfig` in a temp dir (exposing the full available set for this arch), appends them all to the defconfig base, applies `configs/kunitrandconfig.config` fragment (re-pins `CONFIG_KUNIT=y` + core suites), runs `olddefconfig` which drops any test module with unmet deps — only valid, buildable options survive; random set varies per run (rebuild required each time); saves `kunitrand-sampled.config` into `build/<config>-<arch>/`
-  - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
-  - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options; stays reliably under 5 minutes
+  - `rand500config` — special: uses `tinyconfig` as base, samples 500 `=y` lines from a constrained `randconfig` generated in a temp dir (heavy subsystems, sanitizers, torture tests, non-gzip kernel compression excluded), applies the bootability fragment last; saves `rand-source.config` and `rand-sampled.config` into `build/<config>-<arch>/`
+  - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options including `CONFIG_KERNEL_GZIP=y` (prevents a non-standard compressor being auto-selected if GZIP is disabled); stays reliably under 5 minutes
   - `localconfig` — uses `/proc/config.gz` (running Manjaro kernel) as base + `configs/localconfig.config` fragment; for daily-driver builds; `make install` deploys to `/boot` via mkinitcpio + GRUB; x86_64 only
-  - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems) and subject to `BUILD_TIMEOUT` (default 1200 s); exits with `STATUS=TIMEOUT` if exceeded
+  - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems + sanitizers + torture tests + non-gzip kernel compression) and subject to `BUILD_TIMEOUT` (default 1200 s); exits with `STATUS=TIMEOUT` if exceeded
   - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT) that stripped configs disable
 
 ## Key files
@@ -74,9 +74,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/hardware/verify.sh` | Real-hardware verification for localconfig: NVMe, MT7921 WiFi, BT, AMD_PMC, K10TEMP, IDEAPAD_LAPTOP, AES-NI, BTRFS, exFAT; run on the booted laptop |
 | `configs/kunitconfig.config` | KUnit framework + core test suites (lib/, mm/ SLUB); applied on defconfig base |
 | `configs/kunitrandconfig.config` | KUnit=y + core suites baseline; applied after random KUNIT module enumeration; olddefconfig drops modules with unmet deps |
-| `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs) |
-| `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig |
-| `configs/randconfig.config` | Constraint fragment for randconfig (MODULE=n, heavy subsystems off, sanitizers off, RCU/lock torture tests off, KUNIT=n) |
+| `configs/rand500config.config` | Bootability fragment for rand500config (TTY, serial, initramfs); applied last so it wins over any conflicting random selection |
+| `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig; pins `CONFIG_KERNEL_GZIP=y` so a non-standard compressor is not auto-selected if GZIP is randomly disabled |
+| `configs/randconfig.config` | Constraint fragment for randconfig and rand500config sampling pool: MODULE=n, heavy subsystems off, sanitizers off, RCU/lock torture tests off, KUNIT=n, non-gzip kernel compression off |
 | `configs/localconfig.config` | Hardware fragment for Lenovo AMD Ryzen 7 5800H (NVMe, MT7921 WiFi, BT, AMD_PMC, AES-NI, BTRFS); applied on top of `/proc/config.gz` |
 
 ## Conventions
