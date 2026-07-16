@@ -86,7 +86,8 @@ The goal is systematic community verification of each -rc kernel.
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
 - Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `NO_BUILD`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`, `TOYBOX_VERSION`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16; `TOYBOX_VERSION` defaults to `0.8.9`; `NO_BUILD=1` skips the kernel build step and reuses existing `build/<config>-<arch>/` artifacts
-- `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig/kunitrandconfig x86_64 takes ~10–12 min on a 16-core machine
+- `local.mk` — optional file included by the Makefile before all `?=` defaults; used by stable and stable-rc repos to set `STABLE_RELEASE`, `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT` without touching the shared Makefile; not present in the mainline repo
+- `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
 - `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually (chaining stops at the first failure)
 - `make test` skips any config whose `build.status` is not `STATUS=PASS` (prints `SKIP (build TIMEOUT/FAIL)`) so partial build failures don't block testing of the configs that did build
 - `KERNEL_TREE` is normalized at parse time: leading `~` is expanded and the path is made absolute via `$(abspath ...)`; pass `~/git/linux` or `../linux` freely
@@ -147,11 +148,11 @@ Types: `feat` `fix` `docs` `refactor` `chore` `ci` `test` `style` `perf`
 
 **Before opening a PR**, at minimum run:
 ```sh
-make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
+make all NO_FETCH=1 CONFIGS=tinyconfig
 ```
 For any change touching `tests/`, run the full suite:
 ```sh
-make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
+make all NO_FETCH=1
 ```
 
 ## Memory file update triggers
@@ -229,6 +230,12 @@ make info KERNEL_TREE=~/git/linux-stable
 # Full pipeline — latest mainline rc (report always written even on failure)
 make KERNEL_TREE=~/git/linux-stable
 
+# Quick sanity — kunitconfig + tinyconfig, all archs (uses local.mk params)
+make smoke
+
+# Broader coverage — 5 bootable configs, all archs (uses local.mk params)
+make full
+
 # Full pipeline — latest stable release (e.g. v7.1.x)
 make STABLE_RELEASE=7.1
 
@@ -244,13 +251,10 @@ make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
 make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
 # Fast iteration on test scripts — skip kernel rebuild, repack initramfs and re-run
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig
 
 # Test rand500config only (tinyconfig + 500 random options, bootable)
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
-
-# All three arches (arm64 uses TCG; requires aarch64-linux-gnu-gcc + qemu-system-aarch64)
-make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
 
 # Verbose mode
 make V=1 KERNEL_TREE=~/git/linux-stable
