@@ -40,12 +40,12 @@ arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-sy
 
 ### KUnit randomised coverage (kunitrandconfig)
 
-```sh
-make build NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64  # new random sample each run
-make test  NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitrandconfig ARCHS=x86_64 TIMEOUT=60
-```
+Build-only (no VM boot). Rebuild required each run — `NO_BUILD=1` reuses previous sample,
+defeating randomisation. Use `kunitconfig` for deterministic KUnit boot testing.
 
-Rebuild required each run — `NO_BUILD=1` reuses previous sample, defeating randomisation.
+```sh
+make all NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64  # new random sample each run
+```
 
 ### Regression diff between two runs
 
