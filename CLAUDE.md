@@ -260,8 +260,8 @@ make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
 make V=1 KERNEL_TREE=~/git/linux-stable
 
 # Daily-driver localconfig build + install (stable tree)
-make build   NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
-make install            CONFIGS=localconfig ARCHS=x86_64   # KERNEL_TREE read from build.status automatically
+make local                                    # build localconfig x86_64, no timeout
+make install CONFIGS=localconfig ARCHS=x86_64 # deploy to /boot (KERNEL_TREE read from build.status)
 ```
 
 Always use `make all NO_FETCH=1` (not `make build initramfs test report`) — `all` guarantees

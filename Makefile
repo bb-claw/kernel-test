@@ -80,7 +80,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
+.PHONY: all smoke full local fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -155,6 +155,10 @@ smoke:
 # Broader coverage: all bootable configs except allmodconfig/randconfig/kunitrandconfig.
 full:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
+
+# Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
+local:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -296,6 +300,7 @@ Targets:
   fetch        Fetch and checkout the latest -rc tag automatically
   smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (uses local.mk for repo-specific params)
   full         Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
+  local        Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
   info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS

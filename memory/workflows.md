@@ -35,6 +35,7 @@ make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific versio
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
 make smoke                                            # kunitconfig + tinyconfig, uses local.mk
 make full                                             # 5 bootable configs, uses local.mk
+make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 ```
