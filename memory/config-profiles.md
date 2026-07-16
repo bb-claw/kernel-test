@@ -8,7 +8,7 @@
 | `tinyconfig` | yes | minimal | `configs/tinyconfig.config` | Near-empty; fragment pins bootability options |
 | `allnoconfig` | yes | all-no | `configs/allnoconfig.config` | Absolute minimum boot path |
 | `kunitconfig` | yes | defconfig | `configs/kunitconfig.config` | KUnit framework + core test suites; KTAP results shown as kunit:N/N |
-| `kunitrandconfig` | yes | defconfig | `configs/kunitrandconfig.config` | All KUnit test modules available on defconfig base (enumerated from randconfig, olddefconfig drops invalid); random set per run — rebuild required each time |
+| `kunitrandconfig` | no | defconfig | `configs/kunitrandconfig.config` | Build-only: all KUnit test modules available on defconfig base (enumerated from randconfig, olddefconfig drops invalid); random set per run — rebuild required each time; use `kunitconfig` for deterministic KUnit boot testing |
 | `rand500config` | yes | tinyconfig | `configs/rand500config.config` | 500 random =y lines sampled from constrained randconfig |
 | `randdefconfig` | yes | defconfig | `configs/randdefconfig.config` | 300 random options disabled; heavy subsystems forced off |
 | `localconfig` | yes | /proc/config.gz | `configs/localconfig.config` | Daily-driver: full Manjaro config + laptop hardware fragment; `make install` deploys to /boot |
@@ -18,7 +18,7 @@
 Makefile variables:
 ```
 CONFIGS          = tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
-BUILD_ONLY_CONFIGS = allmodconfig randconfig
+BUILD_ONLY_CONFIGS = allmodconfig randconfig kunitrandconfig
 BOOT_CONFIGS       = (CONFIGS minus BUILD_ONLY_CONFIGS)
 ```
 
@@ -133,9 +133,10 @@ Install: `make install CONFIGS=localconfig ARCHS=x86_64` → modules, vmlinuz, m
 
 ## CONFIG_SHA256 Fingerprinting
 
-After `olddefconfig` completes (config fully resolved), `build.sh` computes:
+After the build completes, `build.sh` recomputes:
 ```sh
 CONFIG_SHA256=$(sha256sum "$OUT_DIR/.config" | awk '{print $1}')
 ```
-Stored in `build.status` as `CONFIG_SHA256=<hash>`.
+Stored in `build.status` as `CONFIG_SHA256=<hash>` at each STATUS=PASS/FAIL/TIMEOUT write.
+The hash is taken post-build so it reflects any `syncconfig` changes the kernel build made.
 `report.sh` copies `.config` to the report dir and re-verifies the hash → `OK` or `MISMATCH`.

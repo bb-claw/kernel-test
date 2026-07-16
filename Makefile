@@ -2,6 +2,11 @@
 # All commands go through this Makefile.
 # Usage: make [target] [VAR=value ...]
 
+# ── Repo-specific overrides (optional, not committed in kernel-test main) ──────
+# Create local.mk to set STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, BUILD_TIMEOUT
+# for stable or stable-rc repos without touching this file.
+-include local.mk
+
 # ── User-settable variables ────────────────────────────────────────────────────
 KERNEL_TREE        ?= ../linux
 STABLE_KERNEL_TREE ?= ~/git/linux-stable
@@ -17,7 +22,7 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
-ARCHS         ?= x86_64 i386
+ARCHS         ?= x86_64 i386 arm64
 CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1200
@@ -43,9 +48,9 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 # Configs that are built but not booted:
 #   allmodconfig — boot impractical: sanitizers + built-in self-tests take 100+ s; modules not in initramfs
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
-# kunitconfig/kunitrandconfig use defconfig base (already bootable); tinyconfig/allnoconfig/rand500config
+# kunitconfig uses defconfig base (already bootable); tinyconfig/allnoconfig/rand500config
 # need their configs/<name>.config fragments to restore the TTY/serial/initramfs options they strip.
-BUILD_ONLY_CONFIGS := allmodconfig randconfig
+BUILD_ONLY_CONFIGS := allmodconfig randconfig kunitrandconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
@@ -75,7 +80,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
+.PHONY: all smoke full local fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -138,6 +143,19 @@ info:
 checkout:
 	$(if $(TAG),,$(error TAG is required — usage: make checkout TAG=v7.2-rc2))
 	$(Q)lib/checkout.sh "$(TAG)"
+
+# ── Convenience targets ───────────────────────────────────────────────────────
+
+# local.mk supplies repo-specific params (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …).
+smoke:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig"
+
+full:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
+
+# Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
+local:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -277,6 +295,9 @@ Targets:
   hooks        Activate git hooks only (no package install)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch        Fetch and checkout the latest -rc tag automatically
+  smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (uses local.mk for repo-specific params)
+  full         Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
+  local        Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
   info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS
@@ -296,7 +317,7 @@ Config profiles (CONFIGS=):
   tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
   allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
   kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  kunitrandconfig  Build only defconfig + all available KUnit test modules (random set per run); requires rebuild each run
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained: no sanitizers, torture tests, non-gzip compressors)
   randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off; KERNEL_GZIP pinned
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
@@ -334,6 +355,12 @@ Common workflows:
 
   # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
   make
+
+  # Quick sanity after a fetch (kunitconfig + tinyconfig; uses local.mk params)
+  make smoke
+
+  # Broader coverage without allmodconfig/randconfig (uses local.mk params)
+  make full
 
   # Check what is currently checked out before running
   make info

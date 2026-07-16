@@ -8,7 +8,7 @@
 | `STABLE_KERNEL_TREE` | `~/git/linux-stable` | — |
 | `STABLE_RELEASE` | _(none)_ | `STABLE_RELEASE=7.1` |
 | `TAG` | _(none)_ | `TAG=v7.2-rc2` (used by `make checkout` only) |
-| `ARCHS` | `x86_64 i386` | `ARCHS=x86_64` |
+| `ARCHS` | `x86_64 i386 arm64` | `ARCHS=x86_64` |
 | `CONFIGS` | all 9 profiles | `CONFIGS=defconfig` |
 | `TIMEOUT` | `60` | `TIMEOUT=120` |
 | `BUILD_TIMEOUT` | `1200` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
@@ -17,6 +17,7 @@
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
+| `local.mk` | _(absent)_ | Repo-specific overrides included before all `?=` defaults; stable repo sets `STABLE_RELEASE ?= 7.1`; stable-rc sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT` |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -28,24 +29,28 @@ When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STAB
 ### Full pipeline variants
 
 ```sh
-make KERNEL_TREE=~/git/linux-stable                              # latest mainline rc
-make STABLE_RELEASE=7.1                                          # latest stable vX.Y.*
-make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable        # pin specific version
-make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable               # run after pin
-make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"      # quick single config
-make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"  # fast iteration (no rebuild)
+make KERNEL_TREE=~/git/linux-stable                   # latest mainline rc (with fetch)
+make STABLE_RELEASE=7.1                               # latest stable vX.Y.*
+make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
+make all NO_FETCH=1                                   # run after pin (all configs + archs)
+make smoke                                            # kunitconfig + tinyconfig, uses local.mk
+make full                                             # 5 bootable configs, uses local.mk
+make local                                            # localconfig x86_64, no build timeout
+make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
+make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 ```
 
 arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
+Default `ARCHS` includes arm64; pass `ARCHS="x86_64 i386"` to skip it.
 
 ### KUnit randomised coverage (kunitrandconfig)
 
-```sh
-make build NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64  # new random sample each run
-make test  NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitrandconfig ARCHS=x86_64 TIMEOUT=60
-```
+Build-only (no VM boot). Rebuild required each run — `NO_BUILD=1` reuses previous sample,
+defeating randomisation. Use `kunitconfig` for deterministic KUnit boot testing.
 
-Rebuild required each run — `NO_BUILD=1` reuses previous sample, defeating randomisation.
+```sh
+make all NO_FETCH=1 CONFIGS=kunitrandconfig ARCHS=x86_64  # new random sample each run
+```
 
 ### Regression diff between two runs
 

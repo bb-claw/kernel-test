@@ -36,10 +36,13 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | `BUILD_TIMEOUT` wraps only bzImage step | Prevents runaway builds; exit 124 = TIMEOUT |
 | Sanitizers + non-gzip compressors excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base; lzop/lz4/zstd etc. may not be installed → exit 127; excluding prevents false failures |
 | build.sh deletes vm.status at start | Failed builds never show stale test results from a prior run |
+| CONFIG_SHA256 recomputed post-build | syncconfig can modify .config during make bzImage; hash stored after build reflects actual file |
+| report.sh prefers kernel Makefile for version | git describe fails on untagged trees (stable-rc); read_kernel_makefile_version always authoritative |
+| kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 
-## Current State (2026-07-15)
+## Current State (2026-07-16)
 
-- **Architectures:** x86_64 + i386 (default, KVM); arm64 opt-in (`ARCHS="x86_64 i386 arm64"`, TCG, requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
+- **Architectures:** x86_64 + i386 + arm64 (all default); x86 uses KVM, arm64 uses TCG (requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
 - **Tests:** 26 total (1 smoke + 25 custom; see test-inventory.md); next slot: 250_
 - **Kernel tree:** `~/git/linux-stable` (contains both mainline rc and stable point release tags)
