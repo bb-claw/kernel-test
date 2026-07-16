@@ -2,6 +2,11 @@
 # All commands go through this Makefile.
 # Usage: make [target] [VAR=value ...]
 
+# ── Repo-specific overrides (optional, not committed in kernel-test main) ──────
+# Create local.mk to set STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, BUILD_TIMEOUT
+# for stable or stable-rc repos without touching this file.
+-include local.mk
+
 # ── User-settable variables ────────────────────────────────────────────────────
 KERNEL_TREE        ?= ../linux
 STABLE_KERNEL_TREE ?= ~/git/linux-stable
@@ -75,7 +80,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
+.PHONY: all smoke full fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -138,6 +143,18 @@ info:
 checkout:
 	$(if $(TAG),,$(error TAG is required — usage: make checkout TAG=v7.2-rc2))
 	$(Q)lib/checkout.sh "$(TAG)"
+
+# ── Convenience targets ───────────────────────────────────────────────────────
+
+# Quick sanity: kunitconfig + tinyconfig, no fetch.
+# Repo-specific parameters (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …) are
+# picked up from local.mk so the same command works in all three repos.
+smoke:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig"
+
+# Broader coverage: all bootable configs except allmodconfig/randconfig/kunitrandconfig.
+full:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -277,6 +294,8 @@ Targets:
   hooks        Activate git hooks only (no package install)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch        Fetch and checkout the latest -rc tag automatically
+  smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (uses local.mk for repo-specific params)
+  full         Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
   info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS
@@ -334,6 +353,12 @@ Common workflows:
 
   # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
   make
+
+  # Quick sanity after a fetch (kunitconfig + tinyconfig; uses local.mk params)
+  make smoke
+
+  # Broader coverage without allmodconfig/randconfig (uses local.mk params)
+  make full
 
   # Check what is currently checked out before running
   make info
