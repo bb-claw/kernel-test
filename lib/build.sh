@@ -218,6 +218,7 @@ fi
 BUILD_EXIT=0
 kmake --timed -j"$NPROC" "$KERNEL_IMAGE_NAME" || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then
+    CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
     if [[ $BUILD_EXIT -eq 124 ]]; then
         printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -228,6 +229,7 @@ if [[ $BUILD_EXIT -ne 0 ]]; then
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
+CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
 printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
     "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
 info "Build OK: $CONFIG / $ARCH"
