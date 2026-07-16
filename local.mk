@@ -1,1 +1,4 @@
-STABLE_RELEASE ?= 7.1
+KERNEL_TREE   ?= ~/git/linux-stable-rc
+LABEL         ?= stable-rc
+GCC           ?= gcc-15
+BUILD_TIMEOUT ?= 3600
