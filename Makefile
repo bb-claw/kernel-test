@@ -17,7 +17,7 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
-ARCHS         ?= x86_64 i386
+ARCHS         ?= x86_64 i386 arm64
 CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1200
