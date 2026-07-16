@@ -146,13 +146,10 @@ checkout:
 
 # ── Convenience targets ───────────────────────────────────────────────────────
 
-# Quick sanity: kunitconfig + tinyconfig, no fetch.
-# Repo-specific parameters (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …) are
-# picked up from local.mk so the same command works in all three repos.
+# local.mk supplies repo-specific params (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …).
 smoke:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig"
 
-# Broader coverage: all bootable configs except allmodconfig/randconfig/kunitrandconfig.
 full:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
 

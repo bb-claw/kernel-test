@@ -12,8 +12,7 @@ REPORT_GEN_EPOCH=$(date -u +%s)
 
 VERSION_FILE="$BUILD_DIR/.kernel-version"
 KERNEL_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || true)
-# Validate: must look like a version string (starts with v + digit).
-# A raw SHA (from rev-parse fallback or manual write) is not usable as a version.
+# A raw SHA or empty string produces nonsensical report dir names; parse the kernel Makefile instead.
 if [[ ! $KERNEL_VERSION =~ ^v[0-9] ]]; then
     KERNEL_VERSION=$(read_kernel_makefile_version || echo "unknown")
 fi
