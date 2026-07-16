@@ -15,10 +15,7 @@ KERNEL_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || true)
 # Validate: must look like a version string (starts with v + digit).
 # A raw SHA (from rev-parse fallback or manual write) is not usable as a version.
 if [[ ! $KERNEL_VERSION =~ ^v[0-9] ]]; then
-    KERNEL_VERSION=$(read_kernel_makefile_version \
-        || git -C "$KERNEL_TREE" describe --exact-match HEAD 2>/dev/null \
-        || git -C "$KERNEL_TREE" rev-parse --short HEAD 2>/dev/null \
-        || echo "unknown")
+    KERNEL_VERSION=$(read_kernel_makefile_version || echo "unknown")
 fi
 
 # ── Derive LABEL ─────────────────────────────────────────────────────────────
