@@ -1,0 +1,1 @@
+STABLE_RELEASE ?= 7.1
