@@ -45,7 +45,7 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 #   randconfig   — random config, boot result unpredictable; value is in build coverage
 # kunitconfig/kunitrandconfig use defconfig base (already bootable); tinyconfig/allnoconfig/rand500config
 # need their configs/<name>.config fragments to restore the TTY/serial/initramfs options they strip.
-BUILD_ONLY_CONFIGS := allmodconfig randconfig
+BUILD_ONLY_CONFIGS := allmodconfig randconfig kunitrandconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
@@ -296,7 +296,7 @@ Config profiles (CONFIGS=):
   tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
   allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
   kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  kunitrandconfig  Build only defconfig + all available KUnit test modules (random set per run); requires rebuild each run
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained: no sanitizers, torture tests, non-gzip compressors)
   randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off; KERNEL_GZIP pinned
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS

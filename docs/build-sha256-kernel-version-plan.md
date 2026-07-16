@@ -93,7 +93,11 @@ consistency, though it is cosmetic only.
 | `lib/build.sh` | Recompute `CONFIG_SHA256` at PASS/FAIL/TIMEOUT write points |
 | `lib/report.sh` | Insert `read_kernel_makefile_version` before SHA fallback in version block |
 
-No changes to: config profiles, test scripts, initramfs, VM boot, report format.
+No changes to: test scripts, initramfs, VM boot, report format.
+
+`kunitrandconfig` is already in `BUILD_ONLY_CONFIGS` in the Makefile; this branch also
+updates the Makefile help text and `CLAUDE.md` to document it as build-only (the code
+was correct, the docs were not).
 
 ---
 
