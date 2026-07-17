@@ -86,7 +86,8 @@ The goal is systematic community verification of each -rc kernel.
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
 - Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `NO_BUILD`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`, `TOYBOX_VERSION`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16; `TOYBOX_VERSION` defaults to `0.8.9`; `NO_BUILD=1` skips the kernel build step and reuses existing `build/<config>-<arch>/` artifacts
-- `local.mk` — optional file included by the Makefile before all `?=` defaults; used by stable and stable-rc repos to set `STABLE_RELEASE`, `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT` without touching the shared Makefile; not present in the mainline repo
+- `presets/<dir>.mk` — committed preset auto-included by the Makefile based on `$(notdir $(CURDIR))`; `presets/kernel-test-stable.mk` sets `STABLE_RELEASE ?= 7.1`; `presets/kernel-test-stable-rc.mk` sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT`; mainline has no preset (uses Makefile defaults)
+- `local.mk` — gitignored; included after the preset for machine-local overrides (e.g. different paths); do not commit
 - `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
 - `make all` always runs `report` even when build or test fails; the overall exit code still reflects failures — use `make all NO_FETCH=1 ...` rather than chaining `build initramfs test report` individually (chaining stops at the first failure)
 - `make test` skips any config whose `build.status` is not `STATUS=PASS` (prints `SKIP (build TIMEOUT/FAIL)`) so partial build failures don't block testing of the configs that did build
@@ -230,10 +231,10 @@ make info KERNEL_TREE=~/git/linux-stable
 # Full pipeline — latest mainline rc (report always written even on failure)
 make KERNEL_TREE=~/git/linux-stable
 
-# Quick sanity — kunitconfig + tinyconfig, all archs (uses local.mk params)
+# Quick sanity — kunitconfig + tinyconfig, all archs (preset auto-selected by dir name)
 make smoke
 
-# Broader coverage — 5 bootable configs, all archs (uses local.mk params)
+# Broader coverage — 5 bootable configs, all archs (preset auto-selected by dir name)
 make full
 
 # Full pipeline — latest stable release (e.g. v7.1.x)

@@ -2,9 +2,12 @@
 # All commands go through this Makefile.
 # Usage: make [target] [VAR=value ...]
 
-# ── Repo-specific overrides (optional, not committed in kernel-test main) ──────
-# Create local.mk to set STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, BUILD_TIMEOUT
-# for stable or stable-rc repos without touching this file.
+# ── Repo preset (auto) + user override ────────────────────────────────────────
+# Preset selected by directory name — works immediately after clone, no setup needed.
+# NOTE: renaming the clone directory breaks preset detection (no error, variables silently unset).
+# local.mk (gitignored) is included after the preset for machine-local overrides.
+REPO_DIR := $(notdir $(CURDIR))
+-include presets/$(REPO_DIR).mk
 -include local.mk
 
 # ── User-settable variables ────────────────────────────────────────────────────
@@ -146,7 +149,7 @@ checkout:
 
 # ── Convenience targets ───────────────────────────────────────────────────────
 
-# local.mk supplies repo-specific params (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …).
+# presets/<dir>.mk supplies repo-specific params (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …).
 smoke:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig"
 
@@ -295,7 +298,7 @@ Targets:
   hooks        Activate git hooks only (no package install)
   all          Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch        Fetch and checkout the latest -rc tag automatically
-  smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (uses local.mk for repo-specific params)
+  smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
   full         Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   local        Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
@@ -356,10 +359,10 @@ Common workflows:
   # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
   make
 
-  # Quick sanity after a fetch (kunitconfig + tinyconfig; uses local.mk params)
+  # Quick sanity after a fetch (kunitconfig + tinyconfig; preset auto-selected by dir name)
   make smoke
 
-  # Broader coverage without allmodconfig/randconfig (uses local.mk params)
+  # Broader coverage without allmodconfig/randconfig (preset auto-selected by dir name)
   make full
 
   # Check what is currently checked out before running

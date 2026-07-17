@@ -13,6 +13,9 @@ dmesg/
 # Claude Code local settings (contains user-specific paths and permissions)
 .claude/
 
+# Machine-local Makefile overrides (user-specific; presets/ handles repo defaults)
+local.mk
+
 # Scratch / ad-hoc output files
 *.out
 todos

@@ -17,7 +17,8 @@
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
-| `local.mk` | _(absent)_ | Repo-specific overrides included before all `?=` defaults; stable repo sets `STABLE_RELEASE ?= 7.1`; stable-rc sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT` |
+| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT |
+| `local.mk` | _(gitignored)_ | Machine-local overrides included after preset; never committed |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -33,8 +34,8 @@ make KERNEL_TREE=~/git/linux-stable                   # latest mainline rc (with
 make STABLE_RELEASE=7.1                               # latest stable vX.Y.*
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
-make smoke                                            # kunitconfig + tinyconfig, uses local.mk
-make full                                             # 5 bootable configs, uses local.mk
+make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
+make full                                             # 5 bootable configs, preset auto-selected
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
