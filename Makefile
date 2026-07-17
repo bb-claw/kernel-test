@@ -3,7 +3,8 @@
 # Usage: make [target] [VAR=value ...]
 
 # ── Repo preset (auto) + user override ────────────────────────────────────────
-# Preset selected by directory name — works immediately after clone, no setup.
+# Preset selected by directory name — works immediately after clone, no setup needed.
+# NOTE: renaming the clone directory breaks preset detection (no error, variables silently unset).
 # local.mk (gitignored) is included after the preset for machine-local overrides.
 REPO_DIR := $(notdir $(CURDIR))
 -include presets/$(REPO_DIR).mk
