@@ -2,9 +2,11 @@
 # All commands go through this Makefile.
 # Usage: make [target] [VAR=value ...]
 
-# ── Repo-specific overrides (optional, not committed in kernel-test main) ──────
-# Create local.mk to set STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, BUILD_TIMEOUT
-# for stable or stable-rc repos without touching this file.
+# ── Repo preset (auto) + user override ────────────────────────────────────────
+# Preset selected by directory name — works immediately after clone, no setup.
+# local.mk (gitignored) is included after the preset for machine-local overrides.
+REPO_DIR := $(notdir $(CURDIR))
+-include presets/$(REPO_DIR).mk
 -include local.mk
 
 # ── User-settable variables ────────────────────────────────────────────────────

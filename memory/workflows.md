@@ -17,7 +17,8 @@
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
-| `local.mk` | _(absent)_ | Repo-specific overrides included before all `?=` defaults; stable repo sets `STABLE_RELEASE ?= 7.1`; stable-rc sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT` |
+| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT |
+| `local.mk` | _(gitignored)_ | Machine-local overrides included after preset; never committed |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
