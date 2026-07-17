@@ -231,10 +231,10 @@ make info KERNEL_TREE=~/git/linux-stable
 # Full pipeline — latest mainline rc (report always written even on failure)
 make KERNEL_TREE=~/git/linux-stable
 
-# Quick sanity — kunitconfig + tinyconfig, all archs (uses local.mk params)
+# Quick sanity — kunitconfig + tinyconfig, all archs (preset auto-selected by dir name)
 make smoke
 
-# Broader coverage — 5 bootable configs, all archs (uses local.mk params)
+# Broader coverage — 5 bootable configs, all archs (preset auto-selected by dir name)
 make full
 
 # Full pipeline — latest stable release (e.g. v7.1.x)
