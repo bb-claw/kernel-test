@@ -7,6 +7,10 @@
 # one run but later passed appears only in archive_passed/.
 # Processes reports in reverse chronological order so the most recent version
 # is used in the archive filename.
+#
+# Designed for cross-clone use: run in kernel-test, kernel-test-stable, and
+# kernel-test-stable-rc — each adds its own entries without deleting entries
+# contributed by other clones.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -76,6 +80,24 @@ classify_boot_fail() {
 vmstat_field() {
     local file="$1" key="$2"
     grep "^${key}=" "$file" 2>/dev/null | cut -d= -f2 || echo 0
+}
+
+# Return 0 if sha256 is already present in archive_passed/ (any config/arch/version).
+in_passed() {
+    local f
+    for f in "$PASSED_DIR"/kconfig-*-"$1".config; do
+        [[ -f "$f" ]] && return 0
+    done
+    return 1
+}
+
+# Return 0 if sha256 is already present in archive_failed/.
+in_failed() {
+    local f
+    for f in "$FAILED_DIR"/kconfig-*-"$1"-*.config; do
+        [[ -f "$f" ]] && return 0
+    done
+    return 1
 }
 
 # Process reports newest-first so the most recent version wins in the filename.
@@ -201,24 +223,39 @@ while IFS= read -r -d '' report_dir; do
 done < <(find "$REPORT_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
          ! -name "baseline" -print0 | sort -zr)
 
-# Wipe existing archive contents for a clean regeneration
-find "$PASSED_DIR" -name "*.config" -delete 2>/dev/null || true
-find "$FAILED_DIR" -name "*.config" -delete 2>/dev/null || true
-
-# Write archive_passed
+# Write archive_passed (additive: skip if already present; graduate from failed if needed).
+# Never wipes — other clones may have contributed entries not visible in this reports/ dir.
 written_pass=0
+skipped_pass=0
 for sha256 in "${!PASS_PATH[@]}"; do
+    if in_passed "$sha256"; then
+        skipped_pass=$(( skipped_pass + 1 ))
+        continue
+    fi
     src="${PASS_PATH[$sha256]}"
     [[ -f "$src" ]] || { warn "Source missing: $src"; continue; }
+    # Graduate: remove any failed entry for this sha256 (config now known to pass)
+    for f in "$FAILED_DIR"/kconfig-*-"${sha256}"-*.config; do
+        [[ -f "$f" ]] && rm "$f"
+    done
     dest="$PASSED_DIR/kconfig-${PASS_CONFIG[$sha256]}-${PASS_ARCH[$sha256]}-${PASS_VERSION[$sha256]}-${sha256}.config"
     cp "$src" "$dest"
     written_pass=$(( written_pass + 1 ))
 done
 
-# Write archive_failed (only if sha256 never passed)
+# Write archive_failed (additive: only if not already passed or already tracked as failed).
+# Checks on-disk state so entries from other clones are respected.
 written_fail=0
+skipped_fail=0
 for sha256 in "${!FAIL_PATH[@]}"; do
-    [[ -n "${PASS_PATH[$sha256]+set}" ]] && continue   # passed wins
+    # passed wins — check both in-memory (this run) and on-disk (other clones)
+    if [[ -n "${PASS_PATH[$sha256]+set}" ]] || in_passed "$sha256"; then
+        continue
+    fi
+    if in_failed "$sha256"; then
+        skipped_fail=$(( skipped_fail + 1 ))
+        continue
+    fi
     src="${FAIL_PATH[$sha256]}"
     [[ -f "$src" ]] || { warn "Source missing: $src"; continue; }
     dest="$FAILED_DIR/kconfig-${FAIL_CONFIG[$sha256]}-${FAIL_ARCH[$sha256]}-${FAIL_VERSION[$sha256]}-${sha256}-${FAIL_REASON[$sha256]}.config"
@@ -227,5 +264,5 @@ for sha256 in "${!FAIL_PATH[@]}"; do
 done
 
 info "Scanned $total_reports reports — $total_entries config entries ($total_pass pass, $total_fail fail)"
-info "archive_passed: $written_pass unique configs"
-info "archive_failed: $written_fail unique configs (never passed)"
+info "archive_passed: $written_pass added, $skipped_pass already present"
+info "archive_failed: $written_fail added, $skipped_fail already present"

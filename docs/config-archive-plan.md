@@ -76,12 +76,18 @@ Derived from `summary.txt` table (Build/Boot columns + Notes) per (config, arch)
 
 ## Deduplication Logic
 
-SHA256 is the identity key. Processing order:
+SHA256 is the identity key. The script is **additive** — it never wipes the archive, so
+`make config-archive` can be run in all three clones (`kernel-test`, `kernel-test-stable`,
+`kernel-test-stable-rc`) and each adds its own entries without deleting entries from other
+clones.
 
-1. Scan all reports, collecting every (SHA256, config, arch, version, status, reason) tuple.
-2. Build a set of SHA256 hashes that appear with status=PASS in at least one run.
-3. Write `configs/archive_passed/`: one file per unique passing SHA256 (first seen version used for naming).
-4. Write `configs/archive_failed/`: one file per unique failing SHA256 **not** in the passed set.
+Processing order per run:
+
+1. Scan this clone's `reports/`, collecting every (SHA256, config, arch, version, status, reason) tuple.
+2. For each passing SHA256: skip if already in `archive_passed/` on disk; otherwise copy in.
+   If the sha256 exists in `archive_failed/`, remove it (graduated to passed).
+3. For each failing SHA256: skip if already in `archive_passed/` (on disk — from any clone);
+   skip if already in `archive_failed/`; otherwise copy in.
 
 A config that failed early in development but later passed appears only in `archive_passed/`.
 
