@@ -17,7 +17,8 @@
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
-| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT |
+| `STABLE_RC_BRANCH` | _(from preset)_ | Branch name for `make fetch-stable-rc`; set in `presets/kernel-test-stable-rc.mk` as `linux-7.1.y`; update when series bumps |
+| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT+STABLE_RC_BRANCH |
 | `local.mk` | _(gitignored)_ | Machine-local overrides included after preset; never committed |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
@@ -30,8 +31,7 @@ When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STAB
 ### Full pipeline variants
 
 ```sh
-make KERNEL_TREE=~/git/linux-stable                   # latest mainline rc (with fetch)
-make STABLE_RELEASE=7.1                               # latest stable vX.Y.*
+make fetch                                            # auto-dispatches: mainline/stable/stable-rc by preset
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
 make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
@@ -40,6 +40,14 @@ make local                                            # localconfig x86_64, no b
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 ```
+
+`make fetch` auto-dispatches based on preset variables:
+- `STABLE_RC_BRANCH` set → `lib/fetch-stable-rc.sh` (branch fetch + reset)
+- `STABLE_RELEASE` set → `lib/fetch.sh` stable mode
+- neither → `lib/fetch.sh` mainline rc mode
+
+`STABLE_RC_BRANCH` is set in `presets/kernel-test-stable-rc.mk`. Update it when
+the stable series bumps (e.g. 7.1.y → 7.2.y). See `docs/stable-rc-workflow.md`.
 
 arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
 Default `ARCHS` includes arm64; pass `ARCHS="x86_64 i386"` to skip it.
