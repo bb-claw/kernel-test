@@ -1,4 +1,4 @@
-Failed configs archive — 15 entries, 23 rows — generated 2026-07-18T22:01:24Z
+Failed configs archive — 15 entries, 23 rows — generated 2026-07-18T22:59:18Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON          RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
