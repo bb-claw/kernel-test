@@ -103,105 +103,115 @@ git -C ~/git/linux-next grep "select REGMAP_MMIO" drivers/pinctrl/Kconfig
 
 ```sh
 cd ~/git/linux-next
-git log --oneline -- drivers/pinctrl/Kconfig | head -20
-# or: git log -S 'PINCTRL_MICROCHIP_SGPIO' --oneline
+git log --oneline -- path/to/file | head -20
+# or: git log -S 'symbol_name' --oneline -- path/to/file
 ```
 
-### 2. Apply the fix to your mainline tree
+**Note:** linux-next and mainline clones are shallow — `git log -S` and `git blame`
+may hit the boundary (commits prefixed with `^`).  Fall back to the cgit web interface:
 
-Work against `~/git/linux` (Linus's tree), not linux-next directly — patches are
-submitted to the subsystem maintainer who then pulls them into linux-next:
+```
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/log/path/to/file
+```
+
+The `Fixes:` tag must point to the commit that *introduced* the bug, not necessarily
+the file shown in the error message.
+
+### 2. Apply the fix to your development tree
+
+Work in a dedicated dev tree (e.g. `~/git/linux-dev`) checked out at the current rc
+tag — not in linux-next directly.  Patches go to the subsystem maintainer who pulls
+them into linux-next:
 
 ```sh
-cd ~/git/linux
-git checkout -b fix/pinctrl-microchip-sgpio-regmap-mmio
-# edit drivers/pinctrl/Kconfig
-git add drivers/pinctrl/Kconfig
+cd ~/git/linux-dev
+git checkout v7.2-rc3    # or latest rc tag
+# edit the file
+git add path/to/file
 git commit -s
 ```
 
-Commit message format:
+Commit message format (example: missing Kconfig `select`):
 
 ```
-pinctrl: microchip-sgpio: add missing select REGMAP_MMIO
+subsystem: driver: add missing select DEPENDENCY
 
-PINCTRL_MICROCHIP_SGPIO calls devm_regmap_init_mmio() via ocelot.h but
-does not select REGMAP_MMIO.  Without the select, olddefconfig leaves
-CONFIG_REGMAP_MMIO unset and the build fails:
+The driver calls foo() via <linux/mfd/bar.h>, which internally uses
+baz() and requires DEPENDENCY.  The Kconfig entry does not select it,
+causing a build failure when no other driver in the config pulls in
+DEPENDENCY:
 
-  include/linux/mfd/ocelot.h:19:51: error: 'struct regmap_config'
-    declared inside parameter list
-  include/linux/mfd/ocelot.h:34:24: error: implicit declaration of
-    function 'devm_regmap_init_mmio'
-  drivers/pinctrl/pinctrl-microchip-sgpio.c:910:16: error: variable
-    'regmap_config' has initializer but incomplete type
-  drivers/pinctrl/pinctrl-microchip-sgpio.c:911:18: error: 'struct
-    regmap_config' has no member named 'reg_bits'
+  include/linux/mfd/bar.h:19:51: error: ...
+  drivers/.../driver.c:910:16: error: ...
 
-Fixes: 68c873363a78 ("pinctrl: ocelot: add SGPIO driver")
+Found by randconfig testing on arm64; tinyconfig reproducer below.
+
+Fixes: <sha> ("<exact commit title>")
 Cc: stable@vger.kernel.org
 Signed-off-by: Your Name <your@email>
+---
+Reproducer (tinyconfig, arm64, without patch):
+
+  make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- tinyconfig
+  scripts/config --enable CONFIG_SUBSYSTEM
+  scripts/config --enable CONFIG_DRIVER
+  make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+  make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+      drivers/path/driver.o
+  -> CONFIG_DEPENDENCY absent, build fails as shown above
 ```
+
+Content after `---` is visible in the email but stripped by `git am` — the right place
+for reproducers.  Use the function the driver *directly* calls in the description, not
+a transitive dependency that appears in the error message.
 
 ### 3. Run checkpatch
 
 ```sh
-cd ~/git/linux
-git format-patch -1 HEAD -o /tmp/
-scripts/checkpatch.pl /tmp/0001-pinctrl-microchip-sgpio-add-missing-select-REGMAP_MMIO.patch
+git format-patch -1 HEAD
+~/git/linux/scripts/checkpatch.pl --strict 0001-*.patch
 ```
 
-Fix any warnings before sending.
+Fix all errors and warnings before sending.  `--strict` catches trailing whitespace
+and other style issues that the default mode skips.
 
 ### 4. Find the right recipients
 
 ```sh
-scripts/get_maintainer.pl /tmp/0001-*.patch
+~/git/linux/scripts/get_maintainer.pl 0001-*.patch
 ```
 
-Typical output for `drivers/pinctrl/Kconfig`:
-```
-Linus Walleij <linusw@kernel.org>             (maintainer: PINCTRL SUBSYSTEM)
-linux-gpio@vger.kernel.org                    (open list)
-linux-kernel@vger.kernel.org                  (open list)
-```
-
-Also add any co-authors of the introducing commit (from `git show <fixes-sha>`)
-and `stable@vger.kernel.org` for the `Cc: stable` backport request.
-
-### 5. Send via git send-email
+Routing rules from the output:
+- `(maintainer:...)` and `(blamed_fixes:...)` → `--to`
+- `(open list:...)` / mailing lists → `--cc`
+- `stable@vger.kernel.org` → `--cc` (even if already in the commit body)
 
 ```sh
 git send-email \
-  --to=linusw@kernel.org \
-  --to=Steen.Hegelund@microchip.com \
-  --cc=linux-gpio@vger.kernel.org \
-  --cc=linux-arm-kernel@lists.infradead.org \
-  --cc=linux-kernel@vger.kernel.org \
-  --cc=stable@vger.kernel.org \
-  /tmp/0001-*.patch
+  --to="maintainer@example.com" \
+  --to="blamed.author@example.com" \
+  --cc="linux-subsystem@vger.kernel.org" \
+  --cc="linux-kernel@vger.kernel.org" \
+  --cc="stable@vger.kernel.org" \
+  0001-*.patch
 ```
 
-Configure `~/.gitconfig` once:
+`git send-email` shows a preview with full headers before sending — verify the From
+address and recipient list, then type `y`.
 
-```ini
-[sendemail]
-    smtpserver = smtp.gmail.com
-    smtpserverport = 587
-    smtpencryption = tls
-    smtpuser = your@gmail.com
-```
-
-### 6. Monitor the mailing list
+### 5. Monitor the mailing list
 
 Search lore.kernel.org for replies:
 
 ```
-https://lore.kernel.org/linux-gpio/?q=PINCTRL_MICROCHIP_SGPIO
+https://lore.kernel.org/linux-gpio/?q=subject+keyword
 ```
 
-Maintainers typically reply within a few days.  If the patch is accepted, it
-appears in linux-next within a week via the pinctrl-for-next tree.
+Maintainers typically reply within a few days.  If accepted, the patch appears in
+linux-next within a week via the subsystem tree.
+
+If asked for a v2: resend with `[PATCH v2]` in the subject and a `Changes in v2:`
+section after `---`.
 
 ---
 
