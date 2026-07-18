@@ -329,7 +329,7 @@ generate_index() {
                 fi
             fi
 
-            rows+=("${config}|${arch}|${version}|${reason}|${kconfig_file}|${dmesg_link}")
+            rows+=("${config}|${arch}|${version}|${reason}|${kconfig_file}|${dmesg_link}|${sha256}")
         done
 
         count=${#rows[@]}
@@ -338,42 +338,42 @@ generate_index() {
             sorted_rows=$(printf '%s\n' "${rows[@]}" | sort)
         fi
 
-        # Dynamic column widths (txt uses first 4 fields only)
+        # Dynamic column widths (sha256 is always 64 chars — fixed)
         local w_c=6 w_a=4 w_v=7
         if [[ -n "$sorted_rows" ]]; then
-            while IFS='|' read -r c a v _r _kl _dl; do
+            while IFS='|' read -r c a v _r _kl _dl _sha; do
                 [[ ${#c} -gt $w_c ]] && w_c=${#c}
                 [[ ${#a} -gt $w_a ]] && w_a=${#a}
                 [[ ${#v} -gt $w_v ]] && w_v=${#v}
             done <<< "$sorted_rows"
         fi
         local sep
-        sep=$(printf '─%.0s' $(seq 1 $((w_c + w_a + w_v + 20))))
+        sep=$(printf '─%.0s' $(seq 1 $((w_c + w_a + w_v + 20 + 64))))
 
         # Plain-text index (no links)
         {
             printf 'Config archive — %s  |  %d entries  |  %s\n\n' "$label" "$count" "$date_str"
             if [[ "$label" == FAILED ]]; then
-                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  FAILURE REASON\n" CONFIG ARCH VERSION
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-26s  SHA256\n" CONFIG ARCH VERSION "FAILURE REASON"
                 printf '%s\n' "$sep"
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r _kl _dl; do
-                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %s\n" "$c" "$a" "$v" "$r"
+                    while IFS='|' read -r c a v r _kl _dl sha; do
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-26s  %s\n" "$c" "$a" "$v" "$r" "$sha"
                     done <<< "$sorted_rows"
                 fi
             else
-                printf "%-${w_c}s  %-${w_a}s  VERSION\n" CONFIG ARCH
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  SHA256\n" CONFIG ARCH VERSION
                 printf '%s\n' "$sep"
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r _kl _dl; do
-                        printf "%-${w_c}s  %-${w_a}s  %s\n" "$c" "$a" "$v"
+                    while IFS='|' read -r c a v _r _kl _dl sha; do
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %s\n" "$c" "$a" "$v" "$sha"
                     done <<< "$sorted_rows"
                 fi
             fi
         } > "$dir/index.txt"
 
-        # HTML index (with links to kconfig and dmesg)
-        local hclass kl dl files_cell
+        # HTML index (with links to kconfig and dmesg, sha256 in last column)
+        local hclass kl dl sha files_cell
         if [[ "$label" == PASSED ]]; then hclass=pass; else hclass=fail; fi
         {
             printf '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="utf-8">\n'
@@ -385,29 +385,30 @@ generate_index() {
             printf 'th,td{padding:4px 12px;text-align:left;border:1px solid #ccc}\n'
             printf 'th{background:#f0f0f0}\n'
             printf '.pass{color:#080}.fail{color:#c00}\n'
+            printf '.sha{font-size:0.85em;color:#666}\n'
             printf 'a{color:inherit}\n'
             printf '</style></head>\n<body>\n'
             printf '<h1>Config archive &mdash; <span class="%s">%s</span>' "$hclass" "$label"
             printf ' &nbsp;|&nbsp; %d entries &nbsp;|&nbsp; %s</h1>\n' "$count" "$date_str"
             printf '<table>\n'
             if [[ "$label" == FAILED ]]; then
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Files</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Files</th><th>SHA256</th></tr>\n'
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r kl dl; do
+                    while IFS='|' read -r c a v r kl dl sha; do
                         files_cell="<a href=\"./${kl}\">config</a>"
                         [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
-                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td></tr>\n' \
-                            "$c" "$a" "$v" "$r" "$files_cell"
+                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$c" "$a" "$v" "$r" "$files_cell" "$sha"
                     done <<< "$sorted_rows"
                 fi
             else
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Files</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Files</th><th>SHA256</th></tr>\n'
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r kl dl; do
+                    while IFS='|' read -r c a v _r kl dl sha; do
                         files_cell="<a href=\"./${kl}\">config</a>"
                         [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
-                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td></tr>\n' \
-                            "$c" "$a" "$v" "$files_cell"
+                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$c" "$a" "$v" "$files_cell" "$sha"
                     done <<< "$sorted_rows"
                 fi
             fi

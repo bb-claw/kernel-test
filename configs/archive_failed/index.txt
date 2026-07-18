@@ -1,19 +1,19 @@
-Config archive — FAILED  |  15 entries  |  2026-07-18 15:44
+Config archive — FAILED  |  15 entries  |  2026-07-18 15:54
 
-CONFIG           ARCH    VERSION     FAILURE REASON
-───────────────────────────────────────────────────
-allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT
-allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-kernel-panic
-allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout
-allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout
-allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout
-kunitrandconfig  i386    v7.1.3      KUNIT_FAIL-2-of-1749
-kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout
-rand500config    arm64   v7.1.4-rc1  BOOT_FAIL-timeout
-rand500config    arm64   v7.2-rc2    BUILD_FAIL
-rand500config    i386    v7.1.3      BUILD_FAIL
-rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout
-rand500config    i386    v7.2-rc3    BOOT_FAIL-oops
-rand500config    x86_64  v7.2-rc2    BUILD_FAIL
-randconfig       i386    v7.2-rc2    BUILD_FAIL
-randconfig       x86_64  v7.2-rc2    BUILD_FAIL
+CONFIG           ARCH    VERSION     FAILURE REASON              SHA256
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT               b3140ed196c6675d314227472346d03457d81d3a383a8a8b9ee0ea66e7506992
+allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-kernel-panic      9b3275300d7d9fab8e1ee37a5a66e19bded06828aceacdc7c9c705f1e5839f7f
+allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout           b92465d56b188eeecdb024039890c210fc19546746ae42ea36ed2a2a72065cfb
+allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout           e5abfdcea6835ad8ef769f488fcf9beada0fa8965275827f18f5d3b8a4b95d32
+allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout           f5294a0eadcaa11ec3561cde1dd8da90f69c948ea03235b5f491e2db2223a83f
+kunitrandconfig  i386    v7.1.3      KUNIT_FAIL-2-of-1749        35376dd938df26e368915a706ef26053aec3e6bee302d3825dc0a774007f46fa
+kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout           7ba1db8064ee83c2fc16126d76be213a3718418b7dd02d30f468e2ee6e9e6255
+rand500config    arm64   v7.1.4-rc1  BOOT_FAIL-timeout           523d10d2a2ea5822051c77c10a9fc07fbd13c585841c8b46de8cbf22c51d895f
+rand500config    arm64   v7.2-rc2    BUILD_FAIL                  edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    i386    v7.1.3      BUILD_FAIL                  2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
+rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout           165e686ead919a2e76aa6705da4b1f3a83b1fbb6a93147b44dbfb169a2ac315f
+rand500config    i386    v7.2-rc3    BOOT_FAIL-oops              9d19cfcad5a9acaee1eec7f0f5e576c6f9cb04f159932e52fdaa0d3dfe95e00a
+rand500config    x86_64  v7.2-rc2    BUILD_FAIL                  f5f38d8dbe038bd163c624047f900bd09be6c80ba310db3aba070eaba05e9d10
+randconfig       i386    v7.2-rc2    BUILD_FAIL                  c4edf70d9afccc932d5b3ddafbe750f4e07406bc42c7171e64fad55fddba042f
+randconfig       x86_64  v7.2-rc2    BUILD_FAIL                  c8d8c8dbed978a6137f80949fed8727f6c045fb3c1bea499b7d0902f77c7b7d3
