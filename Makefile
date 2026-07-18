@@ -84,7 +84,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -309,6 +309,15 @@ install:
 		done; \
 	done
 
+# ── Config archive ────────────────────────────────────────────────────────────
+
+# Scan all report directories and populate configs/archive_passed/ and
+# configs/archive_failed/ with deduplicated config files.
+# Deduplicates by SHA256; a config that ever produced PASS goes to archive_passed/
+# even if it also failed in other runs.
+config-archive:
+	$(Q)scripts/config-archive.sh
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -344,6 +353,7 @@ Targets:
   baseline     Pin the latest report dir as the regression baseline; auto-diff will compare against it
   install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
+  config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
