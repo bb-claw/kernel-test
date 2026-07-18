@@ -394,18 +394,18 @@ generate_index() {
             printf '%s archive — %d entries, %d rows — generated %s\n\n' \
                 "$hdr_label" "$entry_count" "$total_rows" "$date_str"
             if [[ "$label" == FAILED ]]; then
-                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-52s  %s\n" \
-                    CONFIG ARCH VERSION "FAILURE REASON" RUNS "REPORT DIR" SHA256
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-9s  %-19s  %-52s  %s\n" \
+                    CONFIG ARCH VERSION "FAILURE REASON" RUNS LINE TIMESTAMP "REPORT DIR" SHA256
             else
-                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-52s  %s\n" \
-                    CONFIG ARCH VERSION RUNS "REPORT DIR" SHA256
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-9s  %-19s  %-52s  %s\n" \
+                    CONFIG ARCH VERSION RUNS LINE TIMESTAMP "REPORT DIR" SHA256
             fi
-            local seplen=$(( w_c + w_a + w_v + 4 + 52 + 64 + 14 ))
+            local seplen=$(( w_c + w_a + w_v + 4 + 9 + 19 + 52 + 64 + 18 ))
             [[ "$label" == FAILED ]] && seplen=$(( seplen + w_r + 2 ))
             printf '─%.0s' $(seq 1 "$seplen"); printf '\n'
 
             if [[ -n "$sorted_rows" ]]; then
-                local tc ta tv tr tsha trc tkf trd trd_abs badge rd_trunc
+                local tc ta tv tr tsha trc tkf trd trd_abs badge rd_trunc line timestamp
                 while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
                     [[ -z "$tc" ]] && continue
                     badge=""
@@ -414,13 +414,26 @@ generate_index() {
                     elif [[ "$label" == FAILED && -n "${passed_shas[$tsha]+set}" ]]; then
                         badge=" [✓ also passed]"
                     fi
+                    line=""
+                    timestamp=""
+                    if [[ -n "$trd" ]]; then
+                        if [[ "$trd" == stable-rc-* ]]; then
+                            line="stable-rc"
+                        elif [[ "$trd" == stable-* ]]; then
+                            line="stable"
+                        elif [[ "$trd" == mainline-* ]]; then
+                            line="mainline"
+                        fi
+                        timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
+                            <<< "$trd" || true)
+                    fi
                     rd_trunc="${trd:0:52}"
                     if [[ "$label" == FAILED ]]; then
-                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-52s%s  %s\n" \
-                            "$tc" "$ta" "$tv" "$tr" "$trc" "$rd_trunc" "$badge" "$tsha"
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
+                            "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
                     else
-                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-52s%s  %s\n" \
-                            "$tc" "$ta" "$tv" "$trc" "$rd_trunc" "$badge" "$tsha"
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
+                            "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
                     fi
                 done <<< "$sorted_rows"
             fi
@@ -450,12 +463,12 @@ generate_index() {
                 "$entry_count" "$total_rows" "$date_str"
             printf '<table>\n'
             if [[ "$label" == FAILED ]]; then
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Runs</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Runs</th><th>Line</th><th>Timestamp</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
             else
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Runs</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Runs</th><th>Line</th><th>Timestamp</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
             fi
             if [[ -n "$sorted_rows" ]]; then
-                local tc ta tv tr tsha trc tkf trd trd_abs tr_id rd_cell rd_link rd_root_inner badge_cell files_cell
+                local tc ta tv tr tsha trc tkf trd trd_abs tr_id rd_cell rd_link rd_root_inner badge_cell files_cell line timestamp
                 while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
                     [[ -z "$tc" ]] && continue
                     # Anchor on first row per SHA
@@ -467,6 +480,8 @@ generate_index() {
                     # Report dir cell — relative link depends on which clone the report lives in
                     rd_cell=""
                     rd_link=""
+                    line=""
+                    timestamp=""
                     if [[ -n "$trd_abs" ]]; then
                         rd_root_inner="$(dirname "$(dirname "$trd_abs")")"
                         if [[ "$rd_root_inner" == "$REPO_ROOT" ]]; then
@@ -475,6 +490,15 @@ generate_index() {
                             rd_link="../../../$(basename "$rd_root_inner")/reports/${trd}"
                         fi
                         rd_cell="<a href=\"${rd_link}/\">${trd}</a>"
+                        if [[ "$trd" == stable-rc-* ]]; then
+                            line="stable-rc"
+                        elif [[ "$trd" == stable-* ]]; then
+                            line="stable"
+                        elif [[ "$trd" == mainline-* ]]; then
+                            line="mainline"
+                        fi
+                        timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
+                            <<< "$trd" || true)
                     fi
                     # Cross-result badge
                     badge_cell=""
@@ -492,11 +516,11 @@ generate_index() {
                             files_cell+=" &nbsp;<a href=\"${rd_link}/dmesg-${tc}-${ta}.txt\">dmesg</a>"
                     fi
                     if [[ "$label" == FAILED ]]; then
-                        printf '<tr%s><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
-                            "$tr_id" "$tc" "$ta" "$tv" "$tr" "$trc" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
+                        printf '<tr%s><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$tr_id" "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
                     else
-                        printf '<tr%s><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
-                            "$tr_id" "$tc" "$ta" "$tv" "$trc" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
+                        printf '<tr%s><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$tr_id" "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
                     fi
                 done <<< "$sorted_rows"
             fi
