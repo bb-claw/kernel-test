@@ -35,7 +35,7 @@ install_packages() {
             sudo pacman -S --needed --noconfirm \
                 gcc-multilib aarch64-linux-gnu-gcc make ccache \
                 qemu-system-x86 qemu-system-aarch64 \
-                cpio git \
+                cpio git lzop \
                 bc flex bison libelf pahole
             ;;
 
@@ -44,7 +44,7 @@ install_packages() {
             sudo apt-get install -y \
                 gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
                 qemu-system-x86 qemu-system-arm \
-                cpio git \
+                cpio git lzop \
                 bc flex bison libelf-dev dwarves
             ;;
 
@@ -52,7 +52,7 @@ install_packages() {
             sudo dnf install -y \
                 gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
                 qemu-system-x86 qemu-system-aarch64 \
-                cpio git \
+                cpio git lzop \
                 bc flex bison elfutils-libelf-devel dwarves
             ;;
 
@@ -60,7 +60,7 @@ install_packages() {
             sudo zypper install -y \
                 gcc gcc-multilib cross-aarch64-linux-gnu-gcc make ccache \
                 qemu-x86 qemu-arm \
-                cpio git \
+                cpio git lzop \
                 bc flex bison libelf-devel dwarves
             ;;
 
