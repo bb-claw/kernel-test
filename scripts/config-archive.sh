@@ -274,10 +274,27 @@ generate_index() {
     local date_str dir label count f base sha256 rest version config_arch config arch reason
     date_str=$(date '+%Y-%m-%d %H:%M')
 
+    # Build sha256 → report-dir lookup so HTML rows can link to dmesg files.
+    # Scans newest-first so the first hit per sha256 is the most recent run.
+    declare -A sha_report=()
+    if [[ -d "$REPORT_ROOT" ]]; then
+        local rd sm sha
+        while IFS= read -r -d '' rd; do
+            [[ "$(basename "$rd")" == baseline ]] && continue
+            sm="$rd/summary.txt"
+            [[ -f "$sm" ]] || continue
+            while IFS= read -r sha; do
+                [[ -n "$sha" && -z "${sha_report[$sha]+set}" ]] && sha_report[$sha]="$rd"
+            done < <(grep -oE '[0-9a-f]{64}' "$sm" || true)
+        done < <(find "$REPORT_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
+                  ! -name baseline -print0 | sort -zr)
+    fi
+
     for dir in "$PASSED_DIR" "$FAILED_DIR"; do
         [[ "$dir" == "$PASSED_DIR" ]] && label=PASSED || label=FAILED
 
         local -a rows=()
+        local kconfig_file dmesg_link rdir dmesg_path
 
         shopt -s nullglob
         local -a files=("$dir"/kconfig-*.config)
@@ -298,7 +315,21 @@ generate_index() {
                 fi
             done
             [[ -z "$arch" ]] && continue
-            rows+=("${config}|${arch}|${version}|${reason}")
+
+            # kconfig link: file is in the same directory as index.html
+            kconfig_file="${f##*/}"
+
+            # dmesg link: look up report dir via sha256, then check file exists
+            dmesg_link=""
+            if [[ -n "${sha_report[$sha256]+set}" ]]; then
+                rdir="${sha_report[$sha256]}"
+                dmesg_path="$rdir/dmesg-${config}-${arch}.txt"
+                if [[ -f "$dmesg_path" ]]; then
+                    dmesg_link="../../reports/$(basename "$rdir")/dmesg-${config}-${arch}.txt"
+                fi
+            fi
+
+            rows+=("${config}|${arch}|${version}|${reason}|${kconfig_file}|${dmesg_link}")
         done
 
         count=${#rows[@]}
@@ -307,10 +338,10 @@ generate_index() {
             sorted_rows=$(printf '%s\n' "${rows[@]}" | sort)
         fi
 
-        # Dynamic column widths
+        # Dynamic column widths (txt uses first 4 fields only)
         local w_c=6 w_a=4 w_v=7
         if [[ -n "$sorted_rows" ]]; then
-            while IFS='|' read -r c a v _r; do
+            while IFS='|' read -r c a v _r _kl _dl; do
                 [[ ${#c} -gt $w_c ]] && w_c=${#c}
                 [[ ${#a} -gt $w_a ]] && w_a=${#a}
                 [[ ${#v} -gt $w_v ]] && w_v=${#v}
@@ -319,14 +350,14 @@ generate_index() {
         local sep
         sep=$(printf '─%.0s' $(seq 1 $((w_c + w_a + w_v + 20))))
 
-        # Plain-text index
+        # Plain-text index (no links)
         {
             printf 'Config archive — %s  |  %d entries  |  %s\n\n' "$label" "$count" "$date_str"
             if [[ "$label" == FAILED ]]; then
                 printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  FAILURE REASON\n" CONFIG ARCH VERSION
                 printf '%s\n' "$sep"
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r; do
+                    while IFS='|' read -r c a v r _kl _dl; do
                         printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %s\n" "$c" "$a" "$v" "$r"
                     done <<< "$sorted_rows"
                 fi
@@ -334,15 +365,15 @@ generate_index() {
                 printf "%-${w_c}s  %-${w_a}s  VERSION\n" CONFIG ARCH
                 printf '%s\n' "$sep"
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r; do
+                    while IFS='|' read -r c a v _r _kl _dl; do
                         printf "%-${w_c}s  %-${w_a}s  %s\n" "$c" "$a" "$v"
                     done <<< "$sorted_rows"
                 fi
             fi
         } > "$dir/index.txt"
 
-        # HTML index
-        local hclass
+        # HTML index (with links to kconfig and dmesg)
+        local hclass kl dl files_cell
         if [[ "$label" == PASSED ]]; then hclass=pass; else hclass=fail; fi
         {
             printf '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="utf-8">\n'
@@ -354,24 +385,29 @@ generate_index() {
             printf 'th,td{padding:4px 12px;text-align:left;border:1px solid #ccc}\n'
             printf 'th{background:#f0f0f0}\n'
             printf '.pass{color:#080}.fail{color:#c00}\n'
+            printf 'a{color:inherit}\n'
             printf '</style></head>\n<body>\n'
             printf '<h1>Config archive &mdash; <span class="%s">%s</span>' "$hclass" "$label"
             printf ' &nbsp;|&nbsp; %d entries &nbsp;|&nbsp; %s</h1>\n' "$count" "$date_str"
             printf '<table>\n'
             if [[ "$label" == FAILED ]]; then
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Files</th></tr>\n'
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r; do
-                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td></tr>\n' \
-                            "$c" "$a" "$v" "$r"
+                    while IFS='|' read -r c a v r kl dl; do
+                        files_cell="<a href=\"./${kl}\">config</a>"
+                        [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
+                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td></tr>\n' \
+                            "$c" "$a" "$v" "$r" "$files_cell"
                     done <<< "$sorted_rows"
                 fi
             else
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th></tr>\n'
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Files</th></tr>\n'
                 if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r; do
-                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td></tr>\n' \
-                            "$c" "$a" "$v"
+                    while IFS='|' read -r c a v _r kl dl; do
+                        files_cell="<a href=\"./${kl}\">config</a>"
+                        [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
+                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td></tr>\n' \
+                            "$c" "$a" "$v" "$files_cell"
                     done <<< "$sorted_rows"
                 fi
             fi
