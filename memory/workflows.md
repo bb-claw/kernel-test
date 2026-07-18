@@ -79,6 +79,19 @@ Auto-detect restricts to same label as newest run (prevents spurious mainline/st
 Auto-diff vs previous same-label run and vs pinned baseline runs at end of every `make all`.
 Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the report dir.
 
+### Config archive
+
+```sh
+make config-archive   # scan all reports/, populate configs/archive_passed/ + configs/archive_failed/
+```
+
+Deduplicates by SHA256 — a config that ever produced PASS appears only in `archive_passed/`.
+Filename: `kconfig-<config>-<arch>-<version>-<sha256>.config` (passed);
+`kconfig-<config>-<arch>-<version>-<sha256>-<STAGE-SYMPTOM>.config` (failed).
+STAGE-SYMPTOM: `BUILD_FAIL`, `BUILD_TIMEOUT`, `BOOT_FAIL-kernel-panic`, `BOOT_FAIL-oops`,
+`BOOT_FAIL-timeout`, `BOOT_FAIL-no-test-done`, `TEST_FAIL-N-of-M`, `KUNIT_FAIL-N-of-M`.
+Both dirs committed; regenerate any time.
+
 ### Migrate old report directories
 
 ```sh

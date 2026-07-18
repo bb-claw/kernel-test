@@ -58,7 +58,7 @@ kernel-test/
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
-├── configs/        *.config fragments applied post-config
+├── configs/        *.config fragments applied post-config; archive_passed/ + archive_failed/ (committed config archive)
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context
 ├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
