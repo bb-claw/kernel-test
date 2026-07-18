@@ -114,8 +114,13 @@ while IFS= read -r -d '' report_dir; do
         arch="${arch%.config}"                    # x86_64
         config="${noprefix%-${arch}.config}"      # rand500config
 
-        # Get SHA256 from the fingerprint table: match the line ending with this filename
+        # Get SHA256 from the fingerprint table: match the line ending with this filename.
+        # Fall back to computing it from the file itself for pre-archive-feature reports
+        # where summary.txt has no fingerprint section.
         sha256=$(grep -m1 "${base}$" "$summary" | awk '{print $3}' || true)
+        if [[ -z "$sha256" || ${#sha256} -ne 64 ]]; then
+            sha256=$(sha256sum "$kconfig_file" | cut -d' ' -f1)
+        fi
         if [[ -z "$sha256" || ${#sha256} -ne 64 ]]; then
             warn "$dirname: no valid SHA256 for $base — skipping"
             continue
