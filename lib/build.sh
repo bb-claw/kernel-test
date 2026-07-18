@@ -100,7 +100,15 @@ BUILD_START_EPOCH=$(date -u +%s)
 
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
-if [[ $CONFIG == rand500config ]]; then
+if [[ -n "${SEED_CONFIG:-}" ]]; then
+    info "Seeding .config from: $SEED_CONFIG"
+    cp "$SEED_CONFIG" "$PWD/$OUT_DIR/.config"
+    if ! kmake olddefconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed (seed olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+elif [[ $CONFIG == rand500config ]]; then
     # Base: tinyconfig (tiny, known-bootable kernel)
     if ! kmake tinyconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
@@ -189,11 +197,12 @@ elif ! kmake "$CONFIG"; then
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-# Step 1b: apply config fragment (post-config, works for all kernel targets)
+# Step 1b: apply config fragment (skip for seed replay — fragment is already baked
+# into the archived config; re-applying would overwrite options the original run set).
 # KCONFIG_ALLCONFIG is NOT used here because some targets (e.g. tinyconfig)
 # explicitly override it internally, silently discarding our fragment.
 # Appending to .config + olddefconfig is reliable for every kernel target.
-if [[ -f $FRAGMENT ]]; then
+if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
     info "Applying config fragment: $FRAGMENT"
     cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
