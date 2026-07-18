@@ -34,6 +34,7 @@ REPORT_DIR    ?= reports
 V             ?= 0
 NO_FETCH      ?= 0
 NO_BUILD      ?= 0
+LINUX_NEXT    ?= 0
 TOYBOX_VERSION ?= 0.8.9
 DMESG_LABEL    ?= mainline
 LABEL          ?=
@@ -72,7 +73,7 @@ endif
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
-export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH
+export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 
@@ -87,7 +88,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -181,13 +182,16 @@ all:
 # ── Pipeline stages ───────────────────────────────────────────────────────────
 
 # Auto-dispatch based on preset variables:
-#   STABLE_RC_BRANCH set → stable-rc branch fetch (lib/fetch-stable-rc.sh)
-#   STABLE_RELEASE set   → stable tag fetch        (lib/fetch.sh)
-#   neither set          → mainline rc tag fetch   (lib/fetch.sh)
+#   LINUX_NEXT=1         → error: use make fetch-next  (lib/fetch-next.sh)
+#   STABLE_RC_BRANCH set → stable-rc branch fetch      (lib/fetch-stable-rc.sh)
+#   STABLE_RELEASE set   → stable tag fetch             (lib/fetch.sh)
+#   neither set          → mainline rc tag fetch        (lib/fetch.sh)
 # Presets set these automatically based on the clone directory name.
 fetch:
 ifeq ($(NO_FETCH),1)
 	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local state"
+else ifeq ($(LINUX_NEXT),1)
+	$(error [fetch] linux-next does not use rc tags — use: make fetch-next)
 else ifneq ($(STABLE_RC_BRANCH),)
 	@echo "[fetch] stable-rc: fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
 	$(Q)lib/fetch-stable-rc.sh
@@ -216,6 +220,15 @@ else
 	$(if $(STABLE_RC_BRANCH),,$(error STABLE_RC_BRANCH is required — set it in presets/ or pass STABLE_RC_BRANCH=linux-7.1.y))
 	@echo "[fetch-stable-rc] Fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
 	$(Q)lib/fetch-stable-rc.sh
+endif
+
+fetch-next:
+ifeq ($(NO_FETCH),1)
+	@echo "[fetch-next] Skipping (NO_FETCH=1) — using existing local state"
+else
+	$(if $(filter 1,$(LINUX_NEXT)),,$(error LINUX_NEXT=1 is required — set it in presets/kernel-test-next.mk or pass LINUX_NEXT=1))
+	@echo "[fetch-next] Fetching origin/master from linux-next tree $(KERNEL_TREE)"
+	$(Q)lib/fetch-next.sh
 endif
 
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
@@ -376,9 +389,10 @@ Targets:
   bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
   hooks        Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
-  fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip
+  fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
   fetch-stable     Explicit stable tag fetch  (requires STABLE_RELEASE=; useful outside preset-managed clones)
   fetch-stable-rc  Explicit stable-rc branch fetch  (requires STABLE_RC_BRANCH=; useful outside preset-managed clones)
+  fetch-next       linux-next branch fetch  (requires LINUX_NEXT=1; set automatically by presets/kernel-test-next.mk)
   smoke            Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
@@ -425,6 +439,7 @@ Variables (current values):
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
   NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)
+  LINUX_NEXT          = $(LINUX_NEXT)  (set to 1 by presets/kernel-test-next.mk; redirects fetch to make fetch-next)
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
   DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
@@ -444,9 +459,10 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
     mainline   (kernel-test)            → fetches latest v*-rc* tag
     stable     (kernel-test-stable)     → fetches latest vX.Y.* tag   (preset: STABLE_RELEASE=7.1)
     stable-rc  (kernel-test-stable-rc)  → fetches linux-X.Y.y branch  (preset: STABLE_RC_BRANCH=linux-7.1.y)
+    linux-next (kernel-test-next)       → error; use make fetch-next   (preset: LINUX_NEXT=1; KERNEL_TREE=~/git/linux-next)
 
 ── Testing kernel releases ─────────────────────────────────────────────────────
-  (identical workflow in all three clones — preset handles the differences)
+  (identical workflow in all four clones — preset handles the differences)
 
   make fetch                                   # fetch the right thing for this clone
   make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs

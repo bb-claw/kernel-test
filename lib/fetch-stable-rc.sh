@@ -24,19 +24,12 @@ if ! git -C "$KERNEL_TREE" diff --quiet 2>/dev/null; then
     warn "Kernel tree has uncommitted changes — reset --hard FETCH_HEAD will discard them"
 fi
 
-GIT=( git -C "$KERNEL_TREE" -c http.lowSpeedLimit=0 -c http.lowSpeedTime=0 )
+setup_git_array
 
 info "Fetching branch $STABLE_RC_BRANCH from origin ..."
 "${GIT[@]}" fetch origin "$STABLE_RC_BRANCH" \
     || die "Failed to fetch $STABLE_RC_BRANCH from origin"
 
-info "Resetting HEAD to FETCH_HEAD ..."
-"${GIT[@]}" reset --hard FETCH_HEAD \
-    || die "Failed to reset to FETCH_HEAD"
-
-VERSION=$(read_kernel_makefile_version) \
-    || die "Could not read version from $KERNEL_TREE/Makefile"
-
-mkdir -p "$BUILD_DIR"
-printf '%s\n' "$VERSION" > "$BUILD_DIR/.kernel-version"
-info "Fetched $STABLE_RC_BRANCH → $VERSION"
+reset_to_fetch_head
+write_kernel_version
+info "Fetched $STABLE_RC_BRANCH → $KERNEL_VERSION"

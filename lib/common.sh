@@ -45,6 +45,29 @@ read_kernel_makefile_version() {
     echo "$KMV_TAG"
 }
 
+# Shared fetch helpers — used by lib/fetch*.sh scripts.
+
+# Set GIT array for git operations on KERNEL_TREE with timeout config.
+setup_git_array() {
+    GIT=( git -C "$KERNEL_TREE" -c http.lowSpeedLimit=0 -c http.lowSpeedTime=0 )
+}
+
+# git reset --hard FETCH_HEAD; die on failure. Requires setup_git_array first.
+reset_to_fetch_head() {
+    info "Resetting HEAD to FETCH_HEAD ..."
+    "${GIT[@]}" reset --hard FETCH_HEAD \
+        || die "Failed to reset to FETCH_HEAD"
+}
+
+# Read version from kernel Makefile; write to build/.kernel-version.
+# Sets KERNEL_VERSION in the caller's scope.
+write_kernel_version() {
+    KERNEL_VERSION=$(read_kernel_makefile_version) \
+        || die "Could not read version from $KERNEL_TREE/Makefile"
+    mkdir -p "$BUILD_DIR"
+    printf '%s\n' "$KERNEL_VERSION" > "$BUILD_DIR/.kernel-version"
+}
+
 # Usage: is_build_only <config>
 # Returns 0 if config is in BUILD_ONLY_CONFIGS, 1 otherwise.
 is_build_only() {

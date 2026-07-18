@@ -1,4 +1,4 @@
-Failed configs archive — 11 entries, 19 rows — generated 2026-07-18T18:32:00Z
+Failed configs archive — 15 entries, 23 rows — generated 2026-07-18T22:59:18Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON          RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -19,5 +19,9 @@ rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   20
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-25-21  mainline-7.2-2026-07-18_19-25-21-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-30-08  mainline-7.2-2026-07-18_19-30-08-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-33-53  mainline-7.2-2026-07-18_19-33-53-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc3    BUILD_FAIL              1     next       2026-07-18_21-09-11  next-7.2-2026-07-18_21-09-11-v7.2-rc3                 53e198623077e919370cf15a40779ce389d98888df43fb5cfc7070c59b0a646c
+rand500config    arm64   v7.2-rc3    BUILD_FAIL              1     mainline   2026-07-18_21-13-55  mainline-7.2-2026-07-18_21-13-55-v7.2-rc3             ad50220bf37b17e766d9deb36a54accb0075ecee52bb5f2f1eaab2703cdba50c
 rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          165e686ead919a2e76aa6705da4b1f3a83b1fbb6a93147b44dbfb169a2ac315f
 rand500config    i386    v7.2-rc3    BOOT_FAIL-oops          1     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             9d19cfcad5a9acaee1eec7f0f5e576c6f9cb04f159932e52fdaa0d3dfe95e00a
+tinyconfig       arm64   v7.2-rc3    BOOT_FAIL-timeout       1     mainline   2026-07-18_23-55-24  mainline-7.2-2026-07-18_23-55-24-v7.2-rc3             46a56cade2f4f4e7697999850e8b9072adb3cf5b275bbe2aa9b0d090f2135034
+tinyconfig       arm64   v7.2-rc3    BUILD_FAIL              1     mainline   2026-07-18_23-51-22  mainline-7.2-2026-07-18_23-51-22-v7.2-rc3             5b67ead92304195446e02168a7d5e529592d8f8e7b4fb17563d208f0b533490c
