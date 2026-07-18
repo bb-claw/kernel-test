@@ -100,7 +100,15 @@ BUILD_START_EPOCH=$(date -u +%s)
 
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
-if [[ $CONFIG == rand500config ]]; then
+if [[ -n "${SEED_CONFIG:-}" ]]; then
+    info "Seeding .config from: $SEED_CONFIG"
+    cp "$SEED_CONFIG" "$PWD/$OUT_DIR/.config"
+    if ! kmake olddefconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed (seed olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+elif [[ $CONFIG == rand500config ]]; then
     # Base: tinyconfig (tiny, known-bootable kernel)
     if ! kmake tinyconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \

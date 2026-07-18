@@ -85,12 +85,18 @@ Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the re
 make config-archive   # scan all reports/, populate configs/archive_passed/ + configs/archive_failed/
 ```
 
-Deduplicates by SHA256 — a config that ever produced PASS appears only in `archive_passed/`.
-Filename: `kconfig-<config>-<arch>-<version>-<sha256>.config` (passed);
-`kconfig-<config>-<arch>-<version>-<sha256>-<STAGE-SYMPTOM>.config` (failed).
-STAGE-SYMPTOM: `BUILD_FAIL`, `BUILD_TIMEOUT`, `BOOT_FAIL-kernel-panic`, `BOOT_FAIL-oops`,
-`BOOT_FAIL-timeout`, `BOOT_FAIL-no-test-done`, `TEST_FAIL-N-of-M`, `KUNIT_FAIL-N-of-M`.
-Both dirs committed; regenerate any time.
+### Replay an archived config
+
+```sh
+make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
+make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
+```
+
+Parses `config` and `arch` from the archive filename; warns if the embedded version
+differs from the current `KERNEL_VERSION`. Delegates to `make all NO_FETCH=1` with
+`SEED_CONFIG=<abs-path>` which causes `build.sh` to copy the archived config into
+`build/<config>-<arch>/.config` and run `olddefconfig` to resolve any kernel version drift,
+then continues the normal pipeline (initramfs → test → report).
 
 ### Migrate old report directories
 
