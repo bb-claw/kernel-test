@@ -267,3 +267,119 @@ done
 info "Scanned $total_reports reports — $total_entries config entries ($total_pass pass, $total_fail fail)"
 info "archive_passed: $written_pass added, $skipped_pass already present"
 info "archive_failed: $written_fail added, $skipped_fail already present"
+
+# Generate index.txt and index.html inside each archive directory.
+# Reads from the on-disk archive, so the index reflects entries from all clones.
+generate_index() {
+    local date_str dir label count f base sha256 rest version config_arch config arch reason
+    date_str=$(date '+%Y-%m-%d %H:%M')
+
+    for dir in "$PASSED_DIR" "$FAILED_DIR"; do
+        [[ "$dir" == "$PASSED_DIR" ]] && label=PASSED || label=FAILED
+
+        local -a rows=()
+
+        shopt -s nullglob
+        local -a files=("$dir"/kconfig-*.config)
+        shopt -u nullglob
+
+        for f in "${files[@]}"; do
+            base="${f##*/}"; base="${base#kconfig-}"; base="${base%.config}"
+            sha256=$(grep -oE '[0-9a-f]{64}' <<< "$base" | head -1 || true)
+            [[ -z "$sha256" ]] && continue
+            rest="${base%%-${sha256}*}"
+            reason="${base##*${sha256}}"; reason="${reason#-}"
+            version=$(grep -oE 'v[0-9]+\.[0-9]+(\.[0-9]+)?(-rc[0-9]+)?$' <<< "$rest" || true)
+            config_arch="${rest%-${version}}"
+            config=""; arch=""
+            for known in x86_64 i386 arm64; do
+                if [[ "$config_arch" == *"-${known}" ]]; then
+                    arch="$known"; config="${config_arch%-${known}}"; break
+                fi
+            done
+            [[ -z "$arch" ]] && continue
+            rows+=("${config}|${arch}|${version}|${reason}")
+        done
+
+        count=${#rows[@]}
+        local sorted_rows=""
+        if [[ $count -gt 0 ]]; then
+            sorted_rows=$(printf '%s\n' "${rows[@]}" | sort)
+        fi
+
+        # Dynamic column widths
+        local w_c=6 w_a=4 w_v=7
+        if [[ -n "$sorted_rows" ]]; then
+            while IFS='|' read -r c a v _r; do
+                [[ ${#c} -gt $w_c ]] && w_c=${#c}
+                [[ ${#a} -gt $w_a ]] && w_a=${#a}
+                [[ ${#v} -gt $w_v ]] && w_v=${#v}
+            done <<< "$sorted_rows"
+        fi
+        local sep
+        sep=$(printf '─%.0s' $(seq 1 $((w_c + w_a + w_v + 20))))
+
+        # Plain-text index
+        {
+            printf 'Config archive — %s  |  %d entries  |  %s\n\n' "$label" "$count" "$date_str"
+            if [[ "$label" == FAILED ]]; then
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  FAILURE REASON\n" CONFIG ARCH VERSION
+                printf '%s\n' "$sep"
+                if [[ -n "$sorted_rows" ]]; then
+                    while IFS='|' read -r c a v r; do
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %s\n" "$c" "$a" "$v" "$r"
+                    done <<< "$sorted_rows"
+                fi
+            else
+                printf "%-${w_c}s  %-${w_a}s  VERSION\n" CONFIG ARCH
+                printf '%s\n' "$sep"
+                if [[ -n "$sorted_rows" ]]; then
+                    while IFS='|' read -r c a v _r; do
+                        printf "%-${w_c}s  %-${w_a}s  %s\n" "$c" "$a" "$v"
+                    done <<< "$sorted_rows"
+                fi
+            fi
+        } > "$dir/index.txt"
+
+        # HTML index
+        local hclass
+        if [[ "$label" == PASSED ]]; then hclass=pass; else hclass=fail; fi
+        {
+            printf '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="utf-8">\n'
+            printf '<title>Config archive \xe2\x80\x94 %s</title>\n' "$label"
+            printf '<style>\n'
+            printf 'body{font-family:monospace;margin:2em}\n'
+            printf 'h1{font-size:1.1em}\n'
+            printf 'table{border-collapse:collapse}\n'
+            printf 'th,td{padding:4px 12px;text-align:left;border:1px solid #ccc}\n'
+            printf 'th{background:#f0f0f0}\n'
+            printf '.pass{color:#080}.fail{color:#c00}\n'
+            printf '</style></head>\n<body>\n'
+            printf '<h1>Config archive &mdash; <span class="%s">%s</span>' "$hclass" "$label"
+            printf ' &nbsp;|&nbsp; %d entries &nbsp;|&nbsp; %s</h1>\n' "$count" "$date_str"
+            printf '<table>\n'
+            if [[ "$label" == FAILED ]]; then
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th></tr>\n'
+                if [[ -n "$sorted_rows" ]]; then
+                    while IFS='|' read -r c a v r; do
+                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td></tr>\n' \
+                            "$c" "$a" "$v" "$r"
+                    done <<< "$sorted_rows"
+                fi
+            else
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th></tr>\n'
+                if [[ -n "$sorted_rows" ]]; then
+                    while IFS='|' read -r c a v _r; do
+                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td></tr>\n' \
+                            "$c" "$a" "$v"
+                    done <<< "$sorted_rows"
+                fi
+            fi
+            printf '</table>\n</body>\n</html>\n'
+        } > "$dir/index.html"
+
+        info "index: $label → $count entries → $(basename "$dir")/index.{txt,html}"
+    done
+}
+
+generate_index
