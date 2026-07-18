@@ -36,6 +36,7 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/fetch-stable-rc.sh` | Fetch stable-rc branch tip (`STABLE_RC_BRANCH`), reset HEAD, read version from kernel Makefile, write `build/.kernel-version`; used by `make fetch-stable-rc` |
 | `lib/fetch-next.sh` | Fetch linux-next `origin/master`, reset HEAD, write `build/.kernel-version`; requires `LINUX_NEXT=1` (set by `presets/kernel-test-next.mk`); used by `make fetch-next` |
+| `presets/kernel-test-next.mk` | linux-next preset: sets `KERNEL_TREE=~/git/linux-next`, `LABEL=next`, `LINUX_NEXT:=1`; auto-loaded when clone dir is `kernel-test-next`; causes `make fetch` to error and redirects to `make fetch-next` |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; derives `CROSS_COMPILE` and `KERNEL_IMAGE_NAME` (bzImage or Image) from arch; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write; deletes `vm.status` at start of each build so a failed build never shows stale test results in the report; `localconfig` is x86_64-only; when `SEED_CONFIG` is set (by `make replay`), copies the archived `.config` and runs `olddefconfig` instead of the normal config-target step |
 | `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686,aarch64}` to `cache/` |
@@ -85,6 +86,8 @@ The goal is systematic community verification of each -rc kernel.
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig; pins `CONFIG_KERNEL_GZIP=y` so a non-standard compressor is not auto-selected if GZIP is randomly disabled |
 | `configs/randconfig.config` | Constraint fragment for randconfig and rand500config sampling pool: MODULE=n, heavy subsystems off, sanitizers off, RCU/lock torture tests off, KUNIT=n, non-gzip kernel compression off |
 | `configs/localconfig.config` | Hardware fragment for Lenovo AMD Ryzen 7 5800H (NVMe, MT7921 WiFi, BT, AMD_PMC, AES-NI, BTRFS); applied on top of `/proc/config.gz` |
+| `docs/linux-next-workflow.md` | linux-next workflow: clone setup, daily `make fetch-next`, full suite, replay archived configs, patch preparation and submission (commit message format, `checkpatch --strict`, `get_maintainer.pl` routing rules, `git send-email`) |
+| `docs/stable-rc-workflow.md` | Stable-rc (rolling branch) workflow: clone setup, `STABLE_RC_BRANCH` update cadence, `make fetch-stable-rc`, `make all` |
 
 ## Conventions
 

@@ -41,7 +41,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 | preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in mainline/stable/stable-rc clones; directory name selects presets/kernel-test-*.mk; `kernel-test-next` preset sets `LINUX_NEXT=1`, causing `make fetch` to error and redirect to `make fetch-next` |
 
-## Current State (2026-07-18)
+## Current State (2026-07-19)
 
 - **Architectures:** x86_64 + i386 + arm64 (all default); x86 uses KVM, arm64 uses TCG (requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
@@ -54,7 +54,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh fetch-stable-rc.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
+├── lib/            fetch.sh fetch-next.sh fetch-stable-rc.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
