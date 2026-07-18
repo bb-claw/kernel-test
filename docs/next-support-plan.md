@@ -105,6 +105,7 @@ Refactored to use the three shared helpers, removing duplicate lines.
 | `presets/kernel-test-next.mk` | New: KERNEL_TREE, LABEL, LINUX_NEXT |
 | `Makefile` | LINUX_NEXT var/export, fetch guard, fetch-next target, help text |
 | `docs/linux-next-workflow.md` | New: patch apply, replay, full submission guide |
+| `scripts/config-archive.sh` | Detect `next-*` report dirs as `line=next` in index |
 | `CLAUDE.md` | Fetch table + key files + fetch section |
 | `memory/workflows.md` | Fetch section update |
 | `memory/project.md` | Current state: four clones |

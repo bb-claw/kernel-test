@@ -18,7 +18,7 @@
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
 | `STABLE_RC_BRANCH` | _(from preset)_ | Branch name for `make fetch-stable-rc`; set in `presets/kernel-test-stable-rc.mk` as `linux-7.1.y`; update when series bumps |
-| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT+STABLE_RC_BRANCH |
+| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT+STABLE_RC_BRANCH; `kernel-test-next.mk`=KERNEL_TREE+LABEL+LINUX_NEXT:=1 |
 | `local.mk` | _(gitignored)_ | Machine-local overrides included after preset; never committed |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
