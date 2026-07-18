@@ -37,6 +37,8 @@ NO_BUILD      ?= 0
 TOYBOX_VERSION ?= 0.8.9
 DMESG_LABEL    ?= mainline
 LABEL          ?=
+CONFIG_FILE    ?=
+SEED_CONFIG    ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -72,6 +74,7 @@ export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH
 export TOYBOX_VERSION LABEL
+export SEED_CONFIG
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -84,7 +87,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -318,6 +321,42 @@ install:
 config-archive:
 	$(Q)scripts/config-archive.sh
 
+# ── Replay archived config ────────────────────────────────────────────────────
+
+# Replay an archived config file through the full pipeline.
+# Parses config + arch from the archive filename, warns on kernel version mismatch,
+# then delegates to 'make all NO_FETCH=1' with SEED_CONFIG set.
+# Usage: make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
+replay:
+	@if [[ -z "$(CONFIG_FILE)" ]]; then \
+	    echo "ERROR: CONFIG_FILE= is required."; \
+	    echo "  make replay CONFIG_FILE=configs/archive_passed/kconfig-<config>-<arch>-<version>-<sha256>.config"; \
+	    exit 1; \
+	fi; \
+	base=$$(basename "$(CONFIG_FILE)" .config); \
+	rest=$${base#kconfig-}; \
+	config=""; arch=""; \
+	for arch_try in x86_64 i386 arm64; do \
+	    if [[ "$$rest" == *"-$$arch_try-"* ]]; then \
+	        config=$${rest%%-$$arch_try-*}; \
+	        arch=$$arch_try; \
+	        break; \
+	    fi; \
+	done; \
+	if [[ -z "$$config" || -z "$$arch" ]]; then \
+	    echo "ERROR: Cannot parse config/arch from filename: $$base"; \
+	    exit 1; \
+	fi; \
+	after=$${rest#$$config-$$arch-}; \
+	sha=$$(grep -oE '[0-9a-f]{64}' <<< "$$after" | head -1); \
+	version=$${after%%-$$sha*}; \
+	if [[ -n "$$version" && "$$version" != "$(KERNEL_VERSION)" ]]; then \
+	    echo "WARN: archived config is from $$version; current kernel is $(KERNEL_VERSION)"; \
+	fi; \
+	seed=$$(realpath "$(CONFIG_FILE)"); \
+	echo "[replay] config=$$config arch=$$arch version=$$version seed=$$seed"; \
+	$(MAKE) all NO_FETCH=1 CONFIGS="$$config" ARCHS="$$arch" SEED_CONFIG="$$seed"
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -354,6 +393,7 @@ Targets:
   install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
+  replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -388,6 +428,8 @@ Variables (current values):
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
   DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
+  CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay CONFIG_FILE=<archive-path>))
+  SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -442,6 +484,10 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Rename old-format report dirs to new label-prefixed format
   bash scripts/migrate-reports.sh          # dry-run — shows what would change
   bash scripts/migrate-reports.sh --apply  # rename dirs + update baseline symlink
+
+  # Re-test an archived config on the current kernel
+  make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
 endef
 export HELP_TEXT
 
