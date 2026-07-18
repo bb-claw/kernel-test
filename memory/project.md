@@ -47,7 +47,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
 - **Tests:** 26 total (1 smoke + 25 custom; see test-inventory.md); next slot: 250_
 - **Fetch strategy:** three clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`), each auto-loads preset by directory name; `make fetch` dispatches correctly in all three
-- **Current kernel (mainline clone):** v7.2-rc2 (stable-rc clone: v7.1.4-rc2)
+- **Current kernel (mainline clone):** v7.2-rc3 (stable-rc clone: v7.1.4-rc2)
 
 ## Directory Structure
 
