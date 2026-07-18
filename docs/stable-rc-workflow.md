@@ -34,17 +34,19 @@ The preset `presets/kernel-test-stable-rc.mk` is auto-loaded by the Makefile
 
 ```sh
 # In kernel-test-stable-rc/
-make fetch-stable-rc          # fetches linux-7.1.y, resets HEAD, writes .kernel-version
-make smoke                    # kunitconfig + tinyconfig (quick sanity)
-make all NO_FETCH=1           # full pipeline
+make fetch            # auto-dispatches to fetch-stable-rc: fetches linux-7.1.y, resets HEAD, writes .kernel-version
+make smoke            # kunitconfig + tinyconfig (quick sanity)
+make all NO_FETCH=1   # full pipeline
 ```
 
-`make fetch-stable-rc`:
+`make fetch` (in this clone) calls `lib/fetch-stable-rc.sh`, which:
 1. Runs `git fetch origin linux-7.1.y` in `KERNEL_TREE`
 2. Resets HEAD to the fetched tip
 3. Reads the version from the kernel Makefile fields (VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION)
 4. Writes the result (e.g. `v7.1.4-rc2`) to `build/.kernel-version`
 5. Prints the fetched version
+
+`make fetch-stable-rc` is also available as an explicit override (useful outside the preset-managed clones).
 
 After the fetch, `build/.kernel-version` is up to date. All subsequent
 `make all NO_FETCH=1` invocations show the correct version in the `[build]`

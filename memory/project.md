@@ -11,7 +11,7 @@ Goal: systematic community verification of each -rc kernel.
 
 ```
 make all
-  └─ lib/fetch.sh        discover + fetch latest tag (ls-remote, --depth=1)
+  └─ lib/fetch.sh / lib/fetch-stable-rc.sh   auto-dispatch by preset: mainline rc tag / stable vX.Y.* tag / stable-rc branch tip
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
@@ -39,21 +39,22 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | CONFIG_SHA256 recomputed post-build | syncconfig can modify .config during make bzImage; hash stored after build reflects actual file |
 | report.sh prefers kernel Makefile for version | git describe fails on untagged trees (stable-rc); read_kernel_makefile_version always authoritative |
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
+| preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in all three clones; directory name selects presets/kernel-test-*.mk which sets STABLE_RC_BRANCH or STABLE_RELEASE; Makefile ifeq dispatches to the right fetch script |
 
-## Current State (2026-07-16)
+## Current State (2026-07-18)
 
 - **Architectures:** x86_64 + i386 + arm64 (all default); x86 uses KVM, arm64 uses TCG (requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
 - **Tests:** 26 total (1 smoke + 25 custom; see test-inventory.md); next slot: 250_
-- **Kernel tree:** `~/git/linux-stable` (contains both mainline rc and stable point release tags)
-- **Current kernel:** v7.2-rc2
+- **Fetch strategy:** three clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`), each auto-loads preset by directory name; `make fetch` dispatches correctly in all three
+- **Current kernel (mainline clone):** v7.2-rc2 (stable-rc clone: v7.1.4-rc2)
 
 ## Directory Structure
 
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
+├── lib/            fetch.sh fetch-stable-rc.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)

@@ -31,13 +31,18 @@ the preset already sets it.
 
 ## Proposed Fix
 
-### Three named fetch targets
+### Auto-dispatching `make fetch`
 
-| Target | Mode | Mechanism |
+`make fetch` auto-dispatches based on the preset loaded for the current clone:
+
+| Clone directory | Preset sets | `make fetch` does |
 |---|---|---|
-| `make fetch` | Mainline rc | Existing: `git ls-remote` → `fetch --depth=1 v*-rc*` tag |
-| `make fetch-stable` | Stable release | Existing `lib/fetch.sh` stable path (needs named target) |
-| `make fetch-stable-rc` | Stable-rc branch | New: `git fetch origin <branch>` + `git reset --hard FETCH_HEAD` |
+| `kernel-test` | _(nothing)_ | `git ls-remote` → `fetch --depth=1 v*-rc*` tag |
+| `kernel-test-stable` | `STABLE_RELEASE=7.1` | `git ls-remote` → `fetch --depth=1 vX.Y.*` tag |
+| `kernel-test-stable-rc` | `STABLE_RC_BRANCH=linux-7.1.y` | `git fetch origin linux-7.1.y` + `git reset --hard FETCH_HEAD` |
+
+`make fetch-stable` and `make fetch-stable-rc` are kept as explicit override targets
+for use outside the preset-managed clones.
 
 ### KERNEL_VERSION fallback fix
 
@@ -52,6 +57,9 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
     || git -C "$(KERNEL_TREE)" rev-parse --short HEAD 2>/dev/null \
     || echo unknown)
 ```
+
+`rev-parse --short HEAD` is a last resort (opaque SHA); `make kernelversion` returns a
+semantic version (e.g. `7.1.4-rc2`) and is always preferred over the SHA fallback.
 
 ### Stable-rc fetch script: `lib/fetch-stable-rc.sh`
 
@@ -99,19 +107,21 @@ No default; user passes `BRANCH=linux-7.1.y` explicitly.
 
 | File | Change |
 |---|---|
-| `Makefile` | Add `make kernelversion` fallback to `KERNEL_VERSION`; add `fetch-stable` and `fetch-stable-rc` targets; export `STABLE_RC_BRANCH`; update `make help` |
+| `Makefile` | Auto-dispatch `make fetch` by preset; `make kernelversion` fallback in `KERNEL_VERSION` chain; add `fetch-stable` and `fetch-stable-rc` override targets; export `STABLE_RC_BRANCH`; update `make help` |
 | `lib/fetch-stable-rc.sh` | New: branch fetch + reset + `.kernel-version` write + version display |
 | `presets/kernel-test-stable-rc.mk` | Add `STABLE_RC_BRANCH ?= linux-7.1.y` |
-| `CLAUDE.md` | Document three fetch modes; add stable-rc workflow to "Running locally"; link to design doc |
-| `memory/workflows.md` | Add `STABLE_RC_BRANCH` to variables table; add `make fetch-stable` and `make fetch-stable-rc` to Common Workflows |
+| `CLAUDE.md` | Document three-clone setup and `make fetch` auto-dispatch; add stable-rc workflow; link to design doc |
+| `memory/workflows.md` | Add `STABLE_RC_BRANCH` to variables table; update fetch dispatch explanation |
+| `memory/project.md` | Add `lib/fetch-stable-rc.sh` to architecture diagram + lib listing; preset auto-dispatch in Key Decisions |
 | `docs/stable-rc-workflow.md` | New: user-facing guide for stable-rc testing workflow |
 
 ---
 
 ## Decisions
 
-1. **Three targets** — `fetch`, `fetch-stable`, `fetch-stable-rc` — one name per mode; no overloading
+1. **Auto-dispatching `make fetch`** — same command in all three clones; `ifeq`/`else ifneq` on `STABLE_RC_BRANCH`/`STABLE_RELEASE` selects the right implementation; named override targets kept for explicit use
 2. **Branch name from preset** — `STABLE_RC_BRANCH ?= linux-7.1.y` in `presets/kernel-test-stable-rc.mk`; version bump is a one-line change in one committed file
 3. **Post-fetch**: fetch + reset + `.kernel-version` write + version display
 4. **Docs**: `CLAUDE.md` + `memory/workflows.md` + `make help` + `docs/stable-rc-workflow.md`
 5. **Separate script** — `lib/fetch-stable-rc.sh` rather than extending `lib/fetch.sh`; keeps each script single-purpose
+6. **KERNEL_VERSION order** — `make kernelversion` before `rev-parse --short HEAD`; semantic version beats opaque SHA for stable-rc untagged commits
