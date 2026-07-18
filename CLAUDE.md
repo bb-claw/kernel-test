@@ -192,39 +192,26 @@ The pre-commit hook enforces:
 
 ## Fetching kernels
 
-Three fetch modes — one named target per mode:
+`make fetch` auto-dispatches based on the preset variables loaded for the current clone:
 
-| Target | Mode | Mechanism |
+| Clone directory | Preset sets | `make fetch` does |
 |---|---|---|
-| `make fetch` | Mainline rc | `git ls-remote` → `fetch --depth=1 v*-rc*` tag |
-| `make fetch-stable` | Stable release | `git ls-remote` → `fetch --depth=1 vX.Y.*` tag |
-| `make fetch-stable-rc` | Stable-rc branch | `git fetch origin linux-7.1.y` + `git reset --hard FETCH_HEAD` |
+| `kernel-test` | _(nothing)_ | `git ls-remote` → `fetch --depth=1 v*-rc*` tag |
+| `kernel-test-stable` | `STABLE_RELEASE=7.1` | `git ls-remote` → `fetch --depth=1 vX.Y.*` tag |
+| `kernel-test-stable-rc` | `STABLE_RC_BRANCH=linux-7.1.y` | `git fetch origin linux-7.1.y` + `git reset --hard FETCH_HEAD` |
 
-**Mainline rc** — discovers and fetches the latest `v*-rc*` tag:
+The same command works in all three clones — no flags needed:
 ```sh
-make fetch KERNEL_TREE=~/git/linux
+make fetch   # fetches the right thing for this clone
 ```
 
-**Stable release** — discovers and fetches the latest `vX.Y.*` tag (non-rc).
-Remote URL verified to contain `/stable/` or `linux-stable`:
-```sh
-make fetch-stable STABLE_RELEASE=7.1
-# → uses ~/git/linux-stable, checks out latest v7.1.x tag
-```
+`make fetch-stable` and `make fetch-stable-rc` remain as explicit override targets for use
+outside the preset-managed clones (e.g. `make fetch-stable STABLE_RELEASE=7.1`).
 
-Setting `STABLE_RELEASE` automatically redirects `KERNEL_TREE` to `STABLE_KERNEL_TREE`
-for all pipeline stages — no extra flags needed for build, test, or report.
-
-**Stable-rc** — stable-rc announcements (e.g. `v7.1.4-rc2`) are **not git tags**;
-they are tips of the rolling `linux-7.1.y` branch. `make fetch` and `make checkout`
-cannot be used here:
-```sh
-make fetch-stable-rc
-# → git fetch origin linux-7.1.y, reset HEAD, write v7.1.4-rc2 to build/.kernel-version
-```
-
-`STABLE_RC_BRANCH` (e.g. `linux-7.1.y`) is set in `presets/kernel-test-stable-rc.mk`.
-Update it when the stable series bumps. See `docs/stable-rc-workflow.md` for details.
+**Stable-rc note** — announcements like `v7.1.4-rc2` are **not git tags**; they are the tip
+of the rolling `linux-7.1.y` branch. `STABLE_RC_BRANCH` is set in
+`presets/kernel-test-stable-rc.mk`; update it when the series bumps. See
+`docs/stable-rc-workflow.md`.
 
 **Pin a specific version:**
 ```sh
@@ -234,40 +221,28 @@ make checkout TAG=v7.1.3 STABLE_RELEASE=7.1               # stable
 
 **Skip fetch entirely:**
 ```sh
-make all NO_FETCH=1 KERNEL_TREE=~/git/linux
+make all NO_FETCH=1
 ```
 
 ## Running locally
 
 ```sh
+# Same workflow in all three clones — preset handles the differences
+make fetch                                    # fetch the right kernel for this clone
+make smoke                                    # quick sanity: kunitconfig + tinyconfig, all archs
+make full                                     # broader: 5 bootable configs, all archs
+make all NO_FETCH=1                           # full pipeline: all 9 configs + archs
+
+# Daily-driver build + install (all three clones)
+make local                                    # build localconfig x86_64, no timeout
+make install CONFIGS=localconfig ARCHS=x86_64 # deploy to /boot (needs sudo)
+
 # Show what is currently checked out
-make info KERNEL_TREE=~/git/linux-stable
+make info
 
-# Full pipeline — latest mainline rc (report always written even on failure)
-make KERNEL_TREE=~/git/linux-stable
-
-# Quick sanity — kunitconfig + tinyconfig, all archs (preset auto-selected by dir name)
-make smoke
-
-# Broader coverage — 5 bootable configs, all archs (preset auto-selected by dir name)
-make full
-
-# Stable-rc announced (e.g. v7.1.4-rc2) — branch-based, not a git tag
-make fetch-stable-rc                          # updates linux-7.1.y, writes .kernel-version
-make smoke                                    # quick sanity; preset auto-selects KERNEL_TREE + LABEL
-make all NO_FETCH=1                           # full pipeline without re-fetching
-
-# Fetch latest stable release tag and test (preset sets STABLE_RELEASE=7.1 automatically)
-make fetch-stable STABLE_RELEASE=7.1
-make all NO_FETCH=1 STABLE_RELEASE=7.1
-
-# Stable release with older GCC (e.g. 7.1.x fails on GCC 16)
-make fetch-stable STABLE_RELEASE=7.1
-make all NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
-
-# Pin a specific version, then test without re-fetching
-make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable
-make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable
+# Pin a specific stable version, then test
+make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
+make all NO_FETCH=1
 
 # Partial run — single config and arch
 make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
@@ -277,13 +252,6 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig
 
 # Test rand500config only (tinyconfig + 500 random options, bootable)
 make all NO_FETCH=1 CONFIGS=rand500config ARCHS=x86_64
-
-# Verbose mode
-make V=1 KERNEL_TREE=~/git/linux-stable
-
-# Daily-driver localconfig build + install (stable tree)
-make local                                    # build localconfig x86_64, no timeout
-make install CONFIGS=localconfig ARCHS=x86_64 # deploy to /boot (KERNEL_TREE read from build.status)
 ```
 
 Always use `make all NO_FETCH=1` (not `make build initramfs test report`) — `all` guarantees

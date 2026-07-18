@@ -31,9 +31,7 @@ When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STAB
 ### Full pipeline variants
 
 ```sh
-make KERNEL_TREE=~/git/linux-stable                   # latest mainline rc (with fetch)
-make fetch-stable STABLE_RELEASE=7.1                  # fetch latest stable vX.Y.* tag
-make fetch-stable-rc                                  # fetch stable-rc branch tip (no tag — branch-based)
+make fetch                                            # auto-dispatches: mainline/stable/stable-rc by preset
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
 make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
@@ -43,16 +41,10 @@ make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 ```
 
-### stable-rc workflow (branch-based, no tags)
-
-stable-rc announcements (e.g. v7.1.4-rc2) are not git tags — they are tips of
-the rolling `linux-7.1.y` branch. Use `make fetch-stable-rc` instead of `make fetch`:
-
-```sh
-make fetch-stable-rc          # fetches linux-7.1.y, resets HEAD, writes .kernel-version
-make smoke                    # quick sanity; preset auto-selects KERNEL_TREE + LABEL
-make all NO_FETCH=1           # full pipeline
-```
+`make fetch` auto-dispatches based on preset variables:
+- `STABLE_RC_BRANCH` set → `lib/fetch-stable-rc.sh` (branch fetch + reset)
+- `STABLE_RELEASE` set → `lib/fetch.sh` stable mode
+- neither → `lib/fetch.sh` mainline rc mode
 
 `STABLE_RC_BRANCH` is set in `presets/kernel-test-stable-rc.mk`. Update it when
 the stable series bumps (e.g. 7.1.y → 7.2.y). See `docs/stable-rc-workflow.md`.

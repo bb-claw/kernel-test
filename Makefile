@@ -177,16 +177,26 @@ all:
 
 # ── Pipeline stages ───────────────────────────────────────────────────────────
 
+# Auto-dispatch based on preset variables:
+#   STABLE_RC_BRANCH set → stable-rc branch fetch (lib/fetch-stable-rc.sh)
+#   STABLE_RELEASE set   → stable tag fetch        (lib/fetch.sh)
+#   neither set          → mainline rc tag fetch   (lib/fetch.sh)
+# Presets set these automatically based on the clone directory name.
 fetch:
 ifeq ($(NO_FETCH),1)
-	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local tag"
+	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local state"
+else ifneq ($(STABLE_RC_BRANCH),)
+	@echo "[fetch] stable-rc: fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
+	$(Q)lib/fetch-stable-rc.sh
+else ifneq ($(STABLE_RELEASE),)
+	@echo "[fetch] stable: fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
+	$(Q)lib/fetch.sh
 else
-	@echo "[fetch] Fetching latest mainline -rc tag from $(KERNEL_TREE)"
+	@echo "[fetch] mainline: fetching latest -rc tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
 endif
 
-# Fetch latest stable release tag (e.g. v7.1.3). STABLE_RELEASE must be set
-# (set automatically by presets/kernel-test-stable.mk when run from that clone).
+# Explicit override targets — useful when running outside the preset-managed clones.
 fetch-stable:
 ifeq ($(NO_FETCH),1)
 	@echo "[fetch-stable] Skipping (NO_FETCH=1) — using existing local tag"
@@ -196,9 +206,6 @@ else
 	$(Q)lib/fetch.sh
 endif
 
-# Fetch the latest stable-rc branch tip (e.g. linux-7.1.y).
-# stable-rc uses rolling branches, not tags — make fetch cannot be used here.
-# STABLE_RC_BRANCH is set automatically by presets/kernel-test-stable-rc.mk.
 fetch-stable-rc:
 ifeq ($(NO_FETCH),1)
 	@echo "[fetch-stable-rc] Skipping (NO_FETCH=1) — using existing local state"
@@ -321,9 +328,9 @@ Targets:
   bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
   hooks        Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
-  fetch            Fetch and checkout the latest mainline -rc tag
-  fetch-stable     Fetch and checkout the latest stable vX.Y.* tag  (requires STABLE_RELEASE=)
-  fetch-stable-rc  Fetch latest stable-rc branch tip and reset HEAD  (requires STABLE_RC_BRANCH=)
+  fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip
+  fetch-stable     Explicit stable tag fetch  (requires STABLE_RELEASE=; useful outside preset-managed clones)
+  fetch-stable-rc  Explicit stable-rc branch fetch  (requires STABLE_RC_BRANCH=; useful outside preset-managed clones)
   smoke            Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
@@ -381,47 +388,29 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   or stable → mainline). Build directories contain generated headers tied to the
   source tree they were built from; reusing them across trees causes subtle mismatches.
 
-── Mainline rc ─────────────────────────────────────────────────────────────────
-  (clone into ~/git/kernel-test  |  no preset; Makefile defaults apply)
+  'make fetch' auto-dispatches based on the preset loaded for this clone:
+    mainline   (kernel-test)            → fetches latest v*-rc* tag
+    stable     (kernel-test-stable)     → fetches latest vX.Y.* tag   (preset: STABLE_RELEASE=7.1)
+    stable-rc  (kernel-test-stable-rc)  → fetches linux-X.Y.y branch  (preset: STABLE_RC_BRANCH=linux-7.1.y)
 
-  make fetch                                   # fetch latest v*-rc* tag from KERNEL_TREE
+── Testing kernel releases ─────────────────────────────────────────────────────
+  (identical workflow in all three clones — preset handles the differences)
+
+  make fetch                                   # fetch the right thing for this clone
   make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
   make full                                    # broader: 5 bootable configs, all archs
   make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
 
-  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
-  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
+── Daily-driver install ────────────────────────────────────────────────────────
 
-── Stable release ──────────────────────────────────────────────────────────────
-  (clone into ~/git/kernel-test-stable  |  preset sets STABLE_RELEASE=7.1)
+  make local                                   # build localconfig x86_64 (no timeout)
+  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot + mkinitcpio + GRUB (needs sudo)
 
-  make fetch-stable                            # fetch latest v7.1.x tag (STABLE_RELEASE from preset)
-  make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
-  make full                                    # broader: 5 bootable configs, all archs
-  make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
-
-  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
-  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
-
-  # Stable kernels before GCC 16: preset sets GCC=gcc-15 automatically.
-  # To pin an exact release instead of fetching the latest:
+  # Stable: preset sets GCC=gcc-15 automatically (stable kernels predate GCC 16).
+  # Stable-rc: version (e.g. v7.1.4-rc2) is read from kernel Makefile; no git tag needed.
+  # Pin a specific stable release instead of fetching latest:
   make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
   make all NO_FETCH=1
-
-── Stable-rc (branch tip, no tags) ────────────────────────────────────────────
-  (clone into ~/git/kernel-test-stable-rc  |  preset sets STABLE_RC_BRANCH=linux-7.1.y)
-
-  make fetch-stable-rc                         # fetch linux-7.1.y tip, reset HEAD, write .kernel-version
-  make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
-  make full                                    # broader: 5 bootable configs, all archs
-  make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
-
-  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
-  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
-
-  # stable-rc uses rolling branches, not tags — make fetch and make checkout TAG= do not work here.
-  # Version (e.g. v7.1.4-rc2) is read from the kernel Makefile after reset.
-  # When the stable series bumps, update STABLE_RC_BRANCH in presets/kernel-test-stable-rc.mk.
 
 ── More ────────────────────────────────────────────────────────────────────────
 
