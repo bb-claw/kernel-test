@@ -278,8 +278,19 @@ generate_index() {
     # ── sha → all report dirs (newest-first, deduplicated per summary.txt) ───────
     declare -A sha_rdirs=()   # sha -> newline-sep absolute paths, newest first
     declare -A sha_rcount=()  # sha -> integer run count
-    if [[ -d "$REPORT_ROOT" ]]; then
-        local rd sm sha
+    # Scan reports/ in all kernel-test* sibling clones, not only this one
+    local parent_dir sd
+    parent_dir="$(dirname "$REPO_ROOT")"
+    local -a all_report_roots=("$REPORT_ROOT")
+    for sd in "$parent_dir"/kernel-test*/; do
+        sd="${sd%/}"
+        [[ "$sd" == "$REPO_ROOT" ]] && continue
+        [[ -d "$sd/reports" ]] && all_report_roots+=("$sd/reports")
+    done
+
+    local rroot rd sm sha
+    for rroot in "${all_report_roots[@]}"; do
+        [[ -d "$rroot" ]] || continue
         while IFS= read -r -d '' rd; do
             [[ "$(basename "$rd")" == baseline ]] && continue
             sm="$rd/summary.txt"
@@ -294,9 +305,9 @@ generate_index() {
                     sha_rcount[$sha]=$(( ${sha_rcount[$sha]} + 1 ))
                 fi
             done < <(grep -oE '[0-9a-f]{64}' "$sm" | sort -u || true)
-        done < <(find "$REPORT_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
+        done < <(find "$rroot" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
                   ! -name baseline -print0 | sort -zr)
-    fi
+    done
 
     # ── Cross-result: SHA sets present in each archive dir ───────────────────────
     declare -A passed_shas=() failed_shas=()
@@ -349,11 +360,11 @@ generate_index() {
             if [[ -n "${sha_rdirs[$sha256]+set}" ]]; then
                 local rd
                 while IFS= read -r rd; do
-                    all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}|$(basename "$rd")")
+                    all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}|$(basename "$rd")|${rd}")
                 done <<< "${sha_rdirs[$sha256]}"
             else
-                # SHA not found in local reports/ (contributed by another clone)
-                all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}|")
+                # SHA not found in any clone's reports/ (contributed by another clone)
+                all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}||")
             fi
         done
 
@@ -394,8 +405,8 @@ generate_index() {
             printf '─%.0s' $(seq 1 "$seplen"); printf '\n'
 
             if [[ -n "$sorted_rows" ]]; then
-                local tc ta tv tr tsha trc tkf trd badge rd_trunc
-                while IFS='|' read -r tc ta tv tr tsha trc tkf trd; do
+                local tc ta tv tr tsha trc tkf trd trd_abs badge rd_trunc
+                while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
                     [[ -z "$tc" ]] && continue
                     badge=""
                     if [[ "$label" == PASSED && -n "${failed_shas[$tsha]+set}" ]]; then
@@ -444,8 +455,8 @@ generate_index() {
                 printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Runs</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
             fi
             if [[ -n "$sorted_rows" ]]; then
-                local tc ta tv tr tsha trc tkf trd tr_id rd_cell badge_cell files_cell
-                while IFS='|' read -r tc ta tv tr tsha trc tkf trd; do
+                local tc ta tv tr tsha trc tkf trd trd_abs tr_id rd_cell rd_link rd_root_inner badge_cell files_cell
+                while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
                     [[ -z "$tc" ]] && continue
                     # Anchor on first row per SHA
                     tr_id=""
@@ -453,9 +464,18 @@ generate_index() {
                         tr_id=" id=\"${tsha}\""
                         seen_shas[$tsha]=1
                     fi
-                    # Report dir cell
+                    # Report dir cell — relative link depends on which clone the report lives in
                     rd_cell=""
-                    [[ -n "$trd" ]] && rd_cell="<a href=\"../../reports/${trd}/\">${trd}</a>"
+                    rd_link=""
+                    if [[ -n "$trd_abs" ]]; then
+                        rd_root_inner="$(dirname "$(dirname "$trd_abs")")"
+                        if [[ "$rd_root_inner" == "$REPO_ROOT" ]]; then
+                            rd_link="../../reports/${trd}"
+                        else
+                            rd_link="../../../$(basename "$rd_root_inner")/reports/${trd}"
+                        fi
+                        rd_cell="<a href=\"${rd_link}/\">${trd}</a>"
+                    fi
                     # Cross-result badge
                     badge_cell=""
                     if [[ "$label" == PASSED && -n "${failed_shas[$tsha]+set}" ]]; then
@@ -463,13 +483,13 @@ generate_index() {
                     elif [[ "$label" == FAILED && -n "${passed_shas[$tsha]+set}" ]]; then
                         badge_cell="<a href=\"../archive_passed/index.html#${tsha}\"><span class=\"badge-pass\">&#10003;&nbsp;also&nbsp;passed</span></a>"
                     fi
-                    # Files: config always; build.log + dmesg when present locally
+                    # Files: config always; build.log + dmesg when present in any clone
                     files_cell="<a href=\"./${tkf}\">config</a>"
-                    if [[ -n "$trd" ]]; then
-                        [[ -f "$REPORT_ROOT/${trd}/build-${tc}-${ta}.log" ]] && \
-                            files_cell+=" &nbsp;<a href=\"../../reports/${trd}/build-${tc}-${ta}.log\">build.log</a>"
-                        [[ -f "$REPORT_ROOT/${trd}/dmesg-${tc}-${ta}.txt" ]] && \
-                            files_cell+=" &nbsp;<a href=\"../../reports/${trd}/dmesg-${tc}-${ta}.txt\">dmesg</a>"
+                    if [[ -n "$trd_abs" ]]; then
+                        [[ -f "${trd_abs}/build-${tc}-${ta}.log" ]] && \
+                            files_cell+=" &nbsp;<a href=\"${rd_link}/build-${tc}-${ta}.log\">build.log</a>"
+                        [[ -f "${trd_abs}/dmesg-${tc}-${ta}.txt" ]] && \
+                            files_cell+=" &nbsp;<a href=\"${rd_link}/dmesg-${tc}-${ta}.txt\">dmesg</a>"
                     fi
                     if [[ "$label" == FAILED ]]; then
                         printf '<tr%s><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
