@@ -1,4 +1,4 @@
-Passed configs archive — 175 entries, 720 rows — generated 2026-07-18T16:36:13Z
+Passed configs archive — 180 entries, 735 rows — generated 2026-07-18T18:23:02Z
 
 CONFIG           ARCH    VERSION     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -326,11 +326,19 @@ rand500config    arm64   v7.2-rc2    10    mainline   2026-07-12_22-21-34  mainl
 rand500config    arm64   v7.2-rc2    10    mainline   2026-07-12_22-22-22  mainline-7.2-2026-07-12_22-22-22-v7.2-rc2             27530cea6496a904c0c07e0f28a2cd999576f220ffccc7d7e38b9944b96d1293
 rand500config    arm64   v7.2-rc2    10    mainline   2026-07-12_22-26-33  mainline-7.2-2026-07-12_22-26-33-v7.2-rc2             27530cea6496a904c0c07e0f28a2cd999576f220ffccc7d7e38b9944b96d1293
 rand500config    arm64   v7.2-rc2    10    mainline   2026-07-12_22-29-53  mainline-7.2-2026-07-12_22-29-53-v7.2-rc2             27530cea6496a904c0c07e0f28a2cd999576f220ffccc7d7e38b9944b96d1293
+rand500config    arm64   v7.2-rc2    4     mainline   2026-07-18_19-36-37  mainline-7.2-2026-07-18_19-36-37-v7.2-rc2             60276c6208800aca3d1b56a84a3a7226ef3f3ee08b30ccaaa54681a2016139f6
+rand500config    arm64   v7.2-rc2    4     mainline   2026-07-18_19-37-53  mainline-7.2-2026-07-18_19-37-53-v7.2-rc2             60276c6208800aca3d1b56a84a3a7226ef3f3ee08b30ccaaa54681a2016139f6
+rand500config    arm64   v7.2-rc2    4     mainline   2026-07-18_19-39-20  mainline-7.2-2026-07-18_19-39-20-v7.2-rc2             60276c6208800aca3d1b56a84a3a7226ef3f3ee08b30ccaaa54681a2016139f6
+rand500config    arm64   v7.2-rc2    4     mainline   2026-07-18_19-40-58  mainline-7.2-2026-07-18_19-40-58-v7.2-rc2             60276c6208800aca3d1b56a84a3a7226ef3f3ee08b30ccaaa54681a2016139f6
 rand500config    arm64   v7.2-rc3    3     mainline   2026-07-14_10-52-09  mainline-7.2-2026-07-14_10-52-09-v7.2-rc3             2bb516c645781c4b0d9a418688d689112cec97c49d8620cfdf8a28bb164d0a6a
 rand500config    arm64   v7.2-rc3    3     mainline   2026-07-15_05-31-47  mainline-7.2-2026-07-15_05-31-47-v7.2-rc3             2bb516c645781c4b0d9a418688d689112cec97c49d8620cfdf8a28bb164d0a6a
 rand500config    arm64   v7.2-rc3    3     mainline   2026-07-15_05-37-01  mainline-7.2-2026-07-15_05-37-01-v7.2-rc3             2bb516c645781c4b0d9a418688d689112cec97c49d8620cfdf8a28bb164d0a6a
 rand500config    arm64   v7.2-rc3    1     mainline   2026-07-16_23-19-58  mainline-7.2-2026-07-16_23-19-58-v7.2-rc3             aa31aeebfcbbb4ac45bd1c9addc5f895cbd2ecae0ba98e4c3014140fd45b9aa8
 rand500config    arm64   v7.2-rc3    1     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             ac57699229eaa218162ea58701e3e47f05dcd5f37886a2377f5216f13c469cba
+rand500config    i386    v7.1.3      4     stable     2026-07-15_06-31-18  stable-7.1-2026-07-15_06-31-18-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
+rand500config    i386    v7.1.3      4     stable     2026-07-15_09-45-49  stable-7.1-2026-07-15_09-45-49-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
+rand500config    i386    v7.1.3      4     stable     2026-07-15_09-58-11  stable-7.1-2026-07-15_09-58-11-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
+rand500config    i386    v7.1.3      4     stable     2026-07-18_18-54-16  stable-7.1-2026-07-18_18-54-16-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
 rand500config    i386    v7.1.3      3     stable     2026-07-15_09-58-17  stable-7.1-2026-07-15_09-58-17-v7.1.3                 5694c61df46c61ebad589d940b592f4d272027adaf33bd134cbc88bb968b7f56
 rand500config    i386    v7.1.3      3     stable     2026-07-15_10-00-44  stable-7.1-2026-07-15_10-00-44-v7.1.3                 5694c61df46c61ebad589d940b592f4d272027adaf33bd134cbc88bb968b7f56
 rand500config    i386    v7.1.3      3     stable     2026-07-15_10-03-30  stable-7.1-2026-07-15_10-03-30-v7.1.3                 5694c61df46c61ebad589d940b592f4d272027adaf33bd134cbc88bb968b7f56
@@ -403,6 +411,8 @@ rand500config    x86_64  v7.2-rc2    5     mainline   2026-07-12_16-28-25  mainl
 rand500config    x86_64  v7.2-rc2    5     mainline   2026-07-12_16-31-55  mainline-7.2-2026-07-12_16-31-55-v7.2-rc2             ec671c2a8ddb8a2ad0371a588ea6b9193f26a5adda351acf517d49729f801bea
 rand500config    x86_64  v7.2-rc2    5     mainline   2026-07-12_16-37-55  mainline-7.2-2026-07-12_16-37-55-v7.2-rc2             ec671c2a8ddb8a2ad0371a588ea6b9193f26a5adda351acf517d49729f801bea
 rand500config    x86_64  v7.2-rc2    5     mainline   2026-07-12_16-39-59  mainline-7.2-2026-07-12_16-39-59-v7.2-rc2             ec671c2a8ddb8a2ad0371a588ea6b9193f26a5adda351acf517d49729f801bea
+rand500config    x86_64  v7.2-rc2    2     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             f5f38d8dbe038bd163c624047f900bd09be6c80ba310db3aba070eaba05e9d10
+rand500config    x86_64  v7.2-rc2    2     mainline   2026-07-18_18-49-33  mainline-7.2-2026-07-18_18-49-33-v7.2-rc2             f5f38d8dbe038bd163c624047f900bd09be6c80ba310db3aba070eaba05e9d10
 rand500config    x86_64  v7.2-rc3    3     mainline   2026-07-14_10-52-09  mainline-7.2-2026-07-14_10-52-09-v7.2-rc3             010b2f40a32fc6f3b5536523b5fd49ae8caae652ab40fc77fab1237d6ea22aab
 rand500config    x86_64  v7.2-rc3    3     mainline   2026-07-15_05-31-47  mainline-7.2-2026-07-15_05-31-47-v7.2-rc3             010b2f40a32fc6f3b5536523b5fd49ae8caae652ab40fc77fab1237d6ea22aab
 rand500config    x86_64  v7.2-rc3    3     mainline   2026-07-15_05-37-01  mainline-7.2-2026-07-15_05-37-01-v7.2-rc3             010b2f40a32fc6f3b5536523b5fd49ae8caae652ab40fc77fab1237d6ea22aab
@@ -413,10 +423,14 @@ rand500config    x86_64  v7.2-rc3    1     mainline   2026-07-13_22-48-10  mainl
 randconfig       i386    v7.1-rc7    1     stable-rc  2026-07-16_19-11-34  stable-rc-7.1-2026-07-16_19-11-34-v7.1-rc7            1d0ed7a0778df51d8f2d99d738911b13cd3fd5e9e4755251a1825d8a4c038073
 randconfig       i386    v7.1-rc7    1     stable-rc  2026-07-16_17-30-47  stable-rc-7.1-2026-07-16_17-30-47-v7.1-rc7            76292e272efc36e76f3e9680f34023c46bf30c4833920ef396fb1832a89e2d5f
 randconfig       i386    v7.2-rc2    1     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             1b1b8f17c158b322002e74f35f7726c905b338047f9a92cb106ea7d32bebad73
+randconfig       i386    v7.2-rc2    2     mainline   2026-07-12_09-12-39  mainline-7.2-2026-07-12_09-12-39-v7.2-rc2             c4edf70d9afccc932d5b3ddafbe750f4e07406bc42c7171e64fad55fddba042f
+randconfig       i386    v7.2-rc2    2     mainline   2026-07-18_18-39-57  mainline-7.2-2026-07-18_18-39-57-v7.2-rc2             c4edf70d9afccc932d5b3ddafbe750f4e07406bc42c7171e64fad55fddba042f
 randconfig       i386    v7.2-rc3    2     mainline   2026-07-18_18-06-40  mainline-7.2-2026-07-18_18-06-40-v7.2-rc3             6f7d9e8723f2ec2ca21c03cbe19dfcfdd56a882acbb47ef0ec347d94ee72c920
 randconfig       i386    v7.2-rc3    2     mainline   2026-07-18_18-31-17  mainline-7.2-2026-07-18_18-31-17-v7.2-rc3             6f7d9e8723f2ec2ca21c03cbe19dfcfdd56a882acbb47ef0ec347d94ee72c920
 randconfig       x86_64  v7.1-rc7    1     stable-rc  2026-07-16_19-11-34  stable-rc-7.1-2026-07-16_19-11-34-v7.1-rc7            cab75c63ec058c9d112baa6efb9788dd9638ac23822e17cff4986c66ed5e7ce6
 randconfig       x86_64  v7.1-rc7    1     stable-rc  2026-07-16_17-30-47  stable-rc-7.1-2026-07-16_17-30-47-v7.1-rc7            cb7b3531673c94f3539565508c1b9cf7480189d65bc5c57d6d69ee5018c9f179
+randconfig       x86_64  v7.2-rc2    2     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             c8d8c8dbed978a6137f80949fed8727f6c045fb3c1bea499b7d0902f77c7b7d3
+randconfig       x86_64  v7.2-rc2    2     mainline   2026-07-18_19-02-56  mainline-7.2-2026-07-18_19-02-56-v7.2-rc2             c8d8c8dbed978a6137f80949fed8727f6c045fb3c1bea499b7d0902f77c7b7d3
 randconfig       x86_64  v7.2-rc3    1     mainline   2026-07-18_16-18-18  mainline-7.2-2026-07-18_16-18-18-v7.2-rc3             5c9b1ec2f7b450d82c22c150206a6bcca4c4419bf64d59d67ac9e3dfeedb101e
 randconfig       x86_64  v7.2-rc3    1     mainline   2026-07-18_17-32-25  mainline-7.2-2026-07-18_17-32-25-v7.2-rc3             5da0b4edff44e627e636d97f11fb91b107a0ad5edbd2ffa4ff7514ab97ee8437
 randdefconfig    arm64   v7.1.3      4     stable     2026-07-15_06-31-18  stable-7.1-2026-07-15_06-31-18-v7.1.3                 c6b8d822dce6952aceaa250585f4448a0044b3478bc4d66904b3faa1e9f0fa82
@@ -521,7 +535,8 @@ tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_10-17-10  stabl
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_11-07-22  stable-rc-7.1-2026-07-18_11-07-22-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_12-05-53  stable-rc-7.1-2026-07-18_12-05-53-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_14-16-14  stable-rc-7.1-2026-07-18_14-16-14-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
-tinyconfig       arm64   v7.2-rc2    1     mainline   2026-07-12_15-00-26  mainline-7.2-2026-07-12_15-00-26-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    2     mainline   2026-07-12_15-00-26  mainline-7.2-2026-07-12_15-00-26-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    2     mainline   2026-07-18_20-18-22  mainline-7.2-2026-07-18_20-18-22-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-45-25  mainline-7.2-2026-07-12_13-45-25-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-49-41  mainline-7.2-2026-07-12_13-49-41-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-57-01  mainline-7.2-2026-07-12_13-57-01-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853

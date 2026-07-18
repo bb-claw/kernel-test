@@ -1,4 +1,4 @@
-Failed configs archive — 15 entries, 20 rows — generated 2026-07-18T16:36:13Z
+Failed configs archive — 11 entries, 19 rows — generated 2026-07-18T18:23:02Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON          RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -13,12 +13,11 @@ kunitrandconfig  i386    v7.1.3      KUNIT_FAIL-2-of-1749    1     stable     20
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout       2     mainline   2026-07-16_21-58-25  mainline-7.2-2026-07-16_21-58-25-v7.2-rc3             7ba1db8064ee83c2fc16126d76be213a3718418b7dd02d30f468e2ee6e9e6255
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout       2     mainline   2026-07-16_22-02-15  mainline-7.2-2026-07-16_22-02-15-v7.2-rc3             7ba1db8064ee83c2fc16126d76be213a3718418b7dd02d30f468e2ee6e9e6255
 rand500config    arm64   v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          523d10d2a2ea5822051c77c10a9fc07fbd13c585841c8b46de8cbf22c51d895f
-rand500config    arm64   v7.2-rc2    BUILD_FAIL              1     mainline   2026-07-12_16-17-27  mainline-7.2-2026-07-12_16-17-27-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
-rand500config    i386    v7.1.3      BUILD_FAIL              3     stable     2026-07-15_06-31-18  stable-7.1-2026-07-15_06-31-18-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
-rand500config    i386    v7.1.3      BUILD_FAIL              3     stable     2026-07-15_09-45-49  stable-7.1-2026-07-15_09-45-49-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
-rand500config    i386    v7.1.3      BUILD_FAIL              3     stable     2026-07-15_09-58-11  stable-7.1-2026-07-15_09-58-11-v7.1.3                 2d8914401a1ed886f97e75925993a800afdb1f2d9cb9b2f83a6c50143b5889df
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-12_16-17-27  mainline-7.2-2026-07-12_16-17-27-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-08-51  mainline-7.2-2026-07-18_19-08-51-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-22-06  mainline-7.2-2026-07-18_19-22-06-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-25-21  mainline-7.2-2026-07-18_19-25-21-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-30-08  mainline-7.2-2026-07-18_19-30-08-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-33-53  mainline-7.2-2026-07-18_19-33-53-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
 rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          165e686ead919a2e76aa6705da4b1f3a83b1fbb6a93147b44dbfb169a2ac315f
 rand500config    i386    v7.2-rc3    BOOT_FAIL-oops          1     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             9d19cfcad5a9acaee1eec7f0f5e576c6f9cb04f159932e52fdaa0d3dfe95e00a
-rand500config    x86_64  v7.2-rc2    BUILD_FAIL              1     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             f5f38d8dbe038bd163c624047f900bd09be6c80ba310db3aba070eaba05e9d10
-randconfig       i386    v7.2-rc2    BUILD_FAIL              1     mainline   2026-07-12_09-12-39  mainline-7.2-2026-07-12_09-12-39-v7.2-rc2             c4edf70d9afccc932d5b3ddafbe750f4e07406bc42c7171e64fad55fddba042f
-randconfig       x86_64  v7.2-rc2    BUILD_FAIL              1     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             c8d8c8dbed978a6137f80949fed8727f6c045fb3c1bea499b7d0902f77c7b7d3
