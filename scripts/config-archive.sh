@@ -116,8 +116,9 @@ while IFS= read -r -d '' report_dir; do
     summary="$report_dir/summary.txt"
     [[ -f "$summary" ]] || continue
 
-    # Extract kernel version: last vX.Y-rcN or vX.Y.Z component in dirname
-    version=$(grep -oE 'v[0-9]+\.[0-9]+(\.[0-9]+)?(-rc[0-9]+)?' <<< "$dirname" | tail -1)
+    # Extract kernel version: last vX.Y-rcN or vX.Y.Z component in dirname.
+    # grep exits 1 when no match (e.g. old SHA-based dirname); || true prevents set -e from firing.
+    version=$(grep -oE 'v[0-9]+\.[0-9]+(\.[0-9]+)?(-rc[0-9]+)?' <<< "$dirname" | tail -1 || true)
     if [[ -z "$version" ]]; then
         warn "Cannot extract version from $dirname — skipping"
         continue
