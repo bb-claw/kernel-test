@@ -381,74 +381,63 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   or stable → mainline). Build directories contain generated headers tied to the
   source tree they were built from; reusing them across trees causes subtle mismatches.
 
-Common workflows:
+── Mainline rc ─────────────────────────────────────────────────────────────────
+  (clone into ~/git/kernel-test  |  no preset; Makefile defaults apply)
 
-  # New mainline rc announced (e.g. v7.2-rc3) — auto-fetch and test everything
-  make
+  make fetch                                   # fetch latest v*-rc* tag from KERNEL_TREE
+  make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
+  make full                                    # broader: 5 bootable configs, all archs
+  make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
 
-  # Quick sanity after a fetch (kunitconfig + tinyconfig; preset auto-selected by dir name)
-  make smoke
+  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
+  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
 
-  # Broader coverage without allmodconfig/randconfig (preset auto-selected by dir name)
-  make full
+── Stable release ──────────────────────────────────────────────────────────────
+  (clone into ~/git/kernel-test-stable  |  preset sets STABLE_RELEASE=7.1)
 
-  # Check what is currently checked out before running
-  make info
+  make fetch-stable                            # fetch latest v7.1.x tag (STABLE_RELEASE from preset)
+  make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
+  make full                                    # broader: 5 bootable configs, all archs
+  make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
 
-  # Quick single-arch test (report always written even on failure)
-  make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
+  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
+  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
+
+  # Stable kernels before GCC 16: preset sets GCC=gcc-15 automatically.
+  # To pin an exact release instead of fetching the latest:
+  make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
+  make all NO_FETCH=1
+
+── Stable-rc (branch tip, no tags) ────────────────────────────────────────────
+  (clone into ~/git/kernel-test-stable-rc  |  preset sets STABLE_RC_BRANCH=linux-7.1.y)
+
+  make fetch-stable-rc                         # fetch linux-7.1.y tip, reset HEAD, write .kernel-version
+  make smoke                                   # quick sanity: kunitconfig + tinyconfig, all archs
+  make full                                    # broader: 5 bootable configs, all archs
+  make all NO_FETCH=1                          # full pipeline: all 9 configs + archs
+
+  make local                                   # build localconfig x86_64 (daily-driver, no timeout)
+  make install CONFIGS=localconfig ARCHS=x86_64  # install to /boot (needs sudo)
+
+  # stable-rc uses rolling branches, not tags — make fetch and make checkout TAG= do not work here.
+  # Version (e.g. v7.1.4-rc2) is read from the kernel Makefile after reset.
+  # When the stable series bumps, update STABLE_RC_BRANCH in presets/kernel-test-stable-rc.mk.
+
+── More ────────────────────────────────────────────────────────────────────────
+
+  make info                                    # show HEAD commit, tag, kernel Makefile version
 
   # Fast iteration on test scripts — skip rebuild, repack initramfs and re-run tests
-  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS="x86_64 i386 arm64"
+  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig
 
-  # Run KUnit tests only (kunit:N/N shown in report Tests column)
-  make all NO_FETCH=1 NO_BUILD=1 CONFIGS=kunitconfig ARCHS="x86_64 i386 arm64"
-
-  # arm64 uses TCG (no KVM on x86 host); requires aarch64-linux-gnu-gcc + qemu-system-aarch64
-  # Install both with: make bootstrap  (then arm64 works in all ARCHS= invocations above)
-  make all NO_FETCH=1 ARCHS="x86_64 i386 arm64"
-
-  # New mainline rc — pin exact version, then test (report always written)
-  make checkout TAG=v7.2-rc3 
-  make all NO_FETCH=1 
-
-  # Build and install daily-driver kernel (Manjaro base config + laptop hardware fragment)
-  # BUILD_TIMEOUT=0 disables the timeout — use for localconfig (larger than defconfig)
-  make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
-  make install            CONFIGS=localconfig ARCHS=x86_64
-
-  # New stable-rc announced (e.g. v7.1.4-rc2) — no git tag; fetch branch tip
-  make fetch-stable-rc                    # updates linux-7.1.y, writes .kernel-version
-  make smoke                              # preset auto-selects KERNEL_TREE and LABEL
-  make all NO_FETCH=1                     # full pipeline without re-fetching
-
-  # New stable release — fetch latest v7.1.x tag and test everything
-  make fetch-stable STABLE_RELEASE=7.1
-  make all NO_FETCH=1 STABLE_RELEASE=7.1
-
-  # Stable release with older GCC (e.g. 7.1.x fails on GCC 16 — use GCC=gcc-15)
-  make fetch-stable STABLE_RELEASE=7.1
-  make all          NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
-
-  # Stable release — pin exact version, then test
-  make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
-  make all NO_FETCH=1 STABLE_RELEASE=7.1
-
-  # Stable localconfig build + install (daily-driver, real hardware)
-  make fetch-stable STABLE_RELEASE=7.1
-  make build NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
-  make install           STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64
-
-  # Verbose output for debugging
-  make V=1 KERNEL_TREE=~/git/linux-stable
+  # Single config + arch (quick check; report always written even on failure)
+  make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64
 
   # Regression diff — auto-detects two most recent same-label runs
   make diff
+  make diff OLD=reports/mainline-7.2-...-v7.2-rc1 NEW=reports/mainline-7.2-...-v7.2-rc2
 
-  # Diff two specific runs (cross-label diff also supported via explicit paths)
-  make diff OLD=reports/mainline-7.2-2026-07-12_10-00-00-v7.2-rc1 NEW=reports/mainline-7.2-2026-07-12_11-00-00-v7.2-rc2
-
-  # Pin current results as baseline; future runs will auto-diff against it
+  # Pin current results as baseline; future 'make all' runs auto-diff against it
   make baseline
 
   # Rename old-format report dirs to new label-prefixed format
