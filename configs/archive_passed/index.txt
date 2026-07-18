@@ -1,4 +1,4 @@
-Passed configs archive — 180 entries, 735 rows — generated 2026-07-18T18:23:02Z
+Passed configs archive — 180 entries, 737 rows — generated 2026-07-18T18:32:00Z
 
 CONFIG           ARCH    VERSION     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -535,8 +535,10 @@ tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_10-17-10  stabl
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_11-07-22  stable-rc-7.1-2026-07-18_11-07-22-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_12-05-53  stable-rc-7.1-2026-07-18_12-05-53-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
 tinyconfig       arm64   v7.1.4-rc2  4     stable-rc  2026-07-18_14-16-14  stable-rc-7.1-2026-07-18_14-16-14-v7.1.4-rc2          c41d1ac7b0c1b33ba0aa94a547343098c875560f94d7a594c7728063ceba4684
-tinyconfig       arm64   v7.2-rc2    2     mainline   2026-07-12_15-00-26  mainline-7.2-2026-07-12_15-00-26-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
-tinyconfig       arm64   v7.2-rc2    2     mainline   2026-07-18_20-18-22  mainline-7.2-2026-07-18_20-18-22-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    4     mainline   2026-07-12_15-00-26  mainline-7.2-2026-07-12_15-00-26-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    4     mainline   2026-07-18_20-18-22  mainline-7.2-2026-07-18_20-18-22-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    4     mainline   2026-07-18_20-26-28  mainline-7.2-2026-07-18_20-26-28-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
+tinyconfig       arm64   v7.2-rc2    4     mainline   2026-07-18_20-29-12  mainline-7.2-2026-07-18_20-29-12-v7.2-rc2             222a42d492401ee4df0ef715b442cc04c145cb79653df3a8fa0f922fbca2d2df
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-45-25  mainline-7.2-2026-07-12_13-45-25-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-49-41  mainline-7.2-2026-07-12_13-49-41-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853
 tinyconfig       arm64   v7.2-rc2    40    mainline   2026-07-12_13-57-01  mainline-7.2-2026-07-12_13-57-01-v7.2-rc2             8d4e48916a65ab2e911aef15b4e6b99956099e4a783f2a07f78b2fee278d9853
