@@ -197,11 +197,12 @@ elif ! kmake "$CONFIG"; then
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-# Step 1b: apply config fragment (post-config, works for all kernel targets)
+# Step 1b: apply config fragment (skip for seed replay — fragment is already baked
+# into the archived config; re-applying would overwrite options the original run set).
 # KCONFIG_ALLCONFIG is NOT used here because some targets (e.g. tinyconfig)
 # explicitly override it internally, silently discarding our fragment.
 # Appending to .config + olddefconfig is reliable for every kernel target.
-if [[ -f $FRAGMENT ]]; then
+if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
     info "Applying config fragment: $FRAGMENT"
     cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
