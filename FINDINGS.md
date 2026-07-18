@@ -337,7 +337,7 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ### High — Build Failure
 
-- [ ] **PINCTRL_MICROCHIP_SGPIO missing `select REGMAP_MMIO` — build fails without regmap**
+- [x] **PINCTRL_MICROCHIP_SGPIO missing `select REGMAP_MMIO` — build fails without regmap** ✅ fix confirmed 2026-07-18
   Kernel: v7.2-rc2 and v7.2-rc3. Arch: arm64 (affects all arches). Found by rand500config sampling.
 
   `pinctrl-microchip-sgpio.c` includes `<linux/mfd/ocelot.h>` which calls
@@ -367,11 +367,17 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
   **Reproduce:** `make checkout TAG=v7.2-rc2 && make replay CONFIG_FILE=<above>`
 
-  **Suggested fix** — `drivers/pinctrl/Kconfig`:
+  **Fix** — `drivers/pinctrl/Kconfig` (tab-indented, same as sibling drivers):
   ```diff
    config PINCTRL_MICROCHIP_SGPIO
   +	select REGMAP_MMIO
   ```
+
+  **Fix confirmed:** replay with original failing config after applying the patch:
+  - SHA changed: `edfe557442df5e93...` → `60276c6208800aca...` (olddefconfig auto-added REGMAP_MMIO=y)
+  - Build: PASS, Boot: PASS, Tests: 26/26 — v7.2-rc2 arm64
+
+  **Next step:** submit as a kernel patch to `linux-gpio@vger.kernel.org` / pinctrl maintainer.
 
 ---
 
@@ -379,7 +385,7 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 | Status | Count |
 |--------|-------|
-| Open   | 1     |
-| Resolved | 15  |
+| Open   | 0     |
+| Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
