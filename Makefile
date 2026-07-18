@@ -42,9 +42,10 @@ LABEL          ?=
 BUILD_DIR := build
 CACHE_DIR := cache
 
-# Kernel version: version file written by fetch/checkout; fall back to git.
+# Kernel version: version file written by fetch/checkout; fall back to git then kernel Makefile.
 KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
     || git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null \
+    || make -s -C "$(KERNEL_TREE)" kernelversion 2>/dev/null \
     || git -C "$(KERNEL_TREE)" rev-parse --short HEAD 2>/dev/null \
     || echo unknown)
 
@@ -69,7 +70,7 @@ endif
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
-export STABLE_RELEASE STABLE_KERNEL_TREE
+export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH
 export TOYBOX_VERSION LABEL
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -140,7 +141,7 @@ info:
 	fi
 	@[[ -f $(BUILD_DIR)/.kernel-version ]] \
 	    && printf 'Version file: %s\n' "$$(cat $(BUILD_DIR)/.kernel-version)" \
-	    || printf 'Version file: (not set — run: make fetch  or  make checkout TAG=v7.2-rc2)\n'
+	    || printf 'Version file: (not set — run: make fetch / make fetch-stable / make fetch-stable-rc  or  make checkout TAG=)\n'
 
 # Fetch and checkout a specific tag or commit. Usage: make checkout TAG=v7.2-rc2
 checkout:
@@ -180,8 +181,31 @@ fetch:
 ifeq ($(NO_FETCH),1)
 	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local tag"
 else
-	@echo "[fetch] Fetching latest -rc tag from $(KERNEL_TREE)"
+	@echo "[fetch] Fetching latest mainline -rc tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
+endif
+
+# Fetch latest stable release tag (e.g. v7.1.3). STABLE_RELEASE must be set
+# (set automatically by presets/kernel-test-stable.mk when run from that clone).
+fetch-stable:
+ifeq ($(NO_FETCH),1)
+	@echo "[fetch-stable] Skipping (NO_FETCH=1) — using existing local tag"
+else
+	$(if $(STABLE_RELEASE),,$(error STABLE_RELEASE is required — usage: make fetch-stable STABLE_RELEASE=7.1))
+	@echo "[fetch-stable] Fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
+	$(Q)lib/fetch.sh
+endif
+
+# Fetch the latest stable-rc branch tip (e.g. linux-7.1.y).
+# stable-rc uses rolling branches, not tags — make fetch cannot be used here.
+# STABLE_RC_BRANCH is set automatically by presets/kernel-test-stable-rc.mk.
+fetch-stable-rc:
+ifeq ($(NO_FETCH),1)
+	@echo "[fetch-stable-rc] Skipping (NO_FETCH=1) — using existing local state"
+else
+	$(if $(STABLE_RC_BRANCH),,$(error STABLE_RC_BRANCH is required — set it in presets/ or pass STABLE_RC_BRANCH=linux-7.1.y))
+	@echo "[fetch-stable-rc] Fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
+	$(Q)lib/fetch-stable-rc.sh
 endif
 
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
@@ -296,12 +320,14 @@ kernel-test — Linux -rc kernel test harness
 Targets:
   bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
   hooks        Activate git hooks only (no package install)
-  all          Full pipeline: fetch → build → initramfs → test → report  [default]
-  fetch        Fetch and checkout the latest -rc tag automatically
-  smoke        Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
-  full         Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
-  local        Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
-  checkout     Fetch and checkout a specific tag or commit  (requires TAG=)
+  all              Full pipeline: fetch → build → initramfs → test → report  [default]
+  fetch            Fetch and checkout the latest mainline -rc tag
+  fetch-stable     Fetch and checkout the latest stable vX.Y.* tag  (requires STABLE_RELEASE=)
+  fetch-stable-rc  Fetch latest stable-rc branch tip and reset HEAD  (requires STABLE_RC_BRANCH=)
+  smoke            Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
+  full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
+  local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
+  checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info         Show current tag/commit checked out in KERNEL_TREE
   build        Build kernels for all CONFIGS × ARCHS
   initramfs    Assemble Toybox cpio initramfs for each arch
@@ -331,6 +357,7 @@ Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)
   STABLE_KERNEL_TREE  = $(STABLE_KERNEL_TREE)  (used when STABLE_RELEASE is set)
   STABLE_RELEASE      = $(if $(STABLE_RELEASE),$(STABLE_RELEASE),(not set — mainline rc mode))
+  STABLE_RC_BRANCH    = $(if $(STABLE_RC_BRANCH),$(STABLE_RC_BRANCH),(not set — used by: make fetch-stable-rc))
   TAG                 = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
   ARCHS               = $(ARCHS)
   CONFIGS             = $(CONFIGS)
@@ -390,22 +417,25 @@ Common workflows:
   make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
   make install            CONFIGS=localconfig ARCHS=x86_64
 
-  # New stable rc announced (e.g. v7.1-rc3) — auto-fetch and test everything
-  make KERNEL_TREE=~/git/linux-stable
+  # New stable-rc announced (e.g. v7.1.4-rc2) — no git tag; fetch branch tip
+  make fetch-stable-rc                    # updates linux-7.1.y, writes .kernel-version
+  make smoke                              # preset auto-selects KERNEL_TREE and LABEL
+  make all NO_FETCH=1                     # full pipeline without re-fetching
 
-  # New stable release — auto-fetch latest v7.1.x and test everything
-  make STABLE_RELEASE=7.1
+  # New stable release — fetch latest v7.1.x tag and test everything
+  make fetch-stable STABLE_RELEASE=7.1
+  make all NO_FETCH=1 STABLE_RELEASE=7.1
 
   # Stable release with older GCC (e.g. 7.1.x fails on GCC 16 — use GCC=gcc-15)
-  make fetch STABLE_RELEASE=7.1
-  make all   NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
+  make fetch-stable STABLE_RELEASE=7.1
+  make all          NO_FETCH=1 STABLE_RELEASE=7.1 GCC=gcc-15
 
-  # New stable release — pin exact version, then test
+  # Stable release — pin exact version, then test
   make checkout TAG=v7.1.3 STABLE_RELEASE=7.1
   make all NO_FETCH=1 STABLE_RELEASE=7.1
 
   # Stable localconfig build + install (daily-driver, real hardware)
-  make fetch STABLE_RELEASE=7.1
+  make fetch-stable STABLE_RELEASE=7.1
   make build NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0 GCC=gcc-15
   make install           STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64
 
