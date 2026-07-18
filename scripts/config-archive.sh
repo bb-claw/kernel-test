@@ -270,37 +270,76 @@ info "archive_failed: $written_fail added, $skipped_fail already present"
 
 # Generate index.txt and index.html inside each archive directory.
 # Reads from the on-disk archive, so the index reflects entries from all clones.
+# One row per (archive entry × report run): diff-friendly, self-contained rows.
 generate_index() {
-    local date_str dir label count f base sha256 rest version config_arch config arch reason
-    date_str=$(date '+%Y-%m-%d %H:%M')
+    local date_str
+    date_str=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-    # Build sha256 → report-dir lookup so HTML rows can link to dmesg files.
-    # Scans newest-first so the first hit per sha256 is the most recent run.
-    declare -A sha_report=()
-    if [[ -d "$REPORT_ROOT" ]]; then
-        local rd sm sha
+    # ── sha → all report dirs (newest-first, deduplicated per summary.txt) ───────
+    declare -A sha_rdirs=()   # sha -> newline-sep absolute paths, newest first
+    declare -A sha_rcount=()  # sha -> integer run count
+    # Scan reports/ in all kernel-test* sibling clones, not only this one
+    local parent_dir sd
+    parent_dir="$(dirname "$REPO_ROOT")"
+    local -a all_report_roots=("$REPORT_ROOT")
+    for sd in "$parent_dir"/kernel-test*/; do
+        sd="${sd%/}"
+        [[ "$sd" == "$REPO_ROOT" ]] && continue
+        [[ -d "$sd/reports" ]] && all_report_roots+=("$sd/reports")
+    done
+
+    local rroot rd sm sha
+    for rroot in "${all_report_roots[@]}"; do
+        [[ -d "$rroot" ]] || continue
         while IFS= read -r -d '' rd; do
             [[ "$(basename "$rd")" == baseline ]] && continue
             sm="$rd/summary.txt"
             [[ -f "$sm" ]] || continue
             while IFS= read -r sha; do
-                [[ -n "$sha" && -z "${sha_report[$sha]+set}" ]] && sha_report[$sha]="$rd"
-            done < <(grep -oE '[0-9a-f]{64}' "$sm" || true)
-        done < <(find "$REPORT_ROOT" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
+                [[ -z "$sha" ]] && continue
+                if [[ -z "${sha_rdirs[$sha]+set}" ]]; then
+                    sha_rdirs[$sha]="$rd"
+                    sha_rcount[$sha]=1
+                else
+                    sha_rdirs[$sha]+=$'\n'"$rd"
+                    sha_rcount[$sha]=$(( ${sha_rcount[$sha]} + 1 ))
+                fi
+            done < <(grep -oE '[0-9a-f]{64}' "$sm" | sort -u || true)
+        done < <(find "$rroot" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
                   ! -name baseline -print0 | sort -zr)
-    fi
+    done
 
+    # ── Cross-result: SHA sets present in each archive dir ───────────────────────
+    declare -A passed_shas=() failed_shas=()
+    local xf xsha
+    shopt -s nullglob
+    for xf in "$PASSED_DIR"/kconfig-*.config; do
+        xsha=$(grep -oE '[0-9a-f]{64}' <<< "${xf##*/}" | head -1 || true)
+        [[ -n "$xsha" ]] && passed_shas[$xsha]=1
+    done
+    for xf in "$FAILED_DIR"/kconfig-*-*.config; do
+        xsha=$(grep -oE '[0-9a-f]{64}' <<< "${xf##*/}" | head -1 || true)
+        [[ -n "$xsha" ]] && failed_shas[$xsha]=1
+    done
+    shopt -u nullglob
+
+    # ── Render each archive dir ──────────────────────────────────────────────────
+    local dir label
     for dir in "$PASSED_DIR" "$FAILED_DIR"; do
         [[ "$dir" == "$PASSED_DIR" ]] && label=PASSED || label=FAILED
 
-        local -a rows=()
-        local kconfig_file dmesg_link rdir dmesg_path
+        # Parse archive files → row tuples (one per report run that used this SHA):
+        #   config|arch|version|reason|sha256|run_count|kconfig_file|report_dir_name
+        local -a all_rows=()
+        local f base rest sha256 reason version config_arch cfg arc kf rc
+        local entry_count=0
 
         shopt -s nullglob
-        local -a files=("$dir"/kconfig-*.config)
+        local -a afiles=("$dir"/kconfig-*.config)
         shopt -u nullglob
+        entry_count=${#afiles[@]}
 
-        for f in "${files[@]}"; do
+        for f in "${afiles[@]}"; do
             base="${f##*/}"; base="${base#kconfig-}"; base="${base%.config}"
             sha256=$(grep -oE '[0-9a-f]{64}' <<< "$base" | head -1 || true)
             [[ -z "$sha256" ]] && continue
@@ -308,73 +347,102 @@ generate_index() {
             reason="${base##*${sha256}}"; reason="${reason#-}"
             version=$(grep -oE 'v[0-9]+\.[0-9]+(\.[0-9]+)?(-rc[0-9]+)?$' <<< "$rest" || true)
             config_arch="${rest%-${version}}"
-            config=""; arch=""
+            cfg=""; arc=""
             for known in x86_64 i386 arm64; do
                 if [[ "$config_arch" == *"-${known}" ]]; then
-                    arch="$known"; config="${config_arch%-${known}}"; break
+                    arc="$known"; cfg="${config_arch%-${known}}"; break
                 fi
             done
-            [[ -z "$arch" ]] && continue
+            [[ -z "$arc" ]] && continue
+            kf="${f##*/}"
+            rc="${sha_rcount[$sha256]:-0}"
 
-            # kconfig link: file is in the same directory as index.html
-            kconfig_file="${f##*/}"
-
-            # dmesg link: look up report dir via sha256, then check file exists
-            dmesg_link=""
-            if [[ -n "${sha_report[$sha256]+set}" ]]; then
-                rdir="${sha_report[$sha256]}"
-                dmesg_path="$rdir/dmesg-${config}-${arch}.txt"
-                if [[ -f "$dmesg_path" ]]; then
-                    dmesg_link="../../reports/$(basename "$rdir")/dmesg-${config}-${arch}.txt"
-                fi
+            if [[ -n "${sha_rdirs[$sha256]+set}" ]]; then
+                local rd
+                while IFS= read -r rd; do
+                    all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}|$(basename "$rd")|${rd}")
+                done <<< "${sha_rdirs[$sha256]}"
+            else
+                # SHA not found in any clone's reports/ (contributed by another clone)
+                all_rows+=("${cfg}|${arc}|${version}|${reason}|${sha256}|${rc}|${kf}||")
             fi
-
-            rows+=("${config}|${arch}|${version}|${reason}|${kconfig_file}|${dmesg_link}|${sha256}")
         done
 
-        count=${#rows[@]}
-        local sorted_rows=""
-        if [[ $count -gt 0 ]]; then
-            sorted_rows=$(printf '%s\n' "${rows[@]}" | sort)
-        fi
+        local total_rows sorted_rows=""
+        total_rows=${#all_rows[@]}
+        [[ $total_rows -gt 0 ]] && \
+            sorted_rows=$(printf '%s\n' "${all_rows[@]}" | sort -t'|' -k1,1 -k2,2 -k3,3)
 
-        # Dynamic column widths (sha256 is always 64 chars — fixed)
-        local w_c=6 w_a=4 w_v=7
+        # Dynamic column widths (minimums cover typical short names)
+        local w_c=9 w_a=6 w_v=9 w_r=14
         if [[ -n "$sorted_rows" ]]; then
-            while IFS='|' read -r c a v _r _kl _dl _sha; do
-                [[ ${#c} -gt $w_c ]] && w_c=${#c}
-                [[ ${#a} -gt $w_a ]] && w_a=${#a}
-                [[ ${#v} -gt $w_v ]] && w_v=${#v}
+            local _c _a _v _r _rest
+            while IFS='|' read -r _c _a _v _r _rest; do
+                [[ -z "$_c" ]] && continue
+                [[ ${#_c} -gt $w_c ]] && w_c=${#_c}
+                [[ ${#_a} -gt $w_a ]] && w_a=${#_a}
+                [[ ${#_v} -gt $w_v ]] && w_v=${#_v}
+                [[ "$label" == FAILED && ${#_r} -gt $w_r ]] && w_r=${#_r}
             done <<< "$sorted_rows"
         fi
-        local sep
-        sep=$(printf '─%.0s' $(seq 1 $((w_c + w_a + w_v + 20 + 64))))
 
-        # Plain-text index (no links)
+        local hdr_label
+        [[ "$label" == PASSED ]] && hdr_label="Passed configs" || hdr_label="Failed configs"
+
+        # ── index.txt ─────────────────────────────────────────────────────────────
         {
-            printf 'Config archive — %s  |  %d entries  |  %s\n\n' "$label" "$count" "$date_str"
+            printf '%s archive — %d entries, %d rows — generated %s\n\n' \
+                "$hdr_label" "$entry_count" "$total_rows" "$date_str"
             if [[ "$label" == FAILED ]]; then
-                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-26s  SHA256\n" CONFIG ARCH VERSION "FAILURE REASON"
-                printf '%s\n' "$sep"
-                if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r _kl _dl sha; do
-                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-26s  %s\n" "$c" "$a" "$v" "$r" "$sha"
-                    done <<< "$sorted_rows"
-                fi
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-9s  %-19s  %-52s  %s\n" \
+                    CONFIG ARCH VERSION "FAILURE REASON" RUNS LINE TIMESTAMP "REPORT DIR" SHA256
             else
-                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  SHA256\n" CONFIG ARCH VERSION
-                printf '%s\n' "$sep"
-                if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r _kl _dl sha; do
-                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %s\n" "$c" "$a" "$v" "$sha"
-                    done <<< "$sorted_rows"
-                fi
+                printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-9s  %-19s  %-52s  %s\n" \
+                    CONFIG ARCH VERSION RUNS LINE TIMESTAMP "REPORT DIR" SHA256
+            fi
+            local seplen=$(( w_c + w_a + w_v + 4 + 9 + 19 + 52 + 64 + 18 ))
+            [[ "$label" == FAILED ]] && seplen=$(( seplen + w_r + 2 ))
+            printf '─%.0s' $(seq 1 "$seplen"); printf '\n'
+
+            if [[ -n "$sorted_rows" ]]; then
+                local tc ta tv tr tsha trc tkf trd trd_abs badge rd_trunc line timestamp
+                while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
+                    [[ -z "$tc" ]] && continue
+                    badge=""
+                    if [[ "$label" == PASSED && -n "${failed_shas[$tsha]+set}" ]]; then
+                        badge=" [✗ also failed]"
+                    elif [[ "$label" == FAILED && -n "${passed_shas[$tsha]+set}" ]]; then
+                        badge=" [✓ also passed]"
+                    fi
+                    line=""
+                    timestamp=""
+                    if [[ -n "$trd" ]]; then
+                        if [[ "$trd" == stable-rc-* ]]; then
+                            line="stable-rc"
+                        elif [[ "$trd" == stable-* ]]; then
+                            line="stable"
+                        elif [[ "$trd" == mainline-* ]]; then
+                            line="mainline"
+                        fi
+                        timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
+                            <<< "$trd" || true)
+                    fi
+                    rd_trunc="${trd:0:52}"
+                    if [[ "$label" == FAILED ]]; then
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
+                            "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
+                    else
+                        printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
+                            "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
+                    fi
+                done <<< "$sorted_rows"
             fi
         } > "$dir/index.txt"
 
-        # HTML index (with links to kconfig and dmesg, sha256 in last column)
-        local hclass kl dl sha files_cell
-        if [[ "$label" == PASSED ]]; then hclass=pass; else hclass=fail; fi
+        # ── index.html ────────────────────────────────────────────────────────────
+        unset seen_shas; declare -A seen_shas=()
+        local hclass
+        [[ "$label" == PASSED ]] && hclass=pass || hclass=fail
         {
             printf '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="utf-8">\n'
             printf '<title>Config archive \xe2\x80\x94 %s</title>\n' "$label"
@@ -386,36 +454,80 @@ generate_index() {
             printf 'th{background:#f0f0f0}\n'
             printf '.pass{color:#080}.fail{color:#c00}\n'
             printf '.sha{font-size:0.85em;color:#666}\n'
+            printf '.badge-pass{color:#080;font-weight:bold}\n'
+            printf '.badge-fail{color:#c00;font-weight:bold}\n'
             printf 'a{color:inherit}\n'
             printf '</style></head>\n<body>\n'
             printf '<h1>Config archive &mdash; <span class="%s">%s</span>' "$hclass" "$label"
-            printf ' &nbsp;|&nbsp; %d entries &nbsp;|&nbsp; %s</h1>\n' "$count" "$date_str"
+            printf ' &nbsp;|&nbsp; %d entries, %d rows &nbsp;|&nbsp; generated %s</h1>\n' \
+                "$entry_count" "$total_rows" "$date_str"
             printf '<table>\n'
             if [[ "$label" == FAILED ]]; then
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Files</th><th>SHA256</th></tr>\n'
-                if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v r kl dl sha; do
-                        files_cell="<a href=\"./${kl}\">config</a>"
-                        [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
-                        printf '<tr><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
-                            "$c" "$a" "$v" "$r" "$files_cell" "$sha"
-                    done <<< "$sorted_rows"
-                fi
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Failure reason</th><th>Runs</th><th>Line</th><th>Timestamp</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
             else
-                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Files</th><th>SHA256</th></tr>\n'
-                if [[ -n "$sorted_rows" ]]; then
-                    while IFS='|' read -r c a v _r kl dl sha; do
-                        files_cell="<a href=\"./${kl}\">config</a>"
-                        [[ -n "$dl" ]] && files_cell+=" &nbsp;<a href=\"${dl}\">dmesg</a>"
-                        printf '<tr><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
-                            "$c" "$a" "$v" "$files_cell" "$sha"
-                    done <<< "$sorted_rows"
-                fi
+                printf '<tr><th>Config</th><th>Arch</th><th>Version</th><th>Runs</th><th>Line</th><th>Timestamp</th><th>Report dir</th><th>Cross-result</th><th>Files</th><th>SHA256</th></tr>\n'
+            fi
+            if [[ -n "$sorted_rows" ]]; then
+                local tc ta tv tr tsha trc tkf trd trd_abs tr_id rd_cell rd_link rd_root_inner badge_cell files_cell line timestamp
+                while IFS='|' read -r tc ta tv tr tsha trc tkf trd trd_abs; do
+                    [[ -z "$tc" ]] && continue
+                    # Anchor on first row per SHA
+                    tr_id=""
+                    if [[ -z "${seen_shas[$tsha]+set}" ]]; then
+                        tr_id=" id=\"${tsha}\""
+                        seen_shas[$tsha]=1
+                    fi
+                    # Report dir cell — relative link depends on which clone the report lives in
+                    rd_cell=""
+                    rd_link=""
+                    line=""
+                    timestamp=""
+                    if [[ -n "$trd_abs" ]]; then
+                        rd_root_inner="$(dirname "$(dirname "$trd_abs")")"
+                        if [[ "$rd_root_inner" == "$REPO_ROOT" ]]; then
+                            rd_link="../../reports/${trd}"
+                        else
+                            rd_link="../../../$(basename "$rd_root_inner")/reports/${trd}"
+                        fi
+                        rd_cell="<a href=\"${rd_link}/\">${trd}</a>"
+                        if [[ "$trd" == stable-rc-* ]]; then
+                            line="stable-rc"
+                        elif [[ "$trd" == stable-* ]]; then
+                            line="stable"
+                        elif [[ "$trd" == mainline-* ]]; then
+                            line="mainline"
+                        fi
+                        timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
+                            <<< "$trd" || true)
+                    fi
+                    # Cross-result badge
+                    badge_cell=""
+                    if [[ "$label" == PASSED && -n "${failed_shas[$tsha]+set}" ]]; then
+                        badge_cell="<a href=\"../archive_failed/index.html#${tsha}\"><span class=\"badge-fail\">&#10007;&nbsp;also&nbsp;failed</span></a>"
+                    elif [[ "$label" == FAILED && -n "${passed_shas[$tsha]+set}" ]]; then
+                        badge_cell="<a href=\"../archive_passed/index.html#${tsha}\"><span class=\"badge-pass\">&#10003;&nbsp;also&nbsp;passed</span></a>"
+                    fi
+                    # Files: config always; build.log + dmesg when present in any clone
+                    files_cell="<a href=\"./${tkf}\">config</a>"
+                    if [[ -n "$trd_abs" ]]; then
+                        [[ -f "${trd_abs}/build-${tc}-${ta}.log" ]] && \
+                            files_cell+=" &nbsp;<a href=\"${rd_link}/build-${tc}-${ta}.log\">build.log</a>"
+                        [[ -f "${trd_abs}/dmesg-${tc}-${ta}.txt" ]] && \
+                            files_cell+=" &nbsp;<a href=\"${rd_link}/dmesg-${tc}-${ta}.txt\">dmesg</a>"
+                    fi
+                    if [[ "$label" == FAILED ]]; then
+                        printf '<tr%s><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$tr_id" "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
+                    else
+                        printf '<tr%s><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$tr_id" "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
+                    fi
+                done <<< "$sorted_rows"
             fi
             printf '</table>\n</body>\n</html>\n'
         } > "$dir/index.html"
 
-        info "index: $label → $count entries → $(basename "$dir")/index.{txt,html}"
+        info "index: $label → $entry_count entries, $total_rows rows → $(basename "$dir")/index.{txt,html}"
     done
 }
 
