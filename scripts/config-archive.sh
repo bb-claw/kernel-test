@@ -423,6 +423,8 @@ generate_index() {
                             line="stable"
                         elif [[ "$trd" == mainline-* ]]; then
                             line="mainline"
+                        elif [[ "$trd" == next-* ]]; then
+                            line="next"
                         fi
                         timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
                             <<< "$trd" || true)
@@ -496,6 +498,8 @@ generate_index() {
                             line="stable"
                         elif [[ "$trd" == mainline-* ]]; then
                             line="mainline"
+                        elif [[ "$trd" == next-* ]]; then
+                            line="next"
                         fi
                         timestamp=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}' \
                             <<< "$trd" || true)
