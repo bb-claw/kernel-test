@@ -377,7 +377,84 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
   - SHA changed: `edfe557442df5e93...` → `60276c6208800aca...` (olddefconfig auto-added REGMAP_MMIO=y)
   - Build: PASS, Boot: PASS, Tests: 26/26 — v7.2-rc2 arm64
 
-  **Next step:** submit as a kernel patch to `linux-gpio@vger.kernel.org` / pinctrl maintainer.
+  **Patch — not yet submitted to mailing list (2026-07-18)**
+
+  Subsystem: PIN CONTROL (`drivers/pinctrl/`). Introduced by commit
+  `68c873363a78` ("pinctrl: microchip-sgpio: add ability to be used in a
+  non-mmio configuration"), present since 2022, affects all stable branches.
+
+  Recipients:
+  ```
+  To:  Linus Walleij <linusw@kernel.org>
+  Cc:  Steen.Hegelund@microchip.com
+  Cc:  daniel.machon@microchip.com
+  Cc:  UNGLinuxDriver@microchip.com
+  Cc:  linux-gpio@vger.kernel.org
+  Cc:  linux-arm-kernel@lists.infradead.org
+  Cc:  linux-kernel@vger.kernel.org
+  Cc:  stable@vger.kernel.org
+  ```
+
+  Commit message:
+  ```
+  Subject: [PATCH] pinctrl: microchip-sgpio: add missing select REGMAP_MMIO
+
+  The driver includes <linux/mfd/ocelot.h>, which calls
+  ocelot_regmap_from_resource() -> devm_regmap_init_mmio(). Both the
+  function and struct regmap_config are guarded by #ifdef CONFIG_REGMAP
+  in <linux/regmap.h>. CONFIG_REGMAP is only auto-selected when something
+  selects CONFIG_REGMAP_MMIO.
+
+  Without 'select REGMAP_MMIO' in the Kconfig entry, a config that
+  enables PINCTRL_MICROCHIP_SGPIO without any other driver pulling in
+  REGMAP_MMIO fails to build:
+
+    include/linux/mfd/ocelot.h:19:51: warning: 'struct regmap_config'
+      declared inside parameter list will not be visible outside of
+      this definition or declaration
+    include/linux/mfd/ocelot.h:34:24: error: implicit declaration of
+      function 'devm_regmap_init_mmio'
+    drivers/pinctrl/pinctrl-microchip-sgpio.c:910:16: error: variable
+      'regmap_config' has initializer but incomplete type
+    drivers/pinctrl/pinctrl-microchip-sgpio.c:911:18: error: 'struct
+      regmap_config' has no member named 'reg_bits'
+
+  PINCTRL_OCELOT uses the same ocelot.h header and correctly has
+  'select REGMAP_MMIO'. Fix PINCTRL_MICROCHIP_SGPIO the same way.
+
+  Fixes: 68c873363a78 ("pinctrl: microchip-sgpio: add ability to be used in a non-mmio configuration")
+  Cc: stable@vger.kernel.org
+  Signed-off-by: Benjamin Boortz <benjamin.boortz@gmail.com>
+  ---
+   drivers/pinctrl/Kconfig | 1 +
+   1 file changed, 1 insertion(+)
+
+  diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+  --- a/drivers/pinctrl/Kconfig
+  +++ b/drivers/pinctrl/Kconfig
+  @@ -425,6 +425,7 @@ config PINCTRL_MICROCHIP_SGPIO
+   	select GENERIC_PINCONF
+   	select GENERIC_PINCTRL_GROUPS
+   	select GENERIC_PINMUX_FUNCTIONS
+  +	select REGMAP_MMIO
+   	help
+  ```
+
+  Send with:
+  ```sh
+  cd ~/git/linux
+  git add drivers/pinctrl/Kconfig && git commit
+  scripts/checkpatch.pl --strict $(git format-patch -1 --stdout)
+  git send-email --to='linusw@kernel.org' \
+    --cc='Steen.Hegelund@microchip.com' \
+    --cc='daniel.machon@microchip.com' \
+    --cc='UNGLinuxDriver@microchip.com' \
+    --cc='linux-gpio@vger.kernel.org' \
+    --cc='linux-arm-kernel@lists.infradead.org' \
+    --cc='linux-kernel@vger.kernel.org' \
+    --cc='stable@vger.kernel.org' \
+    $(git format-patch -1)
+  ```
 
 ---
 
