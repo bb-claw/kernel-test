@@ -45,8 +45,8 @@ CACHE_DIR := cache
 # Kernel version: version file written by fetch/checkout; fall back to git then kernel Makefile.
 KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
     || git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null \
-    || make -s -C "$(KERNEL_TREE)" kernelversion 2>/dev/null \
     || git -C "$(KERNEL_TREE)" rev-parse --short HEAD 2>/dev/null \
+    || make -s -C "$(KERNEL_TREE)" kernelversion 2>/dev/null \
     || echo unknown)
 
 # Configs that are built but not booted:
