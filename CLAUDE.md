@@ -15,6 +15,7 @@ The goal is systematic community verification of each -rc kernel.
 - **Userland:** Toybox static binary (prebuilt, downloaded by `make bootstrap`) packed into a cpio initramfs; arch mapping: `x86_64` → `toybox-x86_64`, `i386` → `toybox-i686`, `arm64` → `toybox-aarch64`; version pinned via `TOYBOX_VERSION` (default `0.8.9`)
 - **Build cache:** ccache (always enabled; cache dir is `cache/`, gitignored)
 - **Architectures:** `x86_64`, `i386`, and `arm64` (all three default); arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64` (installed by `make bootstrap`)
+- **Host tools:** `ccache`, `lzop` (kernel LZO compression), `bc`, `flex`, `bison`, `libelf`, `pahole` — all installed by `make bootstrap`
 - **Kernel configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `kunitrandconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`; plus `localconfig` (not in default `CONFIGS`)
   - Bootable (build + VM test): `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `rand500config`, `randdefconfig`, `localconfig`
   - Build-only (no VM boot): `allmodconfig` (boot impractical: sanitizers + built-in self-tests take 100+ s, modules not in initramfs), `randconfig` (unpredictable boot), `kunitrandconfig` (random KUnit module set; use `kunitconfig` for deterministic KUnit testing)
@@ -31,6 +32,7 @@ The goal is systematic community verification of each -rc kernel.
 | File | Role |
 |---|---|
 | `Makefile` | Main entry point; defines all targets and variables; calls lib scripts |
+| `lib/bootstrap.sh` | Install all build/test dependencies (distro-aware: pacman/apt/dnf/zypper); includes `lzop` for LZO kernel compression; downloads Toybox static binaries; activates git hooks |
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/fetch-stable-rc.sh` | Fetch stable-rc branch tip (`STABLE_RC_BRANCH`), reset HEAD, read version from kernel Makefile, write `build/.kernel-version`; used by `make fetch-stable-rc` |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |

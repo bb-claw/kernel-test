@@ -34,7 +34,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | `make all` always runs `report` | Even on build/test failure there is always an artifact |
 | Config fragment via `cat >> .config + olddefconfig` | Reliable for all targets; `KCONFIG_ALLCONFIG` is overridden by `tinyconfig` internally |
 | `BUILD_TIMEOUT` wraps only bzImage step | Prevents runaway builds; exit 124 = TIMEOUT |
-| Sanitizers + non-gzip compressors excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base; lzop/lz4/zstd etc. may not be installed → exit 127; excluding prevents false failures |
+| Sanitizers + non-gzip compressors excluded from randconfig constraints | KCOV/KASAN crash on tinyconfig base; lz4/zstd etc. may not be installed → exit 127; excluding prevents false failures; `lzop` is now installed by `make bootstrap` so LZO is no longer excluded |
 | build.sh deletes vm.status at start | Failed builds never show stale test results from a prior run |
 | CONFIG_SHA256 recomputed post-build | syncconfig can modify .config during make bzImage; hash stored after build reflects actual file |
 | report.sh prefers kernel Makefile for version | git describe fails on untagged trees (stable-rc); read_kernel_makefile_version always authoritative |
