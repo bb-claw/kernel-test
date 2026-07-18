@@ -333,11 +333,53 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-18 — Kernel Bugs Found by Random-Config Testing
+
+### High — Build Failure
+
+- [ ] **PINCTRL_MICROCHIP_SGPIO missing `select REGMAP_MMIO` — build fails without regmap**
+  Kernel: v7.2-rc2 and v7.2-rc3. Arch: arm64 (affects all arches). Found by rand500config sampling.
+
+  `pinctrl-microchip-sgpio.c` includes `<linux/mfd/ocelot.h>` which calls
+  `ocelot_regmap_from_resource()` → `devm_regmap_init_mmio()`. Both the function and
+  `struct regmap_config` are guarded by `#ifdef CONFIG_REGMAP` in `<linux/regmap.h>`, and
+  `CONFIG_REGMAP` is only auto-selected when `CONFIG_REGMAP_MMIO` is selected. The Kconfig
+  entry for `PINCTRL_MICROCHIP_SGPIO` is missing `select REGMAP_MMIO`, so a random config
+  that enables the driver without independently enabling `REGMAP_MMIO` fails to build.
+
+  **Build errors:**
+  ```
+  include/linux/mfd/ocelot.h:34: error: implicit declaration of function 'devm_regmap_init_mmio'
+  drivers/pinctrl/pinctrl-microchip-sgpio.c:910: error: variable 'regmap_config' has initializer but incomplete type
+  drivers/pinctrl/pinctrl-microchip-sgpio.c:911: error: 'struct regmap_config' has no member named 'reg_bits'
+  ```
+
+  **Note:** `# CONFIG_REGMAP_BUILD is not set` in the trigger config is a red herring —
+  `REGMAP_BUILD` exists only for KUnit testing and has no bearing on the actual regmap library.
+  A config with both `PINCTRL_MICROCHIP_SGPIO=y` and `REGMAP_MMIO=y` (selected by something
+  else) builds successfully. The bug only triggers when `REGMAP_MMIO` is absent.
+
+  **Comparison:** `PINCTRL_OCELOT` uses the same `ocelot.h` header and correctly has
+  `select REGMAP_MMIO`. `PINCTRL_INGENIC`, `PINCTRL_K210`, `PINCTRL_K230` also correctly
+  `select REGMAP_MMIO`. `PINCTRL_MICROCHIP_SGPIO` is the only one missing it.
+
+  **Trigger config:** `configs/archive_failed/kconfig-rand500config-arm64-v7.2-rc2-edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a-BUILD_FAIL.config`
+
+  **Reproduce:** `make checkout TAG=v7.2-rc2 && make replay CONFIG_FILE=<above>`
+
+  **Suggested fix** — `drivers/pinctrl/Kconfig`:
+  ```diff
+   config PINCTRL_MICROCHIP_SGPIO
+  +	select REGMAP_MMIO
+  ```
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 0     |
+| Open   | 1     |
 | Resolved | 15  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
