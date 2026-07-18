@@ -32,6 +32,7 @@ When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STAB
 
 ```sh
 make fetch                                            # auto-dispatches: mainline/stable/stable-rc by preset
+make fetch-next                                       # linux-next only (kernel-test-next clone)
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
 make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
@@ -42,9 +43,13 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuil
 ```
 
 `make fetch` auto-dispatches based on preset variables:
+- `LINUX_NEXT=1` set → **error**: use `make fetch-next` (linux-next has no rc tags)
 - `STABLE_RC_BRANCH` set → `lib/fetch-stable-rc.sh` (branch fetch + reset)
 - `STABLE_RELEASE` set → `lib/fetch.sh` stable mode
 - neither → `lib/fetch.sh` mainline rc mode
+
+`make fetch-next` (`lib/fetch-next.sh`): fetches `origin/master` from `~/git/linux-next`;
+requires `LINUX_NEXT=1` (auto-set by `presets/kernel-test-next.mk`).
 
 `STABLE_RC_BRANCH` is set in `presets/kernel-test-stable-rc.mk`. Update it when
 the stable series bumps (e.g. 7.1.y → 7.2.y). See `docs/stable-rc-workflow.md`.
@@ -92,34 +97,26 @@ make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc
 make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
 ```
 
-Parses `config` and `arch` from the archive filename; warns if the embedded version
-differs from the current `KERNEL_VERSION`. Delegates to `make all NO_FETCH=1` with
-`SEED_CONFIG=<abs-path>` which causes `build.sh` to copy the archived config into
-`build/<config>-<arch>/.config` and run `olddefconfig` to resolve any kernel version drift,
+Parses `config` and `arch` from filename; copies archived `.config`, runs `olddefconfig`,
 then continues the normal pipeline (initramfs → test → report).
 
 ### Migrate old report directories
 
 ```sh
-bash scripts/migrate-reports.sh           # dry-run — shows old→new names
+bash scripts/migrate-reports.sh           # dry-run
 bash scripts/migrate-reports.sh --apply   # rename + update baseline symlink
 ```
 
 Old format: `YYYY-MM-DD_HH-MM-SS_vX.Y-rcN` → New: `mainline-7.2-YYYY-MM-DD_HH-MM-SS-v7.2-rcN`
-Label guessed from version: `-rcN` suffix → mainline; `vX.Y.Z` three-part → stable; else mainline.
 
 ### Capture and analyse host kernel dmesg
 
 ```sh
-make dmesg                        # label: mainline (default)
-make dmesg DMESG_LABEL=stable     # or: longterm / linux-next
-make all NO_FETCH=1 V=1 KERNEL_TREE=~/git/linux-stable  # verbose build output
-make info KERNEL_TREE=~/git/linux-stable                 # show checked-out version
+make dmesg                         # label: mainline (default)
+make dmesg DMESG_LABEL=stable      # or: longterm / linux-next
 ```
 
-Dmesg writes `dmesg/<name>.txt` and `dmesg/<name>-analysis.txt`; diffs warning/error
-lines vs previous capture for same label; exits 1 on VERDICT=ERRORS.
-Script: `lib/dmesg.sh`; valid labels: `mainline stable longterm linux-next`.
+`lib/dmesg.sh`; valid labels: `mainline stable longterm linux-next`.
 
 ---
 
@@ -133,11 +130,13 @@ Script: `lib/dmesg.sh`; valid labels: `mainline stable longterm linux-next`.
 
 ## Fetch Strategy
 
-Both modes: `git ls-remote` to discover tag (no objects), then `git fetch --depth=1 <tag>`.
+Tag-based modes: `git ls-remote` to discover tag (no objects), then `git fetch --depth=1 <tag>`.
 If tag already local, fetch is skipped entirely.
 
 - **Mainline rc:** latest `v*-rc*` tag from `KERNEL_TREE`
 - **Stable:** latest `vX.Y.*` (non-rc) from `STABLE_KERNEL_TREE`; remote URL verified to contain `/stable/` or `linux-stable`
+- **Stable-rc:** `git fetch origin <STABLE_RC_BRANCH>` + `git reset --hard FETCH_HEAD`; no tags
+- **linux-next:** `git fetch origin master` + `git reset --hard FETCH_HEAD`; no tags; use `make fetch-next`
 
 ---
 

@@ -22,7 +22,7 @@ if ! git -C "$KERNEL_TREE" diff --quiet 2>/dev/null; then
     warn "Kernel tree has uncommitted changes"
 fi
 
-GIT=( git -C "$KERNEL_TREE" -c http.lowSpeedLimit=0 -c http.lowSpeedTime=0 )
+setup_git_array
 
 if [[ -n ${STABLE_RELEASE:-} ]]; then
     # ── Stable release mode ───────────────────────────────────────────────────

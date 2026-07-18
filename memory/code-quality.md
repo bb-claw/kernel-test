@@ -45,6 +45,8 @@ Examples:
 - Functions: `lowercase_snake_case` · Constants: `UPPER_SNAKE_CASE`
 - Quote all expansions: `"$VAR"`, `"${VAR:-default}"`
 - No `[[ ]]` in test scripts — use `[ ]` (POSIX sh)
+- New fetch scripts must use the shared helpers from `lib/common.sh`:
+  `setup_git_array` → `reset_to_fetch_head` → `write_kernel_version` (in that order)
 
 ---
 

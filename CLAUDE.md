@@ -35,6 +35,7 @@ The goal is systematic community verification of each -rc kernel.
 | `lib/bootstrap.sh` | Install all build/test dependencies (distro-aware: pacman/apt/dnf/zypper); includes `lzop` for LZO kernel compression; downloads Toybox static binaries; activates git hooks |
 | `lib/fetch.sh` | `git fetch` + auto-checkout; mainline rc mode (default) or stable release mode (`STABLE_RELEASE=X.Y`) |
 | `lib/fetch-stable-rc.sh` | Fetch stable-rc branch tip (`STABLE_RC_BRANCH`), reset HEAD, read version from kernel Makefile, write `build/.kernel-version`; used by `make fetch-stable-rc` |
+| `lib/fetch-next.sh` | Fetch linux-next `origin/master`, reset HEAD, write `build/.kernel-version`; requires `LINUX_NEXT=1` (set by `presets/kernel-test-next.mk`); used by `make fetch-next` |
 | `lib/checkout.sh` | Fetch and checkout a specific tag or commit; verifies kernel Makefile version |
 | `lib/build.sh` | Kernel build with ccache; out-of-tree `O=build/<config>-<arch>/`; derives `CROSS_COMPILE` and `KERNEL_IMAGE_NAME` (bzImage or Image) from arch; prints kernel tag/commit/remote at start; stores `KERNEL_TREE=` in every `build.status` write; deletes `vm.status` at start of each build so a failed build never shows stale test results in the report; `localconfig` is x86_64-only; when `SEED_CONFIG` is set (by `make replay`), copies the archived `.config` and runs `olddefconfig` instead of the normal config-target step |
 | `lib/initramfs.sh` | Assemble Toybox cpio initramfs; inject test scripts; downloads prebuilt `toybox-{x86_64,i686,aarch64}` to `cache/` |
@@ -45,7 +46,7 @@ The goal is systematic community verification of each -rc kernel.
 | `scripts/config-archive.sh` | Scan all `reports/*/` and populate `configs/archive_passed/` + `configs/archive_failed/`; deduplicates by SHA256 (passed wins); names: `kconfig-<config>-<arch>-<version>-<sha256>.config` (passed) / `kconfig-<config>-<arch>-<version>-<sha256>-<STAGE-SYMPTOM>.config` (failed); run via `make config-archive` |
 | `configs/archive_passed/` | Committed config archive: one `.config` per unique SHA256 that ever produced a PASS result (build or boot+test) |
 | `configs/archive_failed/` | Committed config archive: one `.config` per unique SHA256 that only ever failed; filename encodes failure: `BUILD_FAIL`, `BUILD_TIMEOUT`, `BOOT_FAIL-kernel-panic`, `BOOT_FAIL-oops`, `BOOT_FAIL-timeout`, `BOOT_FAIL-no-test-done`, `TEST_FAIL-N-of-M`, `KUNIT_FAIL-N-of-M` |
-| `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version` |
+| `lib/common.sh` | Shared helpers: `log`/`info`/`warn`/`die`, `require_env`, `is_build_only`, `read_kernel_makefile_version`; fetch helpers: `setup_git_array`, `reset_to_fetch_head`, `write_kernel_version` |
 | `lib/dmesg.sh` | Capture host kernel dmesg (`make dmesg [DMESG_LABEL=mainline]`); analyse errors/firmware bugs/hardware subsystems (NVMe, Wi-Fi, AMD, NVIDIA/ideapad); diff warning/error lines vs previous capture for same label; writes `dmesg/<name>.txt` + `dmesg/<name>-analysis.txt`; exits 1 on VERDICT=ERRORS |
 | `tests/001_smoke.sh` | Minimal boot smoke: shell arithmetic, `/dev/null`, `/proc/version`, `/sys` |
 | `tests/custom/001_print-dmesg.sh` | Full dmesg dump to serial console — runs early so kernel messages appear before other tests; always passes |
@@ -92,7 +93,7 @@ The goal is systematic community verification of each -rc kernel.
 - Functions are lowercase_snake_case
 - Constants are UPPER_SNAKE_CASE; the Makefile exports them into the environment before invoking lib scripts
 - Makefile variables (`KERNEL_TREE`, `STABLE_KERNEL_TREE`, `STABLE_RELEASE`, `TAG`, `NO_FETCH`, `NO_BUILD`, `ARCHS`, `CONFIGS`, `TIMEOUT`, `BUILD_TIMEOUT`, `GCC`, `REPORT_DIR`, `V`, `TOYBOX_VERSION`, `CONFIG_FILE`, `SEED_CONFIG`) are the public API; `GCC` defaults to `gcc` — set `GCC=gcc-15` for stable kernels that predate GCC 16; `TOYBOX_VERSION` defaults to `0.8.9`; `NO_BUILD=1` skips the kernel build step and reuses existing `build/<config>-<arch>/` artifacts; `CONFIG_FILE=<path>` is the archive path passed to `make replay`; `SEED_CONFIG` is set automatically by `make replay` and inherited by `lib/build.sh` to bypass the normal config-target step
-- `presets/<dir>.mk` — committed preset auto-included by the Makefile based on `$(notdir $(CURDIR))`; `presets/kernel-test-stable.mk` sets `STABLE_RELEASE ?= 7.1`; `presets/kernel-test-stable-rc.mk` sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT`, `STABLE_RC_BRANCH`; mainline has no preset (uses Makefile defaults)
+- `presets/<dir>.mk` — committed preset auto-included by the Makefile based on `$(notdir $(CURDIR))`; `presets/kernel-test-stable.mk` sets `STABLE_RELEASE ?= 7.1`; `presets/kernel-test-stable-rc.mk` sets `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT`, `STABLE_RC_BRANCH`; `presets/kernel-test-next.mk` sets `KERNEL_TREE`, `LABEL`, `LINUX_NEXT := 1`; mainline has no preset (uses Makefile defaults)
 - `local.mk` — gitignored; included after the preset for machine-local overrides (e.g. different paths); do not commit
 - `STABLE_RC_BRANCH` — branch name used by `make fetch-stable-rc` (e.g. `linux-7.1.y`); set in `presets/kernel-test-stable-rc.mk`; update this when the stable series bumps (e.g. 7.1.y → 7.2.y); see `docs/stable-rc-workflow.md`
 - `BUILD_TIMEOUT` (default 1200 s) wraps only the `bzImage` build step via `timeout`; exit 124 → `STATUS=TIMEOUT` in `build.status`; defconfig/kunitconfig x86_64 takes ~10–12 min on a 16-core machine
@@ -204,14 +205,15 @@ The pre-commit hook enforces:
 | `kernel-test` | _(nothing)_ | `git ls-remote` → `fetch --depth=1 v*-rc*` tag |
 | `kernel-test-stable` | `STABLE_RELEASE=7.1` | `git ls-remote` → `fetch --depth=1 vX.Y.*` tag |
 | `kernel-test-stable-rc` | `STABLE_RC_BRANCH=linux-7.1.y` | `git fetch origin linux-7.1.y` + `git reset --hard FETCH_HEAD` |
+| `kernel-test-next` | `LINUX_NEXT=1`, `KERNEL_TREE=~/git/linux-next` | **error** — use `make fetch-next` instead |
 
-The same command works in all three clones — no flags needed:
+`kernel-test-next` uses `make fetch-next` (not `make fetch`) because linux-next has no rc tags:
 ```sh
-make fetch   # fetches the right thing for this clone
+make fetch-next   # git fetch origin master + git reset --hard FETCH_HEAD
 ```
 
-`make fetch-stable` and `make fetch-stable-rc` remain as explicit override targets for use
-outside the preset-managed clones (e.g. `make fetch-stable STABLE_RELEASE=7.1`).
+`make fetch-stable`, `make fetch-stable-rc`, and `make fetch-next` remain as explicit override
+targets for use outside the preset-managed clones.
 
 **Stable-rc note** — announcements like `v7.1.4-rc2` are **not git tags**; they are the tip
 of the rolling `linux-7.1.y` branch. `STABLE_RC_BRANCH` is set in
@@ -232,8 +234,9 @@ make all NO_FETCH=1
 ## Running locally
 
 ```sh
-# Same workflow in all three clones — preset handles the differences
-make fetch                                    # fetch the right kernel for this clone
+# Same workflow in all four clones — preset handles the differences
+make fetch                                    # fetch the right kernel for this clone (mainline/stable/stable-rc)
+make fetch-next                               # fetch linux-next master (kernel-test-next clone only)
 make smoke                                    # quick sanity: kunitconfig + tinyconfig, all archs
 make full                                     # broader: 5 bootable configs, all archs
 make all NO_FETCH=1                           # full pipeline: all 9 configs + archs
