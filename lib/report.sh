@@ -83,8 +83,10 @@ for config in $CONFIGS; do
             build_start=$(read_status  "$out/build.status" START_TIME)
             build_dur=$(read_status    "$out/build.status" DURATION)
             config_sha256=$(read_status "$out/build.status" CONFIG_SHA256)
+            config_corrected=$(read_status "$out/build.status" CONFIG_CORRECTED)
         else
             build_status='?'; build_start=''; build_dur=''; config_sha256=''
+            config_corrected=''
         fi
 
         if is_build_only "$config"; then
@@ -144,7 +146,7 @@ for config in $CONFIGS; do
         [[ $config_verify != MISMATCH ]] || OVERALL=FAIL
         CONFIG_ROWS+=("$config|$arch|${config_sha256:-unknown}|$config_file|$config_verify")
 
-        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason|${failed_tests:-}")
+        ROWS+=("$config|$arch|$build_status|$boot|$tests_pass|$tests_total|${kunit_pass:-0}|${kunit_fail:-0}|$started|$duration|$fail_reason|${failed_tests:-}|${config_corrected:-}")
     done
 done
 
@@ -208,7 +210,7 @@ TXT="$RUN_DIR/summary.txt"
         ------ ---- ----- ---- ----- ------- --- -----
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests corr <<< "$row"
         if [[ $tp == '-' ]]; then
             tests_col='—'
         else
@@ -222,6 +224,7 @@ TXT="$RUN_DIR/summary.txt"
         fi
         notes="${fr}"
         [[ -n $ftests ]] && notes="${notes:+$notes | }failed: ${ftests// /, }"
+        [[ ${corr:-} == 1 ]] && notes="${notes:+$notes | }cfg-fixed"
         printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
             "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$notes"
     done
@@ -294,7 +297,7 @@ overall_cls=$( [[ $OVERALL == PASS ]] && echo pass || echo fail )
 HTMLHEAD
 
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests corr <<< "$row"
 
         # shellcheck disable=SC2015  # echo always succeeds; A && echo x || echo y is safe
         bld_cls=$( [[ $bld == PASS ]] && echo pass || { [[ $bld == FAIL || $bld == TIMEOUT ]] && echo fail || echo unk; } )
@@ -324,6 +327,7 @@ HTMLHEAD
             [[ -n $notes_content ]] && notes_content="${notes_content} "
             notes_content="${notes_content}<span class=\"fail\">failed: ${ftests// /, }</span>"
         fi
+        [[ ${corr:-} == 1 ]] && notes_content="${notes_content:+$notes_content }cfg-fixed"
 
         if [[ $tp == '-' ]]; then
             tests_cell='<td>—</td>'
@@ -362,7 +366,7 @@ HTMLHEAD
     printf '</table>\n<h2 style="font-size:1em;margin-top:1.5em">All report files</h2>\n'
     printf '<table>\n<tr><th>Config</th><th>Arch</th><th>dmesg</th><th>build log</th><th>QEMU log</th><th>kconfig</th><th>Extras</th></tr>\n'
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests <<< "$row"
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests corr <<< "$row"
         _dmesg="dmesg-${cfg}-${arc}.txt"
         _blog="build-${cfg}-${arc}.log"
         _qlog="qemu-${cfg}-${arc}.log"

@@ -212,6 +212,48 @@ if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
     fi
 fi
 
+# Step 1c: verify bootability floor for all bootable configs.
+# configs/tinyconfig.config is the authoritative minimum: PRINTK, TTY + arch serial,
+# initramfs, BINFMT_ELF/SCRIPT, TMPFS.  olddefconfig can silently drop these when a
+# dependency chain changes between kernel versions.
+# Only flag options that exist in this arch's Kconfig (disabled = problem;
+# completely absent from .config = not supported by this arch, skip).
+BOOT_BASELINE="$SCRIPT_DIR/configs/tinyconfig.config"
+CONFIG_CORRECTED=0
+if ! is_build_only "$CONFIG" && [[ -f $BOOT_BASELINE ]]; then
+    missing=()
+    while IFS= read -r opt; do
+        key="${opt%%=*}"
+        if ! grep -q "^${key}=y" "$PWD/$OUT_DIR/.config"; then
+            grep -q "^# ${key} is not set" "$PWD/$OUT_DIR/.config" \
+                && missing+=("$opt") || true
+        fi
+    done < <(grep '^CONFIG_[A-Z0-9_]*=y' "$BOOT_BASELINE")
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        warn "Boot baseline options missing — auto-correcting: ${missing[*]}"
+        printf '# boot-baseline-correction: %s\n' "${missing[*]}" >> "$LOG_FILE"
+        printf '%s\n' "${missing[@]}" >> "$PWD/$OUT_DIR/.config"
+        if ! kmake olddefconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config correction failed (olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
+        fi
+        still_missing=()
+        for opt in "${missing[@]}"; do
+            key="${opt%%=*}"
+            grep -q "^${key}=y" "$PWD/$OUT_DIR/.config" || still_missing+=("$opt")
+        done
+        if [[ ${#still_missing[@]} -gt 0 ]]; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Boot baseline correction failed — still missing after olddefconfig: ${still_missing[*]} ($CONFIG / $ARCH)"
+        fi
+        CONFIG_CORRECTED=1
+        info "Boot baseline corrected: ${missing[*]}"
+    fi
+fi
+
 # Fingerprint the final .config — config is now fully resolved
 CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
 info "Config SHA256: $CONFIG_SHA256 — $CONFIG / $ARCH"
@@ -231,14 +273,17 @@ if [[ $BUILD_EXIT -ne 0 ]]; then
     if [[ $BUILD_EXIT -eq 124 ]]; then
         printf 'STATUS=TIMEOUT\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
+        [[ $CONFIG_CORRECTED -eq 1 ]] && printf 'CONFIG_CORRECTED=1\n' >> "$STATUS_FILE"
         die "Build timed out after ${BUILD_TIMEOUT}s: $CONFIG / $ARCH — see $LOG_FILE"
     fi
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
+    [[ $CONFIG_CORRECTED -eq 1 ]] && printf 'CONFIG_CORRECTED=1\n' >> "$STATUS_FILE"
     die "Build failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
 CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
 printf 'STATUS=PASS\nSTART_TIME=%s\nDURATION=%d\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
     "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$CONFIG_SHA256" "$KERNEL_TREE" > "$STATUS_FILE"
+[[ $CONFIG_CORRECTED -eq 1 ]] && printf 'CONFIG_CORRECTED=1\n' >> "$STATUS_FILE"
 info "Build OK: $CONFIG / $ARCH"
