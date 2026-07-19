@@ -268,6 +268,16 @@ info "Scanned $total_reports reports — $total_entries config entries ($total_p
 info "archive_passed: $written_pass added, $skipped_pass already present"
 info "archive_failed: $written_fail added, $skipped_fail already present"
 
+# Last non-empty line of a file, optionally limited to the final N lines.
+last_nonempty_line() {
+    local file="$1" n="${2:-}"
+    if [[ -n "$n" ]]; then
+        tail -"$n" "$file" | grep -v '^[[:space:]]*$' | tail -1 || true
+    else
+        grep -v '^[[:space:]]*$' "$file" | tail -1 || true
+    fi
+}
+
 # Extract a one-line failure detail from report-dir files (120-char max).
 # Returns empty string when files are absent or no relevant line is found.
 get_fail_detail() {
@@ -284,7 +294,7 @@ get_fail_detail() {
             ;;
         BUILD_TIMEOUT)
             if [[ -f "$build_log" ]]; then
-                detail=$(tail -20 "$build_log" | grep -v '^[[:space:]]*$' | tail -1 || true)
+                detail=$(last_nonempty_line "$build_log" 20)
                 [[ -n "$detail" ]] && detail="last: $detail"
             fi
             ;;
@@ -298,7 +308,7 @@ get_fail_detail() {
             ;;
         BOOT_FAIL-*)
             if [[ -f "$dmesg_txt" ]]; then
-                detail=$(grep -v '^[[:space:]]*$' "$dmesg_txt" | tail -1 || true)
+                detail=$(last_nonempty_line "$dmesg_txt")
                 [[ -n "$detail" ]] && detail="last: $detail"
             fi
             ;;
