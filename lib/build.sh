@@ -218,26 +218,32 @@ fi
 # dependency chain changes between kernel versions.
 # Only flag options that exist in this arch's Kconfig (disabled = problem;
 # completely absent from .config = not supported by this arch, skip).
+# Loop up to 3 passes: enabling a parent option (e.g. TTY) makes previously
+# absent child options (e.g. SERIAL_AMBA_PL011) visible as disabled on the next pass.
 BOOT_BASELINE="$SCRIPT_DIR/configs/tinyconfig.config"
 CONFIG_CORRECTED=0
 if ! is_build_only "$CONFIG" && [[ -f $BOOT_BASELINE ]]; then
-    missing=()
-    while IFS= read -r opt; do
-        key="${opt%%=*}"
-        if ! grep -q "^${key}=y" "$PWD/$OUT_DIR/.config"; then
-            grep -q "^# ${key} is not set" "$PWD/$OUT_DIR/.config" \
-                && missing+=("$opt") || true
-        fi
-    done < <(grep '^CONFIG_[A-Z0-9_]*=y' "$BOOT_BASELINE")
+    _correction_pass=0
+    while [[ $_correction_pass -lt 3 ]]; do
+        _correction_pass=$(( _correction_pass + 1 ))
+        missing=()
+        while IFS= read -r opt; do
+            key="${opt%%=*}"
+            if ! grep -q "^${key}=y" "$PWD/$OUT_DIR/.config"; then
+                grep -q "^# ${key} is not set" "$PWD/$OUT_DIR/.config" \
+                    && missing+=("$opt") || true
+            fi
+        done < <(grep '^CONFIG_[A-Z0-9_]*=y' "$BOOT_BASELINE")
 
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        warn "Boot baseline options missing — auto-correcting: ${missing[*]}"
-        printf '# boot-baseline-correction: %s\n' "${missing[*]}" >> "$LOG_FILE"
+        [[ ${#missing[@]} -eq 0 ]] && break
+
+        warn "Boot baseline options missing (pass ${_correction_pass}) — auto-correcting: ${missing[*]}"
+        printf '# boot-baseline-correction pass %d: %s\n' "$_correction_pass" "${missing[*]}" >> "$LOG_FILE"
         printf '%s\n' "${missing[@]}" >> "$PWD/$OUT_DIR/.config"
         if ! kmake olddefconfig; then
             printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
                 "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-            die "Config correction failed (olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
+            die "Config correction failed (olddefconfig pass ${_correction_pass}): $CONFIG / $ARCH — see $LOG_FILE"
         fi
         still_missing=()
         for opt in "${missing[@]}"; do
@@ -250,8 +256,8 @@ if ! is_build_only "$CONFIG" && [[ -f $BOOT_BASELINE ]]; then
             die "Boot baseline correction failed — still missing after olddefconfig: ${still_missing[*]} ($CONFIG / $ARCH)"
         fi
         CONFIG_CORRECTED=1
-        info "Boot baseline corrected: ${missing[*]}"
-    fi
+        info "Boot baseline corrected (pass ${_correction_pass}): ${missing[*]}"
+    done
 fi
 
 # Fingerprint the final .config — config is now fully resolved
