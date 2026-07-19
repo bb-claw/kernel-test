@@ -89,9 +89,8 @@ Diff output goes to terminal and `diff-prev.txt` / `diff-baseline.txt` in the re
 ```sh
 make config-archive   # scan all reports/, populate configs/archive_passed/ + configs/archive_failed/
 ```
-
 Prints `[config-archive] enriched N of M failed rows with detail` at the end.
-Failed index detail sources: BUILD_FAIL → first `error:` line from build log; BUILD_TIMEOUT → last build line (prefixed `last:`); BOOT_FAIL-kernel-panic → first `Kernel panic` line; BOOT_FAIL-oops → first `Oops`/`BUG:` line; BOOT_FAIL-timeout/no-test-done/unknown → last dmesg line (`last:`); TEST_FAIL → `FAILED_TESTS=` from vmstatus (`failed:`); KUNIT_FAIL → first `not ok` KTAP line. Detail truncated to 120 chars; silent when report dir absent.
+Failed index detail sources: BUILD_FAIL → first `error:` line from build log; BUILD_TIMEOUT → last build line (`last:`); BOOT_FAIL-kernel-panic → first `Kernel panic` line; BOOT_FAIL-oops → first `Oops`/`BUG:` line; BOOT_FAIL-timeout/* → last dmesg line (`last:`); TEST_FAIL → `FAILED_TESTS=` (`failed:`); KUNIT_FAIL → first `not ok` KTAP line. Truncated to 120 chars; silent when report dir absent.
 
 ### Replay an archived config
 
