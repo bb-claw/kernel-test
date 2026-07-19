@@ -105,7 +105,7 @@ timeout "$VM_TIMEOUT" "$QEMU" \
     -no-reboot \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS" \
-    -append "console=$CONSOLE panic=5 quiet" \
+    -append "console=$CONSOLE earlycon panic=5 quiet" \
     -serial "file:$DMESG_FILE" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?
