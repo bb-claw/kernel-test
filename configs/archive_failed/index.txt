@@ -1,4 +1,4 @@
-Failed configs archive — 17 entries, 25 rows — generated 2026-07-19T20:27:53Z
+Failed configs archive — 17 entries, 29 rows — generated 2026-07-19T21:31:52Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON          RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -40,7 +40,11 @@ rand500config    arm64   v7.2-rc3    BUILD_FAIL              1     mainline   20
 rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          165e686ead919a2e76aa6705da4b1f3a83b1fbb6a93147b44dbfb169a2ac315f
 rand500config    i386    v7.2-rc3    BOOT_FAIL-oops          1     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             9d19cfcad5a9acaee1eec7f0f5e576c6f9cb04f159932e52fdaa0d3dfe95e00a
     -> BUG: kernel NULL pointer dereference, address: 00000000
-rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       1     mainline   2026-07-19_09-39-24  mainline-7.2-2026-07-19_09-39-24-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
+rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       5     mainline   2026-07-19_09-39-24  mainline-7.2-2026-07-19_09-39-24-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
+rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       5     mainline   2026-07-19_22-33-33  mainline-7.2-2026-07-19_22-33-33-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
+rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       5     mainline   2026-07-19_22-40-44  mainline-7.2-2026-07-19_22-40-44-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
+rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       5     mainline   2026-07-19_22-40-50  mainline-7.2-2026-07-19_22-40-50-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
+rand500config    x86_64  v7.2-rc3    BOOT_FAIL-timeout       5     mainline   2026-07-19_22-43-02  mainline-7.2-2026-07-19_22-43-02-v7.2-rc3             adf02661f90ba926c9ed00b4c862ef2dc509e1b0647122500116bd85b6b97cd8
 tinyconfig       arm64   v7.2-rc3    BOOT_FAIL-no-console    1     mainline   2026-07-19_22-16-43  mainline-7.2-2026-07-19_22-16-43-v7.2-rc3             2193e47ea7ca8d272937fe9695c6c8b6e496686c7fe6989c54396c1d8c786d4b
     -> no console output
 tinyconfig       arm64   v7.2-rc3    BOOT_FAIL-timeout       1     mainline   2026-07-18_23-55-24  mainline-7.2-2026-07-18_23-55-24-v7.2-rc3             46a56cade2f4f4e7697999850e8b9072adb3cf5b275bbe2aa9b0d090f2135034
