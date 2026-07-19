@@ -268,6 +268,72 @@ info "Scanned $total_reports reports — $total_entries config entries ($total_p
 info "archive_passed: $written_pass added, $skipped_pass already present"
 info "archive_failed: $written_fail added, $skipped_fail already present"
 
+# Last non-empty line of a file, optionally limited to the final N lines.
+last_nonempty_line() {
+    local file="$1" n="${2:-}"
+    if [[ -n "$n" ]]; then
+        tail -"$n" "$file" | grep -v '^[[:space:]]*$' | tail -1 || true
+    else
+        grep -v '^[[:space:]]*$' "$file" | tail -1 || true
+    fi
+}
+
+# Extract a one-line failure detail from report-dir files (120-char max).
+# Returns empty string when files are absent or no relevant line is found.
+get_fail_detail() {
+    local reason="$1" rdir="$2" cfg="$3" arch="$4"
+    [[ -z "$rdir" ]] && return
+    local build_log="$rdir/build-${cfg}-${arch}.log"
+    local dmesg_txt="$rdir/dmesg-${cfg}-${arch}.txt"
+    local vmstatus="$rdir/vmstatus-${cfg}-${arch}.txt"
+    local detail=""
+    case "$reason" in
+        BUILD_FAIL)
+            [[ -f "$build_log" ]] && \
+                detail=$(grep -m1 ' error:' "$build_log" || true)
+            ;;
+        BUILD_TIMEOUT)
+            if [[ -f "$build_log" ]]; then
+                detail=$(last_nonempty_line "$build_log" 20)
+                [[ -n "$detail" ]] && detail="last: $detail"
+            fi
+            ;;
+        BOOT_FAIL-kernel-panic)
+            [[ -f "$dmesg_txt" ]] && \
+                detail=$(grep -m1 'Kernel panic' "$dmesg_txt" || true)
+            ;;
+        BOOT_FAIL-oops)
+            [[ -f "$dmesg_txt" ]] && \
+                detail=$(grep -m1 'Oops\|BUG:' "$dmesg_txt" || true)
+            ;;
+        BOOT_FAIL-*)
+            if [[ -f "$dmesg_txt" ]]; then
+                detail=$(last_nonempty_line "$dmesg_txt")
+                [[ -n "$detail" ]] && detail="last: $detail"
+            fi
+            ;;
+        TEST_FAIL-*)
+            if [[ -f "$vmstatus" ]]; then
+                detail=$(grep '^FAILED_TESTS=' "$vmstatus" | cut -d= -f2- || true)
+                [[ -n "$detail" ]] && detail="failed: $detail"
+            fi
+            ;;
+        KUNIT_FAIL-*)
+            [[ -f "$dmesg_txt" ]] && \
+                detail=$(grep -m1 '^not ok' "$dmesg_txt" | sed 's/^not ok [0-9]* //' || true)
+            ;;
+    esac
+    [[ ${#detail} -gt 120 ]] && detail="${detail:0:117}..."
+    printf '%s' "$detail"
+}
+
+# Escape a string for use in an HTML attribute value.
+html_attr_escape() {
+    local s="$1"
+    s="${s//&/&amp;}"; s="${s//</&lt;}"; s="${s//>/&gt;}"; s="${s//\"/&quot;}"
+    printf '%s' "$s"
+}
+
 # Generate index.txt and index.html inside each archive directory.
 # Reads from the on-disk archive, so the index reflects entries from all clones.
 # One row per (archive entry × report run): diff-friendly, self-contained rows.
@@ -372,6 +438,7 @@ generate_index() {
         total_rows=${#all_rows[@]}
         [[ $total_rows -gt 0 ]] && \
             sorted_rows=$(printf '%s\n' "${all_rows[@]}" | sort -t'|' -k1,1 -k2,2 -k3,3)
+        local enriched_count=0 total_fail_rows=0
 
         # Dynamic column widths (minimums cover typical short names)
         local w_c=9 w_a=6 w_v=9 w_r=14
@@ -433,6 +500,15 @@ generate_index() {
                     if [[ "$label" == FAILED ]]; then
                         printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-${w_r}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
                             "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
+                        total_fail_rows=$(( total_fail_rows + 1 ))
+                        if [[ -n "$trd_abs" ]]; then
+                            local detail
+                            detail=$(get_fail_detail "$tr" "$trd_abs" "$tc" "$ta")
+                            if [[ -n "$detail" ]]; then
+                                printf '    -> %s\n' "$detail"
+                                enriched_count=$(( enriched_count + 1 ))
+                            fi
+                        fi
                     else
                         printf "%-${w_c}s  %-${w_a}s  %-${w_v}s  %-4s  %-9s  %-19s  %-52s%s  %s\n" \
                             "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_trunc" "$badge" "$tsha"
@@ -459,6 +535,7 @@ generate_index() {
             printf '.badge-pass{color:#080;font-weight:bold}\n'
             printf '.badge-fail{color:#c00;font-weight:bold}\n'
             printf 'a{color:inherit}\n'
+            printf 'td[title]{cursor:help}\n'
             printf '</style></head>\n<body>\n'
             printf '<h1>Config archive &mdash; <span class="%s">%s</span>' "$hclass" "$label"
             printf ' &nbsp;|&nbsp; %d entries, %d rows &nbsp;|&nbsp; generated %s</h1>\n' \
@@ -520,8 +597,17 @@ generate_index() {
                             files_cell+=" &nbsp;<a href=\"${rd_link}/dmesg-${tc}-${ta}.txt\">dmesg</a>"
                     fi
                     if [[ "$label" == FAILED ]]; then
-                        printf '<tr%s><td>%s</td><td>%s</td><td>%s</td><td class="fail">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
-                            "$tr_id" "$tc" "$ta" "$tv" "$tr" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
+                        local reason_td="<td class=\"fail\">$tr</td>"
+                        if [[ -n "$trd_abs" ]]; then
+                            local detail esc_detail
+                            detail=$(get_fail_detail "$tr" "$trd_abs" "$tc" "$ta")
+                            if [[ -n "$detail" ]]; then
+                                esc_detail=$(html_attr_escape "$detail")
+                                reason_td="<td class=\"fail\" title=\"${esc_detail}\">$tr</td>"
+                            fi
+                        fi
+                        printf '<tr%s><td>%s</td><td>%s</td><td>%s</td>%s<td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
+                            "$tr_id" "$tc" "$ta" "$tv" "$reason_td" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
                     else
                         printf '<tr%s><td>%s</td><td>%s</td><td class="pass">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="sha">%s</td></tr>\n' \
                             "$tr_id" "$tc" "$ta" "$tv" "$trc" "$line" "$timestamp" "$rd_cell" "$badge_cell" "$files_cell" "$tsha"
@@ -532,6 +618,8 @@ generate_index() {
         } > "$dir/index.html"
 
         info "index: $label → $entry_count entries, $total_rows rows → $(basename "$dir")/index.{txt,html}"
+        [[ "$label" == FAILED ]] && \
+            info "enriched $enriched_count of $total_fail_rows failed rows with detail"
     done
 }
 

@@ -1,27 +1,45 @@
-Failed configs archive — 15 entries, 23 rows — generated 2026-07-18T22:59:18Z
+Failed configs archive — 15 entries, 23 rows — generated 2026-07-19T05:05:13Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON          RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT           2     mainline   2026-07-12_09-12-39  mainline-7.2-2026-07-12_09-12-39-v7.2-rc2             b3140ed196c6675d314227472346d03457d81d3a383a8a8b9ee0ea66e7506992
+    -> last:   CC [M]  drivers/net/dsa/sja1105/sja1105_static_config.o
 allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT           2     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             b3140ed196c6675d314227472346d03457d81d3a383a8a8b9ee0ea66e7506992
+    -> last: make[2]: *** [Makefile:248: __sub-make] Terminated
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-kernel-panic  2     mainline   2026-07-12_19-38-48  mainline-7.2-2026-07-12_19-38-48-v7.2-rc2             9b3275300d7d9fab8e1ee37a5a66e19bded06828aceacdc7c9c705f1e5839f7f
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-kernel-panic  2     mainline   2026-07-12_19-44-12  mainline-7.2-2026-07-12_19-44-12-v7.2-rc2             9b3275300d7d9fab8e1ee37a5a66e19bded06828aceacdc7c9c705f1e5839f7f
+    -> [  153.804313][    C0] Kernel panic - not syncing: Fatal exception in interrupt
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout       1     mainline   2026-07-12_21-38-29  mainline-7.2-2026-07-12_21-38-29-v7.2-rc2             b92465d56b188eeecdb024039890c210fc19546746ae42ea36ed2a2a72065cfb
+    -> last: [   24.721946][    T1] cpufreq: Unable to obtain ARMCLK: -2
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout       1     mainline   2026-07-12_21-44-29  mainline-7.2-2026-07-12_21-44-29-v7.2-rc2             e5abfdcea6835ad8ef769f488fcf9beada0fa8965275827f18f5d3b8a4b95d32
+    -> last: [   25.247596][    T1] cpufreq: Unable to obtain ARMCLK: -2
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout       1     mainline   2026-07-12_20-41-21  mainline-7.2-2026-07-12_20-41-21-v7.2-rc2             f5294a0eadcaa11ec3561cde1dd8da90f69c948ea03235b5f491e2db2223a83f
+    -> last: [   24.830716][    T1] cpufreq: Unable to obtain ARMCLK: -2
 kunitrandconfig  i386    v7.1.3      KUNIT_FAIL-2-of-1749    1     stable     2026-07-16_21-43-16  stable-7.1-2026-07-16_21-43-16-v7.1.3                 35376dd938df26e368915a706ef26053aec3e6bee302d3825dc0a774007f46fa
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout       2     mainline   2026-07-16_21-58-25  mainline-7.2-2026-07-16_21-58-25-v7.2-rc3             7ba1db8064ee83c2fc16126d76be213a3718418b7dd02d30f468e2ee6e9e6255
+    -> last: [    7.315400] ext4_issue_zeroout_stub: lblk=10 pblk=100 len=1
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-timeout       2     mainline   2026-07-16_22-02-15  mainline-7.2-2026-07-16_22-02-15-v7.2-rc3             7ba1db8064ee83c2fc16126d76be213a3718418b7dd02d30f468e2ee6e9e6255
+    -> last: [    7.331570] ext4_issue_zeroout_stub: lblk=10 pblk=100 len=1
 rand500config    arm64   v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          523d10d2a2ea5822051c77c10a9fc07fbd13c585841c8b46de8cbf22c51d895f
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-12_16-17-27  mainline-7.2-2026-07-12_16-17-27-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-08-51  mainline-7.2-2026-07-18_19-08-51-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-22-06  mainline-7.2-2026-07-18_19-22-06-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-25-21  mainline-7.2-2026-07-18_19-25-21-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-30-08  mainline-7.2-2026-07-18_19-30-08-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL              6     mainline   2026-07-18_19-33-53  mainline-7.2-2026-07-18_19-33-53-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc3    BUILD_FAIL              1     next       2026-07-18_21-09-11  next-7.2-2026-07-18_21-09-11-v7.2-rc3                 53e198623077e919370cf15a40779ce389d98888df43fb5cfc7070c59b0a646c
+    -> /home/benni/git/linux-next/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_ini...
 rand500config    arm64   v7.2-rc3    BUILD_FAIL              1     mainline   2026-07-18_21-13-55  mainline-7.2-2026-07-18_21-13-55-v7.2-rc3             ad50220bf37b17e766d9deb36a54accb0075ecee52bb5f2f1eaab2703cdba50c
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    i386    v7.1.4-rc1  BOOT_FAIL-timeout       1     stable-rc  2026-07-17_01-21-17  stable-rc-7.1-2026-07-17_01-21-17-v7.1.4-rc1          165e686ead919a2e76aa6705da4b1f3a83b1fbb6a93147b44dbfb169a2ac315f
 rand500config    i386    v7.2-rc3    BOOT_FAIL-oops          1     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             9d19cfcad5a9acaee1eec7f0f5e576c6f9cb04f159932e52fdaa0d3dfe95e00a
+    -> BUG: kernel NULL pointer dereference, address: 00000000
 tinyconfig       arm64   v7.2-rc3    BOOT_FAIL-timeout       1     mainline   2026-07-18_23-55-24  mainline-7.2-2026-07-18_23-55-24-v7.2-rc3             46a56cade2f4f4e7697999850e8b9072adb3cf5b275bbe2aa9b0d090f2135034
 tinyconfig       arm64   v7.2-rc3    BUILD_FAIL              1     mainline   2026-07-18_23-51-22  mainline-7.2-2026-07-18_23-51-22-v7.2-rc3             5b67ead92304195446e02168a7d5e529592d8f8e7b4fb17563d208f0b533490c
+    -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
