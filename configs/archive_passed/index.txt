@@ -1,4 +1,4 @@
-Passed configs archive — 236 entries, 831 rows — generated 2026-07-19T21:43:38Z
+Passed configs archive — 236 entries, 833 rows — generated 2026-07-19T22:09:42Z
 
 CONFIG           ARCH    VERSION     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -59,12 +59,14 @@ defconfig        i386    v7.2-rc2    9     mainline   2026-07-12_22-08-56  mainl
 defconfig        i386    v7.2-rc2    9     mainline   2026-07-12_22-22-22  mainline-7.2-2026-07-12_22-22-22-v7.2-rc2             54349ad4614e69c469ceb5e6503e6193b4af2142219eb948cd2c774e03c60577
 defconfig        i386    v7.2-rc2    9     mainline   2026-07-12_22-26-33  mainline-7.2-2026-07-12_22-26-33-v7.2-rc2             54349ad4614e69c469ceb5e6503e6193b4af2142219eb948cd2c774e03c60577
 defconfig        i386    v7.2-rc2    9     mainline   2026-07-12_22-29-53  mainline-7.2-2026-07-12_22-29-53-v7.2-rc2             54349ad4614e69c469ceb5e6503e6193b4af2142219eb948cd2c774e03c60577
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-14_10-52-09  mainline-7.2-2026-07-14_10-52-09-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-15_05-31-47  mainline-7.2-2026-07-15_05-31-47-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-15_05-37-01  mainline-7.2-2026-07-15_05-37-01-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-16_23-19-58  mainline-7.2-2026-07-16_23-19-58-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
-defconfig        i386    v7.2-rc3    6     mainline   2026-07-19_22-48-52  mainline-7.2-2026-07-19_22-48-52-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-13_22-48-10  mainline-7.2-2026-07-13_22-48-10-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-14_10-52-09  mainline-7.2-2026-07-14_10-52-09-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-15_05-31-47  mainline-7.2-2026-07-15_05-31-47-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-15_05-37-01  mainline-7.2-2026-07-15_05-37-01-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-16_23-19-58  mainline-7.2-2026-07-16_23-19-58-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-19_22-48-52  mainline-7.2-2026-07-19_22-48-52-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-19_23-52-57  mainline-7.2-2026-07-19_23-52-57-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
+defconfig        i386    v7.2-rc3    8     mainline   2026-07-19_23-55-31  mainline-7.2-2026-07-19_23-55-31-v7.2-rc3             64836c800c0985eab94e7c8e897d0ed570383afc0dddfc5992571eb7c8ecff5f
 defconfig        x86_64  v7.1.3      5     stable     2026-07-15_06-31-18  stable-7.1-2026-07-15_06-31-18-v7.1.3                 06ad00978337bdb71e5960e930561e2a19d4c8bc0d659d306ded853731b8c4a6
 defconfig        x86_64  v7.1.3      5     stable     2026-07-15_09-45-49  stable-7.1-2026-07-15_09-45-49-v7.1.3                 06ad00978337bdb71e5960e930561e2a19d4c8bc0d659d306ded853731b8c4a6
 defconfig        x86_64  v7.1.3      5     stable     2026-07-15_10-00-44  stable-7.1-2026-07-15_10-00-44-v7.1.3                 06ad00978337bdb71e5960e930561e2a19d4c8bc0d659d306ded853731b8c4a6
