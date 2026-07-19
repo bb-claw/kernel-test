@@ -51,6 +51,8 @@ classify_reason_text() {
         echo "BOOT_FAIL-kernel-panic"
     elif grep -qi "oops" <<< "$text"; then
         echo "BOOT_FAIL-oops"
+    elif grep -qi "no console" <<< "$text"; then
+        echo "BOOT_FAIL-no-console"
     elif grep -qi "Timeout\|did not reach init" <<< "$text"; then
         echo "BOOT_FAIL-timeout"
     elif grep -qi "TEST_DONE\|Init started" <<< "$text"; then
@@ -305,6 +307,9 @@ get_fail_detail() {
         BOOT_FAIL-oops)
             [[ -f "$dmesg_txt" ]] && \
                 detail=$(grep -m1 'Oops\|BUG:' "$dmesg_txt" || true)
+            ;;
+        BOOT_FAIL-no-console)
+            detail="no console output"
             ;;
         BOOT_FAIL-*)
             if [[ -f "$dmesg_txt" ]]; then
