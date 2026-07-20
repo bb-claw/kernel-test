@@ -34,15 +34,15 @@ Confirmed on v7.2-rc4, arm64 cross-compile:
 ```sh
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- tinyconfig
 scripts/config --enable CONFIG_PINCTRL
+scripts/config --enable CONFIG_COMPILE_TEST
 scripts/config --enable CONFIG_PINCTRL_BM1880
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
     drivers/pinctrl/pinctrl-bm1880.o
 ```
 
-`COMPILE_TEST` is not required — `scripts/config --enable` forces the value
-regardless of the `depends on OF && (ARCH_BITMAIN || COMPILE_TEST)` guard,
-and `olddefconfig` preserves it.
+`CONFIG_COMPILE_TEST` is required to satisfy `depends on OF && (ARCH_BITMAIN || COMPILE_TEST)`;
+without it `olddefconfig` silently drops `CONFIG_PINCTRL_BM1880=y`.
 
 Expected output (build fails):
 
