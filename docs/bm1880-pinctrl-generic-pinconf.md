@@ -110,6 +110,17 @@ One-line change to `drivers/pinctrl/Kconfig`:
 
 ---
 
+## Affected trees
+
+Bug confirmed present (unfixed) in:
+- Linux v7.2-rc4 (commit `1590cf0329716306e948a8fc29f1d3ee87d3989f`)
+- linux-next (as of 2026-07-20)
+
+Fix verified working in both trees via `make replay` (rand500config arm64:
+BUILD_FAIL → PASS, 26/26 tests).
+
+---
+
 ## Upstream submission
 
 File: `drivers/pinctrl/Kconfig`
@@ -118,7 +129,7 @@ Cc: `linux-kernel@vger.kernel.org`, `linus.walleij@linaro.org`
 
 Suggested subject:
 ```
-pinctrl: bm1880: select GENERIC_PINCONF to fix build without it
+pinctrl: bm1880: add missing select GENERIC_PINCONF
 ```
 
 ---
