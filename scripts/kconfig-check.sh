@@ -179,6 +179,10 @@ verify_build() {
 
 # ── Pass 1: #ifdef CONFIG_X guards in subsystem headers ───────────────────────
 
+# Drivers inside "if SUBSYSTEM ... endif" blocks implicitly depend on the
+# subsystem symbol — skip it as a candidate to avoid mass false positives.
+SUBSYSTEM_CFG="CONFIG_$(config_sym "$SUBSYSTEM")"
+
 info "kconfig-check: subsystem=$SUBSYSTEM"
 info "              kernel=$KERNEL_TREE"
 info "              arch=$ARCH"
@@ -191,6 +195,8 @@ while IFS= read -r c; do
 done < <({ grep -rh -oP '(?<=#ifdef )CONFIG_[A-Z0-9_]+' "$HEADER_DIR"/*.h 2>/dev/null || true; } | sort -u)
 
 for cfg in "${HEADER_CFGS[@]+"${HEADER_CFGS[@]}"}"; do
+    # The subsystem gate symbol is implicit for all drivers in the subsystem.
+    [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
     FIELDS=()
     while IFS= read -r f; do
         FIELDS+=("$f")
@@ -239,6 +245,7 @@ for cfile in "$DRIVER_DIR"/*.c; do
     done < <({ grep -oP '(?<=IS_ENABLED\()CONFIG_[A-Z0-9_]+' "$cfile" 2>/dev/null || true; } | sort -u)
 
     for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
+        [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
         block_selects "$cfg" "$block" && continue
         evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
         emit_candidate "$cfile" "$sym" "$cfg" \
