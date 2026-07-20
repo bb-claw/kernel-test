@@ -36,7 +36,9 @@ kernel-test's rand500config arm64 sweep on v7.2-rc4.
    the candidate is a real build failure (not a false positive).
 4. Optional `ARCHS=<arch>` selects the build architecture for VERIFY=1.
 5. Optional `DRIVER=<stem>` restricts the scan to a single driver C file.
-6. Output is human-readable and grep-friendly.
+6. Optional `PASS2=1` enables the IS_ENABLED() pass (off by default; high
+   false-positive rate — IS_ENABLED is intentionally safe without select).
+7. Output is human-readable and grep-friendly.
 
 ---
 
@@ -76,10 +78,16 @@ Two patterns that indicate a driver uses a conditionally-compiled symbol:
 
 1. **`#ifdef CONFIG_X` in a subsystem header** — guards a struct field or function
    declaration. Drivers using that field/function need `select CONFIG_X`.
+   **Always active (Pass 1).** High signal.
 
 2. **`IS_ENABLED(CONFIG_X)` in a driver C file** — driver conditionally calls code
-   based on a symbol. If the driver never selects it, the call may be dead code or
-   may cause a build error depending on the guard in the called function.
+   based on a symbol. `IS_ENABLED` is intentionally safe without `select` (expands
+   to 0 when config is absent), so this pass has a high false-positive rate.
+   **Opt-in via `PASS2=1`.**
+
+The subsystem gate symbol (`CONFIG_<SUBSYSTEM>`, e.g. `CONFIG_PINCTRL`) is skipped
+in both passes. All drivers inside `if SUBSYSTEM … endif` blocks implicitly depend on
+it — flagging it would produce a false positive for every driver in the subsystem.
 
 ### Analysis algorithm
 
@@ -183,7 +191,8 @@ Default is `x86_64` when ARCHS is not specified.
   dropped. Same false-positive guard applies.
 - **IS_ENABLED false positives (Pass 2)**: `IS_ENABLED(CONFIG_MACH_X)` used for
   SoC detection at compile time is not a missing-select bug. VERIFY=1 will mark
-  these FALSE_POSITIVE (builds OK).
+  these FALSE_POSITIVE (builds OK). Pass 2 is disabled by default for this reason;
+  enable with `PASS2=1` when doing exploratory scanning.
 - **Scan scope**: only `drivers/<subsystem>/*.c` (top-level files). Subdirectories
   are not scanned.
 
@@ -192,14 +201,20 @@ Default is `x86_64` when ARCHS is not specified.
 ## Testing commands
 
 ```sh
+# Static analysis only (no build) — Pass 1 only
+make kconfig-check SUBSYSTEM=pinctrl
+
+# Static analysis including IS_ENABLED pass
+make kconfig-check SUBSYSTEM=pinctrl PASS2=1
+
 # Single driver, arm64, with verification
 make kconfig-check SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64 VERIFY=1
 
-# Full subsystem sweep, default arch (x86_64)
-make kconfig-check SUBSYSTEM=pinctrl VERIFY=1
+# Full subsystem sweep with verification, arm64
+make kconfig-check SUBSYSTEM=pinctrl ARCHS=arm64 VERIFY=1
 
-# Static analysis only (no build)
-make kconfig-check SUBSYSTEM=pinctrl
+# Full sweep including IS_ENABLED candidates
+make kconfig-check SUBSYSTEM=pinctrl ARCHS=arm64 VERIFY=1 PASS2=1
 
 # Standalone from kernel tree
 cd ~/git/linux

@@ -341,7 +341,7 @@ config-archive:
 # ── Kconfig static analysis ───────────────────────────────────────────────────
 
 # Scan a kernel subsystem for missing 'select' dependencies.
-# Usage: make kconfig-check SUBSYSTEM=pinctrl [VERIFY=1] [ARCHS=arm64]
+# Usage: make kconfig-check SUBSYSTEM=pinctrl [VERIFY=1] [ARCHS=arm64] [DRIVER=pinctrl-bm1880] [PASS2=1]
 kconfig-check:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-check SUBSYSTEM=<name>"; exit 1; }
 	$(Q)ARCH=$(firstword $(ARCHS)) scripts/kconfig-check.sh "$(SUBSYSTEM)"
