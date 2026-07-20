@@ -1,4 +1,4 @@
-# kconfig-check — Plan
+# kconfig-check — Design
 
 Branch: `feat/kconfig-check`
 Start date: 2026-07-20
@@ -32,9 +32,11 @@ kernel-test's rand500config arm64 sweep on v7.2-rc4.
 1. `make kconfig-check SUBSYSTEM=<name>` runs in seconds and reports candidate
    missing-select bugs for the named subsystem against KERNEL_TREE.
 2. Script is runnable standalone from KERNEL_TREE without kernel-test.
-3. Optional `VERIFY=1` flag triggers a build of each flagged config to confirm
+3. Optional `VERIFY=1` flag triggers a build of each flagged driver to confirm
    the candidate is a real build failure (not a false positive).
-4. Output is human-readable and grep-friendly.
+4. Optional `ARCHS=<arch>` selects the build architecture for VERIFY=1.
+5. Optional `DRIVER=<stem>` restricts the scan to a single driver C file.
+6. Output is human-readable and grep-friendly.
 
 ---
 
@@ -42,8 +44,7 @@ kernel-test's rand500config arm64 sweep on v7.2-rc4.
 
 Files/components changed:
 - `scripts/kconfig-check.sh` — new standalone analysis script
-- `Makefile` — new `kconfig-check` target passing KERNEL_TREE and SUBSYSTEM
-- `CLAUDE.md` — add `kconfig-check` to Key files table
+- `Makefile` — new `kconfig-check` target passing KERNEL_TREE, SUBSYSTEM, ARCH, DRIVER
 
 No changes to: `lib/`, `configs/`, `tests/`, existing make targets.
 
@@ -51,9 +52,9 @@ No changes to: `lib/`, `configs/`, `tests/`, existing make targets.
 
 ## Non-goals
 
-- Whole-tree scan (start with SUBSYSTEM= scoped; SUBSYSTEM=all can be added later)
+- Whole-tree scan (start with SUBSYSTEM= scoped; can be added later)
 - Automatic patch generation
-- Integration with config archive (that is approach 1 / feat/kconfig-build)
+- Integration with config archive (that is approach 2 / feat/kconfig-build)
 - Checking `depends on` consistency (only `select` gaps for now)
 
 ---
@@ -67,9 +68,7 @@ No changes to: `lib/`, `configs/`, `tests/`, existing make targets.
 - Drivers: `$KERNEL_TREE/drivers/pinctrl/`
 - Kconfig: `$KERNEL_TREE/drivers/pinctrl/Kconfig`
 
-No hardcoded table. Derived from standard kernel layout. Works for the majority
-of subsystems. Edge cases (e.g. `gpio` headers under `include/linux/gpio/` but
-drivers under `drivers/gpio/`) are handled naturally by the same convention.
+No hardcoded table. Derived from standard kernel layout.
 
 ### What to detect
 
@@ -88,6 +87,7 @@ Two patterns that indicate a driver uses a conditionally-compiled symbol:
 for each CONFIG_X guarding code in subsystem headers:
     extract the guarded symbol names (struct fields, function names)
     for each driver .c file in drivers/<subsystem>/:
+        if DRIVER= is set, skip files that don't match
         if driver uses any guarded symbol:
             find driver's config entry in Kconfig (config PINCTRL_<NAME>)
             if entry does not select CONFIG_X:
@@ -102,9 +102,13 @@ for each IS_ENABLED(CONFIG_X) in drivers/<subsystem>/*.c:
 
 A symbol may be selected transitively (another selected symbol selects it).
 Static analysis cannot resolve transitive selects without a full Kconfig solver.
-`VERIFY=1` eliminates false positives by building the flagged config.
-Without `VERIFY=1`, candidates are labelled "possible missing select — verify
-with VERIFY=1".
+`VERIFY=1` eliminates false positives by building the flagged driver object.
+
+A second class of false positive: a driver that is inside `if SYMBOL … endif`
+can never be enabled without SYMBOL=y, so a missing `select SYMBOL` is
+unreachable. The VERIFY=1 guard detects this: if the driver symbol is absent
+from `.config` after `olddefconfig`, the candidate is reported as FALSE_POSITIVE
+with the `depends on` line printed so the user can see why.
 
 ### Output format
 
@@ -112,64 +116,92 @@ with VERIFY=1".
 [CANDIDATE] drivers/pinctrl/pinctrl-bm1880.c
   Kconfig entry : config PINCTRL_BM1880
   Missing select: CONFIG_GENERIC_PINCONF
-  Evidence      : pinctrl-bm1880.c:1288: .is_generic = true
-                  (guarded by #ifdef CONFIG_GENERIC_PINCONF in pinconf.h)
+  Evidence      : pinctrl-bm1880.c:1288: .is_generic = true,
+  Note          : field guarded by #ifdef CONFIG_GENERIC_PINCONF in include/linux/pinctrl/
+
+  -> [VERIFIED — build fails without select]
+     log: build/kconfig-check-arm64/PINCTRL_BM1880/GENERIC_PINCONF/build.log
+     reproducer: build/kconfig-check-arm64/PINCTRL_BM1880/GENERIC_PINCONF/reproducer.sh
 ```
 
-One block per candidate. Machine-greppable: lines start with `[CANDIDATE]`,
-`[VERIFIED]`, or `[FALSE_POSITIVE]` when VERIFY=1 is used.
-
-### Standalone usage (from KERNEL_TREE)
-
-```sh
-cd ~/git/linux
-~/git/kernel-test/scripts/kconfig-check.sh pinctrl
-```
-
-Script auto-detects it is run from a kernel tree (checks for `Kconfig` at root).
+One block per candidate. Machine-greppable: result lines start with
+`-> [VERIFIED`, `-> [FALSE_POSITIVE`, or no result line when VERIFY=0.
 
 ### VERIFY=1 mode
 
-When `VERIFY=1`, for each candidate:
-- Build `tinyconfig` + enable the driver's config option + `olddefconfig`
-- Build the driver object: `make ARCH=x86_64 drivers/<subsystem>/<file>.o`
-- If build fails → `[VERIFIED]` real bug
-- If build passes → `[FALSE_POSITIVE]` (transitive select resolved it)
+For each candidate, `verify_build()`:
 
-Uses x86_64 by default for speed. Arm64 cross-compile only if driver is
-arm64-specific (`depends on ARM64` in Kconfig).
+1. Runs `make ARCH=<arch> tinyconfig` in a temp out-of-tree build dir.
+2. Enables, via `scripts/config`, only the symbols actually required:
+   - `CONFIG_OF` — if `depends on` mentions `OF`
+   - `CONFIG_COMPILE_TEST` — if `depends on` mentions `COMPILE_TEST`
+   - `CONFIG_<SUBSYSTEM>` — the subsystem gate (e.g. `CONFIG_PINCTRL`)
+   - `CONFIG_<DRIVER>` — the driver under test
+3. Runs `olddefconfig` to resolve the dependency graph.
+4. Checks `CONFIG_<DRIVER>=y` in the resulting `.config`. If absent, the driver
+   has an unsatisfied dependency that our enablers didn't cover — reported as
+   FALSE_POSITIVE with the `depends on` line from the Kconfig entry.
+5. Builds the driver object: `make ARCH=<arch> drivers/<subsystem>/<file>.o`
+6. If build fails → VERIFIED (real bug); if build passes → FALSE_POSITIVE
+   (transitive select already resolved it).
+
+Logs saved to `build/kconfig-check-<ARCH>/<SYM>/<CFG>/`:
+- `tinyconfig.log` — config setup output (check here if tinyconfig fails)
+- `olddefconfig.log` — dependency resolution output
+- `.config` — the exact config used for the build
+- `build.log` — compiler output (VERIFIED candidates only)
+- `reproducer.sh` — self-contained shell script to recreate the failure;
+  includes `set -x`, only the dep enables actually needed, and grep checks
+  to confirm the driver is =y and the missing dep is absent after olddefconfig
+
+**Kernel source tree must be clean** for out-of-tree VERIFY builds. If
+`tinyconfig` fails with "source tree is not clean", run:
+```sh
+make -C "$KERNEL_TREE" mrproper
+```
+
+### Architecture and cross-compile
+
+`ARCHS=arm64` (or any single arch from the standard ARCHS list) selects the
+build architecture. The Makefile passes `ARCH=$(firstword $(ARCHS))` to the
+script. CROSS_COMPILE is derived automatically:
+- `arm64` → `aarch64-linux-gnu-`
+- `x86_64`, `i386` → (empty)
+
+Default is `x86_64` when ARCHS is not specified.
 
 ---
 
-## Testing strategy
+## Known limitations
 
-- **Correctness** — run against pinctrl subsystem on v7.2-rc4; must flag
-  `PINCTRL_BM1880` / `CONFIG_GENERIC_PINCONF` as a candidate
-- **False positive rate** — compare candidates against known-good drivers that
-  already have correct selects; expect zero false positives for those
-- **VERIFY=1** — confirmed candidate must show build failure; known-good must
-  not flag
-- **Standalone** — run directly from `~/git/linux` without kernel-test
+- **Multi-line `depends on`**: if the continuation line holds `OF` or
+  `COMPILE_TEST` (e.g. `depends on \ \n    OF && ...`), it won't be detected by
+  the single-line grep. The false-positive guard catches it — the driver is
+  absent from `.config` and the `depends on` line is printed.
+- **Nested `if` blocks beyond the subsystem gate**: only the top-level subsystem
+  gate symbol is enabled. Drivers inside a nested `if ACPI` block would be
+  dropped. Same false-positive guard applies.
+- **IS_ENABLED false positives (Pass 2)**: `IS_ENABLED(CONFIG_MACH_X)` used for
+  SoC detection at compile time is not a missing-select bug. VERIFY=1 will mark
+  these FALSE_POSITIVE (builds OK).
+- **Scan scope**: only `drivers/<subsystem>/*.c` (top-level files). Subdirectories
+  are not scanned.
 
 ---
 
 ## Testing commands
 
 ```sh
-# 1. Static analysis — must flag BM1880
-make kconfig-check SUBSYSTEM=pinctrl
-# Expected: [CANDIDATE] PINCTRL_BM1880 missing CONFIG_GENERIC_PINCONF
+# Single driver, arm64, with verification
+make kconfig-check SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64 VERIFY=1
 
-# 2. Verify mode — must confirm as real build failure
+# Full subsystem sweep, default arch (x86_64)
 make kconfig-check SUBSYSTEM=pinctrl VERIFY=1
-# Expected: [VERIFIED] PINCTRL_BM1880 — build failed without CONFIG_GENERIC_PINCONF
 
-# 3. Standalone from kernel tree
+# Static analysis only (no build)
+make kconfig-check SUBSYSTEM=pinctrl
+
+# Standalone from kernel tree
 cd ~/git/linux
 ~/git/kernel-test/scripts/kconfig-check.sh pinctrl
-# Expected: same output as above
-
-# 4. Clean subsystem — expect no candidates (or only known false positives)
-make kconfig-check SUBSYSTEM=i2c
-# Expected: 0 candidates or all FALSE_POSITIVE after VERIFY=1
 ```
