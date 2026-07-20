@@ -40,6 +40,8 @@ DMESG_LABEL    ?= mainline
 LABEL          ?=
 CONFIG_FILE    ?=
 SEED_CONFIG    ?=
+SUBSYSTEM      ?=
+VERIFY         ?= 0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -75,6 +77,7 @@ export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
+export SUBSYSTEM VERIFY
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -87,7 +90,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -333,6 +336,14 @@ install:
 config-archive:
 	$(Q)scripts/config-archive.sh
 
+# ── Kconfig static analysis ───────────────────────────────────────────────────
+
+# Scan a kernel subsystem for missing 'select' dependencies.
+# Usage: make kconfig-check SUBSYSTEM=pinctrl [VERIFY=1]
+kconfig-check:
+	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-check SUBSYSTEM=<name>"; exit 1; }
+	$(Q)scripts/kconfig-check.sh "$(SUBSYSTEM)"
+
 # ── Replay archived config ────────────────────────────────────────────────────
 
 # Replay an archived config file through the full pipeline.
@@ -407,6 +418,7 @@ Targets:
   dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
+  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; VERIFY=1 confirms with a build)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -444,6 +456,8 @@ Variables (current values):
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
   CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay CONFIG_FILE=<archive-path>))
   SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))
+  SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check SUBSYSTEM=<name>))
+  VERIFY              = $(VERIFY)  (set to 1 to confirm kconfig-check candidates with an x86_64 object build)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
