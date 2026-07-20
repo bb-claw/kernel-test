@@ -51,7 +51,8 @@ kconfig_block() {
 
 # True if a Kconfig block body ($2) contains "select $1"
 block_selects() {
-    printf '%s\n' "$2" | grep -qP "^\s+select\s+$1(\s|$)"
+    local sym="${1#CONFIG_}"
+    printf '%s\n' "$2" | grep -qP "^\s+select\s+$sym(\s|$)"
 }
 
 # Print identifier names inside all #ifdef CFG blocks in subsystem headers
