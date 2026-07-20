@@ -105,7 +105,7 @@ timeout "$VM_TIMEOUT" "$QEMU" \
     -no-reboot \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS" \
-    -append "console=$CONSOLE panic=5 quiet" \
+    -append "console=$CONSOLE earlycon panic=5 quiet" \
     -serial "file:$DMESG_FILE" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?
@@ -174,6 +174,8 @@ else
         FAIL_REASON=$(grep -m1 "Kernel panic" "$DMESG_FILE" 2>/dev/null || echo "Kernel panic")
     elif [[ $OOPS -eq 1 ]]; then
         FAIL_REASON=$(grep -m1 "Oops:"        "$DMESG_FILE" 2>/dev/null || echo "Oops")
+    elif [[ $QEMU_EXIT -eq 0 && ! -s $DMESG_FILE ]]; then
+        FAIL_REASON="No console output (QEMU exit 0)"
     elif [[ $QEMU_EXIT -eq 124 ]]; then
         FAIL_REASON="Timeout after ${VM_TIMEOUT}s — kernel did not reach init"
     else
