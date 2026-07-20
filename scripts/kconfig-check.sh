@@ -13,6 +13,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 . "$SCRIPT_DIR/../lib/common.sh"
 
 SUBSYSTEM=${1:?usage: kconfig-check.sh <subsystem>}
@@ -82,9 +83,12 @@ emit_candidate() {
     [[ $VERIFY -eq 1 ]] && verify_build "$sym" "$cfile" || true
 }
 
-# Build the driver object on x86_64 to confirm the candidate is a real failure
+# Build the driver object on x86_64 to confirm the candidate is a real failure.
+# Logs saved to build/kconfig-check/<SYM>/ for inspection.
 verify_build() {
     local sym=$1 cfile=$2 result tmp
+    local logdir="$REPO_ROOT/build/kconfig-check/$sym"
+    mkdir -p "$logdir"
     tmp=$(mktemp -d)
     # shellcheck disable=SC2064
     trap "rm -rf $tmp" RETURN
@@ -99,12 +103,14 @@ verify_build() {
     }
     local obj
     obj="drivers/$SUBSYSTEM/$(basename "${cfile%.c}.o")"
-    if make -C "$KERNEL_TREE" O="$tmp" ARCH=x86_64 "$obj" >/dev/null 2>&1; then
+    if make -C "$KERNEL_TREE" O="$tmp" ARCH=x86_64 "$obj" >"$logdir/build.log" 2>&1; then
         result="FALSE_POSITIVE — builds OK (symbol may be selected transitively)"
     else
         result="VERIFIED — build fails without select"
+        grep 'error:' "$logdir/build.log" | head -3 | sed 's/^/    /'
     fi
-    printf '  -> [%s]\n\n' "$result"
+    printf '  -> [%s]\n'     "$result"
+    printf '     log: %s\n\n' "$logdir/build.log"
 }
 
 # ── Pass 1: #ifdef CONFIG_X guards in subsystem headers ───────────────────────
