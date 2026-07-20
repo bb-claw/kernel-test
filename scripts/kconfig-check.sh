@@ -18,6 +18,7 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 
 SUBSYSTEM=${1:?usage: kconfig-check.sh <subsystem>}
 VERIFY=${VERIFY:-0}
+PASS2=${PASS2:-0}
 KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
 DRIVER=${DRIVER:-}
@@ -187,6 +188,7 @@ info "kconfig-check: subsystem=$SUBSYSTEM"
 info "              kernel=$KERNEL_TREE"
 info "              arch=$ARCH"
 [[ -n "$DRIVER" ]] && info "              driver=$DRIVER"
+[[ $PASS2 -eq 1 ]] && info "              pass2=enabled"
 info "Pass 1 — #ifdef guards in include/linux/$SUBSYSTEM/"
 
 HEADER_CFGS=()
@@ -226,33 +228,37 @@ for cfg in "${HEADER_CFGS[@]+"${HEADER_CFGS[@]}"}"; do
     done
 done
 
-# ── Pass 2: IS_ENABLED(CONFIG_X) in driver C files ───────────────────────────
+# ── Pass 2: IS_ENABLED(CONFIG_X) in driver C files (opt-in) ──────────────────
 
-info "Pass 2 — IS_ENABLED() calls in drivers/$SUBSYSTEM/"
+if [[ $PASS2 -eq 1 ]]; then
+    info "Pass 2 — IS_ENABLED() calls in drivers/$SUBSYSTEM/"
 
-for cfile in "$DRIVER_DIR"/*.c; do
-    [[ -f "$cfile" ]] || continue
-    stem=$(basename "$cfile" .c)
-    [[ -n "$DRIVER" && "$stem" != "$DRIVER" ]] && continue
-    sym=$(config_sym "$stem")
-    kconfig_has "$sym" || continue
+    for cfile in "$DRIVER_DIR"/*.c; do
+        [[ -f "$cfile" ]] || continue
+        stem=$(basename "$cfile" .c)
+        [[ -n "$DRIVER" && "$stem" != "$DRIVER" ]] && continue
+        sym=$(config_sym "$stem")
+        kconfig_has "$sym" || continue
 
-    block=$(kconfig_block "$sym")
+        block=$(kconfig_block "$sym")
 
-    IE_CFGS=()
-    while IFS= read -r c; do
-        IE_CFGS+=("$c")
-    done < <({ grep -oP '(?<=IS_ENABLED\()CONFIG_[A-Z0-9_]+' "$cfile" 2>/dev/null || true; } | sort -u)
+        IE_CFGS=()
+        while IFS= read -r c; do
+            IE_CFGS+=("$c")
+        done < <({ grep -oP '(?<=IS_ENABLED\()CONFIG_[A-Z0-9_]+' "$cfile" 2>/dev/null || true; } | sort -u)
 
-    for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
-        [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
-        block_selects "$cfg" "$block" && continue
-        evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
-        emit_candidate "$cfile" "$sym" "$cfg" \
-            "$(basename "$cfile"):$evidence" \
-            "IS_ENABLED($cfg) without select in Kconfig"
+        for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
+            [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
+            block_selects "$cfg" "$block" && continue
+            evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
+            emit_candidate "$cfile" "$sym" "$cfg" \
+                "$(basename "$cfile"):$evidence" \
+                "IS_ENABLED($cfg) without select in Kconfig"
+        done
     done
-done
+else
+    info "Pass 2 — skipped (IS_ENABLED checks have high false-positive rate; enable with PASS2=1)"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
