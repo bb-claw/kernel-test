@@ -19,6 +19,7 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SUBSYSTEM=${1:?usage: kconfig-check.sh <subsystem>}
 VERIFY=${VERIFY:-0}
 PASS2=${PASS2:-0}
+SKIP_CFGS=${SKIP_CFGS:-}
 KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
 DRIVER=${DRIVER:-}
@@ -184,11 +185,27 @@ verify_build() {
 # subsystem symbol — skip it as a candidate to avoid mass false positives.
 SUBSYSTEM_CFG="CONFIG_$(config_sym "$SUBSYSTEM")"
 
+# Parse SKIP_CFGS comma-separated list into an array.
+SKIP_CFGS_ARRAY=()
+if [[ -n "$SKIP_CFGS" ]]; then
+    IFS=',' read -ra SKIP_CFGS_ARRAY <<< "$SKIP_CFGS"
+fi
+
+# True if cfg is in SKIP_CFGS_ARRAY.
+cfg_is_skipped() {
+    local c
+    for c in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+        [[ "$1" == "$c" ]] && return 0
+    done
+    return 1
+}
+
 info "kconfig-check: subsystem=$SUBSYSTEM"
 info "              kernel=$KERNEL_TREE"
 info "              arch=$ARCH"
-[[ -n "$DRIVER" ]] && info "              driver=$DRIVER"
-[[ $PASS2 -eq 1 ]] && info "              pass2=enabled"
+[[ -n "$DRIVER" ]]    && info "              driver=$DRIVER"
+[[ $PASS2 -eq 1 ]]    && info "              pass2=enabled"
+[[ -n "$SKIP_CFGS" ]] && info "              skip=$SKIP_CFGS"
 info "Pass 1 — #ifdef guards in include/linux/$SUBSYSTEM/"
 
 HEADER_CFGS=()
@@ -199,6 +216,7 @@ done < <({ grep -rh -oP '(?<=#ifdef )CONFIG_[A-Z0-9_]+' "$HEADER_DIR"/*.h 2>/dev
 for cfg in "${HEADER_CFGS[@]+"${HEADER_CFGS[@]}"}"; do
     # The subsystem gate symbol is implicit for all drivers in the subsystem.
     [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
+    cfg_is_skipped "$cfg" && continue
     FIELDS=()
     while IFS= read -r f; do
         FIELDS+=("$f")
@@ -249,6 +267,7 @@ if [[ $PASS2 -eq 1 ]]; then
 
         for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
             [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
+            cfg_is_skipped "$cfg" && continue
             block_selects "$cfg" "$block" && continue
             evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
             emit_candidate "$cfile" "$sym" "$cfg" \

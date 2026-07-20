@@ -44,6 +44,7 @@ SUBSYSTEM      ?=
 DRIVER         ?=
 VERIFY         ?= 0
 PASS2          ?= 0
+SKIP_CFGS      ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -79,7 +80,7 @@ export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
-export SUBSYSTEM DRIVER VERIFY PASS2
+export SUBSYSTEM DRIVER VERIFY PASS2 SKIP_CFGS
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -341,7 +342,7 @@ config-archive:
 # ── Kconfig static analysis ───────────────────────────────────────────────────
 
 # Scan a kernel subsystem for missing 'select' dependencies.
-# Usage: make kconfig-check SUBSYSTEM=pinctrl [VERIFY=1] [ARCHS=arm64] [DRIVER=pinctrl-bm1880] [PASS2=1]
+# Usage: make kconfig-check SUBSYSTEM=pinctrl [VERIFY=1] [ARCHS=arm64] [DRIVER=pinctrl-bm1880] [PASS2=1] [SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM]
 kconfig-check:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-check SUBSYSTEM=<name>"; exit 1; }
 	$(Q)ARCH=$(firstword $(ARCHS)) scripts/kconfig-check.sh "$(SUBSYSTEM)"
@@ -420,7 +421,7 @@ Targets:
   dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
-  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1)
+  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -462,6 +463,7 @@ Variables (current values):
   DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check to one driver: DRIVER=pinctrl-bm1880))
   VERIFY              = $(VERIFY)  (set to 1 to confirm kconfig-check candidates with an object build; arch from ARCHS)
   PASS2               = $(PASS2)  (set to 1 to enable IS_ENABLED() pass in kconfig-check; high false-positive rate)
+  SKIP_CFGS           = $(if $(SKIP_CFGS),$(SKIP_CFGS),(not set — skip specific configs: SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
