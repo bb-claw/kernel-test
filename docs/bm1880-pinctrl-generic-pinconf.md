@@ -123,14 +123,17 @@ BUILD_FAIL → PASS, 26/26 tests).
 
 ## Upstream submission
 
-File: `drivers/pinctrl/Kconfig`
-Mailing list: `linux-gpio@vger.kernel.org`
-Cc: `linux-kernel@vger.kernel.org`, `linus.walleij@linaro.org`
+Patch sent: 2026-07-20
 
-Suggested subject:
 ```
-pinctrl: bm1880: add missing select GENERIC_PINCONF
+To:  linux-gpio@vger.kernel.org
+Cc:  linusw@kernel.org, mani@kernel.org, linux-kernel@vger.kernel.org,
+     stable@vger.kernel.org
+Subject: [PATCH] pinctrl: bm1880: add missing select GENERIC_PINCONF
 ```
+
+Commit: `85c9e64c2c25` (in `~/git/linux-dev`)
+Status: sent, awaiting review
 
 ---
 
