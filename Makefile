@@ -43,6 +43,7 @@ SEED_CONFIG    ?=
 SUBSYSTEM      ?=
 DRIVER         ?=
 VERIFY         ?= 0
+DRY_RUN        ?= 0
 PASS2          ?= 0
 SKIP_CFGS      ?=
 GATE_CFGS      ?=
@@ -81,7 +82,7 @@ export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
-export SUBSYSTEM DRIVER VERIFY PASS2 SKIP_CFGS GATE_CFGS
+export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -94,7 +95,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -348,6 +349,13 @@ kconfig-check:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-check SUBSYSTEM=<name>"; exit 1; }
 	$(Q)ARCH=$(firstword $(ARCHS)) scripts/kconfig-check.sh "$(SUBSYSTEM)"
 
+# Exhaustive per-option build+boot sweep for a kernel subsystem.
+# Enumerates all config entries in drivers/<SUBSYSTEM>/Kconfig and builds+boots each.
+# Usage: make kconfig-build SUBSYSTEM=pinctrl [ARCHS=arm64] [DRY_RUN=1] [GATE_CFGS=CONFIG_X]
+kconfig-build:
+	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-build SUBSYSTEM=<name>"; exit 1; }
+	$(Q)lib/build-kconfig.sh
+
 # ── Replay archived config ────────────────────────────────────────────────────
 
 # Replay an archived config file through the full pipeline.
@@ -400,8 +408,8 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
-  hooks        Activate git hooks only (no package install)
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
+  hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
   fetch-stable     Explicit stable tag fetch  (requires STABLE_RELEASE=; useful outside preset-managed clones)
@@ -411,21 +419,22 @@ Targets:
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
-  info         Show current tag/commit checked out in KERNEL_TREE
-  build        Build kernels for all CONFIGS × ARCHS
-  initramfs    Assemble Toybox cpio initramfs for each arch
-  test         Boot each (config, arch) in QEMU/KVM and run tests
-  report       Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
-  diff         Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
-  baseline     Pin the latest report dir as the regression baseline; auto-diff will compare against it
-  install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
-  dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
-  config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
-  replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
-  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM GATE_CFGS=CONFIG_GPIOLIB)
-  clean        Remove build/ and cache/
-  distclean    Remove build/, cache/, and reports/
-  help         Show this message
+  info             Show current tag/commit checked out in KERNEL_TREE
+  build            Build kernels for all CONFIGS × ARCHS
+  initramfs        Assemble Toybox cpio initramfs for each arch
+  test             Boot each (config, arch) in QEMU/KVM and run tests
+  report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
+  diff             Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
+  baseline         Pin the latest report dir as the regression baseline; auto-diff will compare against it
+  install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
+  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
+  config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
+  replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
+  kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_X GATE_CFGS=CONFIG_X)
+  kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
+  clean            Remove build/ and cache/
+  distclean        Remove build/, cache/, and reports/
+  help             Show this message
 
 Config profiles (CONFIGS=):
   defconfig        Boot+test  Architecture default — broad baseline coverage
@@ -438,6 +447,7 @@ Config profiles (CONFIGS=):
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
   allmodconfig     Build only All options as modules — catches build-time regressions
   randconfig       Build only Fully random config — catches compile-time regressions; constrained to exclude non-gzip compressors (BUILD_TIMEOUT capped)
+  randkconfigconfig-<OPT>  Boot+test  Generated per-option by kconfig-build sweep; not in default CONFIGS; one per subsystem config entry
 
 Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)
@@ -460,12 +470,13 @@ Variables (current values):
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
   CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay CONFIG_FILE=<archive-path>))
   SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))
-  SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check SUBSYSTEM=<name>))
-  DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check to one driver: DRIVER=pinctrl-bm1880))
+  SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check/kconfig-build SUBSYSTEM=<name>))
+  DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check/kconfig-build to one driver: DRIVER=pinctrl-bm1880))
   VERIFY              = $(VERIFY)  (set to 1 to confirm kconfig-check candidates with an object build; arch from ARCHS)
+  DRY_RUN             = $(DRY_RUN)  (set to 1 to print kconfig-build option list without building)
   PASS2               = $(PASS2)  (set to 1 to enable IS_ENABLED() pass in kconfig-check; high false-positive rate)
   SKIP_CFGS           = $(if $(SKIP_CFGS),$(SKIP_CFGS),(not set — skip symbols as candidates: SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM))
-  GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — enable gate symbols in verify_build: GATE_CFGS=CONFIG_GPIOLIB))
+  GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — comma-separated extra symbols to enable for drivers inside nested if blocks))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -525,6 +536,16 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Re-test an archived config on the current kernel
   make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
   make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
+
+── Kconfig tools ───────────────────────────────────────────────────────────────
+
+  # Static analysis: find missing 'select' in a subsystem (object-build confirm)
+  make kconfig-check SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64 VERIFY=1
+
+  # Exhaustive build+boot sweep — dry run first, then single driver, then full
+  make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1
+  make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 KERNEL_TREE=~/git/linux-dev
+  make kconfig-build SUBSYSTEM=pinctrl ARCHS=arm64
 endef
 export HELP_TEXT
 

@@ -18,8 +18,10 @@
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — report dir prefix; auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline |
 | `STABLE_RC_BRANCH` | _(from preset)_ | Branch name for `make fetch-stable-rc`; set in `presets/kernel-test-stable-rc.mk` as `linux-7.1.y`; update when series bumps |
-| `presets/<dir>.mk` | _(auto)_ | Committed preset auto-selected by `$(notdir $(CURDIR))`; `kernel-test-stable.mk`=STABLE_RELEASE 7.1; `kernel-test-stable-rc.mk`=KERNEL_TREE+LABEL+GCC+BUILD_TIMEOUT+STABLE_RC_BRANCH; `kernel-test-next.mk`=KERNEL_TREE+LABEL+LINUX_NEXT:=1 |
-| `local.mk` | _(gitignored)_ | Machine-local overrides included after preset; never committed |
+| `SUBSYSTEM` | _(none)_ | `SUBSYSTEM=pinctrl` — required by `make kconfig-check/kconfig-build` |
+| `DRIVER` | _(none)_ | `DRIVER=pinctrl-bm1880` — restrict kconfig-check/kconfig-build to one driver (`.c` suffix ok) |
+| `DRY_RUN` | `0` | `DRY_RUN=1` — print kconfig-build option list without building |
+| `GATE_CFGS` | _(none)_ | `GATE_CFGS=CONFIG_X,CONFIG_Y` — enable extra gate symbols for drivers inside nested `if` blocks |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -53,9 +55,6 @@ requires `LINUX_NEXT=1` (auto-set by `presets/kernel-test-next.mk`).
 
 `STABLE_RC_BRANCH` is set in `presets/kernel-test-stable-rc.mk`. Update it when
 the stable series bumps (e.g. 7.1.y → 7.2.y). See `docs/stable-rc-workflow.md`.
-
-arm64 uses TCG (no KVM on x86 host); requires `aarch64-linux-gnu-gcc` + `qemu-system-aarch64`.
-Default `ARCHS` includes arm64; pass `ARCHS="x86_64 i386"` to skip it.
 
 ### KUnit randomised coverage (kunitrandconfig)
 
@@ -102,14 +101,14 @@ make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc
 Parses `config` and `arch` from filename; copies archived `.config`, runs `olddefconfig`,
 then continues the normal pipeline (initramfs → test → report).
 
-### Migrate old report directories
+### Kconfig subsystem sweep (kconfig-build)
 
 ```sh
-bash scripts/migrate-reports.sh           # dry-run
-bash scripts/migrate-reports.sh --apply   # rename + update baseline symlink
+make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1              # list options without building
+make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64  # single driver
+make kconfig-build SUBSYSTEM=pinctrl                         # all options × all archs
 ```
-
-Old format: `YYYY-MM-DD_HH-MM-SS_vX.Y-rcN` → New: `mainline-7.2-YYYY-MM-DD_HH-MM-SS-v7.2-rcN`
+Per option: tinyconfig + `configs/randkconfigconfig.config` + `CONFIG_<OPT>=y` → build + boot.
 
 ### Capture and analyse host kernel dmesg
 
