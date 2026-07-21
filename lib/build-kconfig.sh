@@ -20,6 +20,8 @@ require_env SUBSYSTEM KERNEL_TREE BUILD_DIR
 ARCHS_RAW=${ARCHS:-x86_64 i386 arm64}
 DRY_RUN=${DRY_RUN:-0}
 GATE_CFGS=${GATE_CFGS:-}
+DRIVER=${DRIVER:-}
+DRIVER=${DRIVER%.c}
 
 FRAGMENT="$REPO_ROOT/configs/randkconfigconfig.config"
 [[ -f "$FRAGMENT" ]] || die "bootability fragment not found: $FRAGMENT"
@@ -36,19 +38,31 @@ if [[ -n "$GATE_CFGS" ]]; then
     IFS=',' read -ra GATE_ARR <<< "$GATE_CFGS"
 fi
 
-# Enumerate all config symbols for this subsystem
-OPTS=()
+# Enumerate all config symbols for this subsystem; filter to DRIVER= if set
+ALL_OPTS=()
 while IFS= read -r opt; do
-    OPTS+=("$opt")
+    ALL_OPTS+=("$opt")
 done < <("$REPO_ROOT/scripts/kconfig-enumerate.sh" "$SUBSYSTEM")
 
-[[ ${#OPTS[@]} -gt 0 ]] || die "no config entries found in $KERNEL_TREE/drivers/$SUBSYSTEM/Kconfig"
+[[ ${#ALL_OPTS[@]} -gt 0 ]] || die "no config entries found in $KERNEL_TREE/drivers/$SUBSYSTEM/Kconfig"
+
+if [[ -n "$DRIVER" ]]; then
+    WANT="CONFIG_$(config_sym "$DRIVER")"
+    OPTS=()
+    for opt in "${ALL_OPTS[@]}"; do
+        [[ $opt == "$WANT" ]] && OPTS+=("$opt")
+    done
+    [[ ${#OPTS[@]} -gt 0 ]] || die "$WANT not found in $KERNEL_TREE/drivers/$SUBSYSTEM/Kconfig"
+else
+    OPTS=("${ALL_OPTS[@]}")
+fi
 
 TOTAL=$(( ${#OPTS[@]} * ${#ARCHS_ARR[@]} ))
 
 info "kconfig-build: subsystem=$SUBSYSTEM"
 info "              kernel=$KERNEL_TREE"
 info "              archs=${ARCHS_ARR[*]}"
+[[ -n "$DRIVER" ]] && info "              driver=$DRIVER"
 info "              options=${#OPTS[@]}"
 info "              total builds=$TOTAL"
 [[ -n "$GATE_CFGS" ]] && info "              gate=$GATE_CFGS"
