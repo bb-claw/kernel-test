@@ -458,11 +458,87 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-21 — v7.2-rc4 rand500config Boot Failures (10-run sweep)
+
+### High — Kernel Crash
+
+- [ ] **`CONFIG_RCU_SCALE_TEST=y` triggers NULL pointer dereference in `rcu_scale_writer` on i386**
+  Kernel: v7.2-rc4. Arch: i386. Found in 2 of 10 rand500config/i386 runs.
+
+  Both failing configs have `CONFIG_RCU_SCALE_TEST=y`. After the scale test completes
+  100 measurements the writer task crashes with a write fault (Oops code 0002) at
+  address 0x00000000 — a NULL pointer write:
+
+  ```
+  BUG: kernel NULL pointer dereference, address: 00000000
+  Oops: Oops: 0002 [#1]
+  CPU: 0 PID: 17 Comm: rcu_scale_write  7.2.0-rc4
+  EIP: rcu_scale_writer+0x497/0x4b0
+  note: rcu_scale_write[17] exited with irqs disabled
+  ```
+
+  The second oops config lacks `CONFIG_KALLSYMS` so EIP resolves to a raw address
+  (`0xc105fb2b`), but the sequence is identical: 100 measurements → NULL write → irqs
+  disabled on exit.
+
+  **Both configs differ significantly** (different CPU targets, different subsystems
+  enabled) — the only shared factor relevant to this crash is `CONFIG_RCU_SCALE_TEST=y`.
+
+  **Root cause:** Unknown. Likely a bug in `kernel/rcu/rcuscale.c` on i386 where
+  `rcu_scale_writer` writes through a pointer that is NULL after the first measurement
+  batch. Could be an i386-specific alignment or pointer arithmetic issue.
+
+  **Trigger configs:**
+  ```
+  configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-22799f...BOOT_FAIL-oops.config
+  configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-90748f...BOOT_FAIL-oops.config
+  ```
+
+  **Reproduce:**
+  ```sh
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-22799f1390815c3a0bc53894af09fecc99ae7a62245377f3f0938010604dc225-BOOT_FAIL-oops.config CONFIGS=rand500config ARCHS=i386
+  ```
+
+  **Next steps:**
+  - Replay to confirm consistent reproduction
+  - Check if `CONFIG_RCU_EXPERT=y` (present in run 1 config) is required to trigger
+  - Check `kernel/rcu/rcuscale.c` around `rcu_scale_writer` offset 0x497 on i386
+  - Consider adding `CONFIG_RCU_SCALE_TEST=n` to `configs/randconfig.config` (sibling
+    to the already-excluded `CONFIG_RCU_TORTURE_TEST`) to stop this appearing in future
+    sampling, pending upstream investigation
+
+  **Subsystem:** RCU (`kernel/rcu/`). Maintainer: Paul McKenney / Joel Fernandes.
+  Mailing list: `rcu@vger.kernel.org`, `linux-kernel@vger.kernel.org`.
+
+### Low — Boot Failure (single occurrence)
+
+- [ ] **arm64: init crashes with SIGSEGV (exitcode=0x0000000b) on one rand500config**
+  Kernel: v7.2-rc4. Arch: arm64. Found in 1 of 10 runs (config SHA: `d2d7a42d...`).
+
+  ```
+  Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+  ```
+
+  `exitcode=0x0000000b` = signal 11 (SIGSEGV). The toybox `/init` process crashed with
+  a segfault before any tests ran. No backtrace captured (CONFIG_KALLSYMS status unknown
+  for this config).
+
+  **Not yet reproducible:** Only one occurrence. Could be a missing kernel feature that
+  toybox requires (BPF, compat32, specific syscall) or a real kernel mm/exec bug.
+
+  **Next step:** Replay the archived config and inspect full dmesg for what init was doing
+  at the point of crash:
+  ```sh
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-rand500config-arm64-v7.2-rc4-d2d7a42d5a261ceb37b934aef3b2f4e98d3a033c0b9d0146ab64d5e5383902fe-BOOT_FAIL-kernel-panic.config CONFIGS=rand500config ARCHS=arm64
+  ```
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 0     |
+| Open   | 2     |
 | Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |

@@ -74,9 +74,9 @@ make ARCH=<arch> CROSS_COMPILE=<prefix> olddefconfig
 make ARCH=<arch> CROSS_COMPILE=<prefix> <driver-object>
 ```
 
-Use `scripts/config --enable` to force values regardless of `depends on` guards.
-`olddefconfig` preserves forced values while resolving dependencies.
-`COMPILE_TEST` is often not needed — test without it first.
+`olddefconfig` respects `depends on`: if a driver has `depends on ARCH_X || COMPILE_TEST`
+and neither is set, it silently drops the driver even if it was force-enabled.
+Enable `CONFIG_COMPILE_TEST` whenever the driver has such an arch guard.
 
 ---
 
