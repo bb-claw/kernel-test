@@ -24,6 +24,7 @@ case "$ARCH" in
         QEMU_MACHINE=q35
         KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
         CONSOLE=ttyS0
+        EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
         ;;
     i386)
@@ -31,6 +32,7 @@ case "$ARCH" in
         QEMU_MACHINE=pc
         KERNEL_IMAGE="$OUT_DIR/arch/x86/boot/bzImage"
         CONSOLE=ttyS0
+        EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
         ;;
     arm64)
@@ -38,6 +40,7 @@ case "$ARCH" in
         QEMU_MACHINE=virt
         KERNEL_IMAGE="$OUT_DIR/arch/arm64/boot/Image"
         CONSOLE=ttyAMA0
+        EARLYCON="earlycon"
         QEMU_CPU_FLAGS=(-cpu cortex-a57)
         ;;
     *)
@@ -105,7 +108,7 @@ timeout "$VM_TIMEOUT" "$QEMU" \
     -no-reboot \
     -kernel "$KERNEL_IMAGE" \
     -initrd "$INITRAMFS" \
-    -append "console=$CONSOLE earlycon panic=5 quiet" \
+    -append "console=$CONSOLE ${EARLYCON} panic=5 quiet" \
     -serial "file:$DMESG_FILE" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?
