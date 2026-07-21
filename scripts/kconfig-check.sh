@@ -18,9 +18,12 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 
 SUBSYSTEM=${1:?usage: kconfig-check.sh <subsystem>}
 VERIFY=${VERIFY:-0}
+PASS2=${PASS2:-0}
+SKIP_CFGS=${SKIP_CFGS:-}
+GATE_CFGS=${GATE_CFGS:-}
 KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
-DRIVER=${DRIVER:-}
+DRIVER=${DRIVER%.c}
 
 case "$ARCH" in
     arm64) CROSS_COMPILE=aarch64-linux-gnu- ;;
@@ -36,6 +39,19 @@ KCONFIG="$DRIVER_DIR/Kconfig"
 [[ -f "$KCONFIG"    ]] || die "not found: $KCONFIG"
 
 CANDIDATES=0
+
+# Per-sym build-dir cache: avoids re-running tinyconfig+olddefconfig for every
+# (sym, cfg) pair when a driver has multiple missing-select candidates.
+# Value is the prepared tmpdir path, or "" if setup failed for that sym.
+declare -A _BUILD_CACHE
+
+_cleanup_build_cache() {
+    local d
+    for d in "${_BUILD_CACHE[@]+"${_BUILD_CACHE[@]}"}"; do
+        [[ -n "$d" ]] && rm -rf "$d"
+    done
+}
+trap _cleanup_build_cache EXIT
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -92,60 +108,81 @@ emit_candidate() {
 }
 
 # Build the driver object to confirm the candidate is a real failure.
-# Logs saved to build/kconfig-check-<ARCH>/<SYM>/<CFG>/ for inspection.
+# tinyconfig+olddefconfig is run once per sym (driver) and cached; subsequent
+# candidates for the same driver reuse the prepared build dir.
+# Setup logs: build/kconfig-check-<ARCH>/<SYM>/{tinyconfig,olddefconfig}.log + .config
+# Per-candidate: build/kconfig-check-<ARCH>/<SYM>/<CFG>/build.log + reproducer.sh
 verify_build() {
-    local sym=$1 cfile=$2 cfg=$3 result tmp
-    local logdir="$REPO_ROOT/build/kconfig-check-$ARCH/$sym/${cfg#CONFIG_}"
-    mkdir -p "$logdir"
-    tmp=$(mktemp -d)
-    # shellcheck disable=SC2064
-    trap "rm -rf $tmp" RETURN
-
-    if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$ARCH" \
-            ${CROSS_COMPILE:+CROSS_COMPILE="$CROSS_COMPILE"} tinyconfig \
-            >"$logdir/tinyconfig.log" 2>&1; then
-        if grep -q "source tree is not clean" "$logdir/tinyconfig.log"; then
-            warn "  VERIFY: kernel source tree has in-tree build artifacts"
-            warn "          fix: make -C $KERNEL_TREE mrproper"
-        else
-            warn "  VERIFY: tinyconfig failed (see $logdir/tinyconfig.log)"
-        fi
-        return
-    fi
-    local block dep_flags=()
+    local sym=$1 cfile=$2 cfg=$3 result
+    local symdir="$REPO_ROOT/build/kconfig-check-$ARCH/$sym"
+    local cfgdir="$symdir/${cfg#CONFIG_}"
+    local block tmp
+    mkdir -p "$cfgdir"
     block=$(kconfig_block "$sym")
-    grep -qP '\bdepends on\b.*\bOF\b' <<< "$block"           && dep_flags+=(--enable CONFIG_OF)
-    grep -qP '\bCOMPILE_TEST\b'       <<< "$block"           && dep_flags+=(--enable CONFIG_COMPILE_TEST)
-    "$KERNEL_TREE/scripts/config" --file "$tmp/.config" \
-        "${dep_flags[@]}" \
-        --enable "CONFIG_$(config_sym "$SUBSYSTEM")" \
-        --enable "CONFIG_$sym" >/dev/null 2>&1 || true
-    if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$ARCH" \
-            ${CROSS_COMPILE:+CROSS_COMPILE="$CROSS_COMPILE"} olddefconfig \
-            >"$logdir/olddefconfig.log" 2>&1; then
-        warn "  VERIFY: olddefconfig failed (see $logdir/olddefconfig.log)"; return
+
+    if [[ -v _BUILD_CACHE[$sym] ]]; then
+        tmp=${_BUILD_CACHE[$sym]}
+        [[ -z "$tmp" ]] && return  # setup failed on a prior candidate for this sym
+    else
+        tmp=$(mktemp -d)
+        if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$ARCH" \
+                ${CROSS_COMPILE:+CROSS_COMPILE="$CROSS_COMPILE"} tinyconfig \
+                >"$symdir/tinyconfig.log" 2>&1; then
+            if grep -q "source tree is not clean" "$symdir/tinyconfig.log"; then
+                warn "  VERIFY: kernel source tree has in-tree build artifacts"
+                warn "          fix: make -C $KERNEL_TREE mrproper"
+            else
+                warn "  VERIFY: tinyconfig failed (see $symdir/tinyconfig.log)"
+            fi
+            rm -rf "$tmp"
+            _BUILD_CACHE[$sym]=""
+            return
+        fi
+        local dep_flags=()
+        grep -qP '\bdepends on\b.*\bOF\b' <<< "$block" && dep_flags+=(--enable CONFIG_OF)
+        grep -qP '\bCOMPILE_TEST\b'       <<< "$block" && dep_flags+=(--enable CONFIG_COMPILE_TEST)
+        # Enable gate symbols so drivers inside 'if SYMBOL endif' blocks can
+        # appear in .config after olddefconfig (e.g. GPIOLIB for gpio drivers).
+        local sc
+        for sc in "${GATE_CFGS_ARRAY[@]+"${GATE_CFGS_ARRAY[@]}"}"; do
+            dep_flags+=(--enable "$sc")
+        done
+        "$KERNEL_TREE/scripts/config" --file "$tmp/.config" \
+            "${dep_flags[@]}" \
+            --enable "CONFIG_$(config_sym "$SUBSYSTEM")" \
+            --enable "CONFIG_$sym" >/dev/null 2>&1 || true
+        if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$ARCH" \
+                ${CROSS_COMPILE:+CROSS_COMPILE="$CROSS_COMPILE"} olddefconfig \
+                >"$symdir/olddefconfig.log" 2>&1; then
+            warn "  VERIFY: olddefconfig failed (see $symdir/olddefconfig.log)"
+            rm -rf "$tmp"
+            _BUILD_CACHE[$sym]=""
+            return
+        fi
+        cp "$tmp/.config" "$symdir/.config"
+        _BUILD_CACHE[$sym]=$tmp
     fi
-    cp "$tmp/.config" "$logdir/.config"
-    if ! grep -q "^CONFIG_${sym}=y" "$logdir/.config"; then
+
+    if ! grep -q "^CONFIG_${sym}=y" "$tmp/.config"; then
         local dep_line
         dep_line=$(grep -m1 'depends on' <<< "$block" | sed 's/^\s*//')
         printf '  -> [FALSE_POSITIVE — %s absent from config after olddefconfig]\n' "$sym"
         [[ -n "$dep_line" ]] && printf '     Kconfig: %s\n' "$dep_line"
-        printf '     config: %s\n\n' "$logdir/.config"
+        printf '     config: %s\n\n' "$symdir/.config"
         return
     fi
     local obj
     obj="drivers/$SUBSYSTEM/$(basename "${cfile%.c}.o")"
     if make -C "$KERNEL_TREE" O="$tmp" ARCH="$ARCH" \
             ${CROSS_COMPILE:+CROSS_COMPILE="$CROSS_COMPILE"} "$obj" \
-            >"$logdir/build.log" 2>&1; then
+            >"$cfgdir/build.log" 2>&1; then
         result="FALSE_POSITIVE — builds OK (symbol may be selected transitively)"
     else
         result="VERIFIED — build fails without select"
-        grep 'error:' "$logdir/build.log" | head -3 | sed 's/^/    /'
+        grep 'error:' "$cfgdir/build.log" | head -3 | sed 's/^/    /'
     fi
     printf '  -> [%s]\n'     "$result"
-    printf '     log: %s\n' "$logdir/build.log"
+    printf '     log: %s\n' "$cfgdir/build.log"
     if [[ "$result" == VERIFIED* ]]; then
         local cross_line=""
         [[ -n "$CROSS_COMPILE" ]] && cross_line=" CROSS_COMPILE=$CROSS_COMPILE"
@@ -160,6 +197,9 @@ verify_build() {
                 printf 'scripts/config --enable CONFIG_OF\n'
             grep -qP '\bCOMPILE_TEST\b'         <<< "$block" && \
                 printf 'scripts/config --enable CONFIG_COMPILE_TEST\n'
+            for sc in "${GATE_CFGS_ARRAY[@]+"${GATE_CFGS_ARRAY[@]}"}"; do
+                printf 'scripts/config --enable %s\n' "$sc"
+            done
             printf 'scripts/config --enable CONFIG_%s\n' "$(config_sym "$SUBSYSTEM")"
             printf 'scripts/config --enable CONFIG_%s\n' "$sym"
             printf 'make ARCH=%s%s olddefconfig\n' "$ARCH" "$cross_line"
@@ -169,20 +209,46 @@ verify_build() {
             printf '\n'
             printf 'make ARCH=%s%s %s\n\n' "$ARCH" "$cross_line" "$obj"
             printf '# Expected error (build fails without '\''select %s'\'' in Kconfig):\n' "$cfg"
-            grep 'error:' "$logdir/build.log" 2>/dev/null | head -3 | sed 's/^/# /'
-        } > "$logdir/reproducer.sh"
-        chmod +x "$logdir/reproducer.sh"
-        printf '     reproducer: %s\n' "$logdir/reproducer.sh"
+            grep 'error:' "$cfgdir/build.log" 2>/dev/null | head -3 | sed 's/^/# /'
+        } > "$cfgdir/reproducer.sh"
+        chmod +x "$cfgdir/reproducer.sh"
+        printf '     reproducer: %s\n' "$cfgdir/reproducer.sh"
     fi
     printf '\n'
 }
 
 # ── Pass 1: #ifdef CONFIG_X guards in subsystem headers ───────────────────────
 
+# Drivers inside "if SUBSYSTEM ... endif" blocks implicitly depend on the
+# subsystem symbol — skip it as a candidate to avoid mass false positives.
+SUBSYSTEM_CFG="CONFIG_$(config_sym "$SUBSYSTEM")"
+
+# Parse SKIP_CFGS / GATE_CFGS comma-separated lists into arrays.
+SKIP_CFGS_ARRAY=()
+if [[ -n "$SKIP_CFGS" ]]; then
+    IFS=',' read -ra SKIP_CFGS_ARRAY <<< "$SKIP_CFGS"
+fi
+GATE_CFGS_ARRAY=()
+if [[ -n "$GATE_CFGS" ]]; then
+    IFS=',' read -ra GATE_CFGS_ARRAY <<< "$GATE_CFGS"
+fi
+
+# True if cfg is in SKIP_CFGS_ARRAY.
+cfg_is_skipped() {
+    local c
+    for c in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+        [[ "$1" == "$c" ]] && return 0
+    done
+    return 1
+}
+
 info "kconfig-check: subsystem=$SUBSYSTEM"
 info "              kernel=$KERNEL_TREE"
 info "              arch=$ARCH"
-[[ -n "$DRIVER" ]] && info "              driver=$DRIVER"
+[[ -n "$DRIVER" ]]    && info "              driver=$DRIVER"
+[[ $PASS2 -eq 1 ]]    && info "              pass2=enabled"
+[[ -n "$SKIP_CFGS" ]] && info "              skip=$SKIP_CFGS"
+[[ -n "$GATE_CFGS" ]] && info "              gate=$GATE_CFGS"
 info "Pass 1 — #ifdef guards in include/linux/$SUBSYSTEM/"
 
 HEADER_CFGS=()
@@ -191,6 +257,9 @@ while IFS= read -r c; do
 done < <({ grep -rh -oP '(?<=#ifdef )CONFIG_[A-Z0-9_]+' "$HEADER_DIR"/*.h 2>/dev/null || true; } | sort -u)
 
 for cfg in "${HEADER_CFGS[@]+"${HEADER_CFGS[@]}"}"; do
+    # The subsystem gate symbol is implicit for all drivers in the subsystem.
+    [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
+    cfg_is_skipped "$cfg" && continue
     FIELDS=()
     while IFS= read -r f; do
         FIELDS+=("$f")
@@ -220,32 +289,38 @@ for cfg in "${HEADER_CFGS[@]+"${HEADER_CFGS[@]}"}"; do
     done
 done
 
-# ── Pass 2: IS_ENABLED(CONFIG_X) in driver C files ───────────────────────────
+# ── Pass 2: IS_ENABLED(CONFIG_X) in driver C files (opt-in) ──────────────────
 
-info "Pass 2 — IS_ENABLED() calls in drivers/$SUBSYSTEM/"
+if [[ $PASS2 -eq 1 ]]; then
+    info "Pass 2 — IS_ENABLED() calls in drivers/$SUBSYSTEM/"
 
-for cfile in "$DRIVER_DIR"/*.c; do
-    [[ -f "$cfile" ]] || continue
-    stem=$(basename "$cfile" .c)
-    [[ -n "$DRIVER" && "$stem" != "$DRIVER" ]] && continue
-    sym=$(config_sym "$stem")
-    kconfig_has "$sym" || continue
+    for cfile in "$DRIVER_DIR"/*.c; do
+        [[ -f "$cfile" ]] || continue
+        stem=$(basename "$cfile" .c)
+        [[ -n "$DRIVER" && "$stem" != "$DRIVER" ]] && continue
+        sym=$(config_sym "$stem")
+        kconfig_has "$sym" || continue
 
-    block=$(kconfig_block "$sym")
+        block=$(kconfig_block "$sym")
 
-    IE_CFGS=()
-    while IFS= read -r c; do
-        IE_CFGS+=("$c")
-    done < <({ grep -oP '(?<=IS_ENABLED\()CONFIG_[A-Z0-9_]+' "$cfile" 2>/dev/null || true; } | sort -u)
+        IE_CFGS=()
+        while IFS= read -r c; do
+            IE_CFGS+=("$c")
+        done < <({ grep -oP '(?<=IS_ENABLED\()CONFIG_[A-Z0-9_]+' "$cfile" 2>/dev/null || true; } | sort -u)
 
-    for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
-        block_selects "$cfg" "$block" && continue
-        evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
-        emit_candidate "$cfile" "$sym" "$cfg" \
-            "$(basename "$cfile"):$evidence" \
-            "IS_ENABLED($cfg) without select in Kconfig"
+        for cfg in "${IE_CFGS[@]+"${IE_CFGS[@]}"}"; do
+            [[ "$cfg" == "$SUBSYSTEM_CFG" ]] && continue
+            cfg_is_skipped "$cfg" && continue
+            block_selects "$cfg" "$block" && continue
+            evidence=$(grep -nP "IS_ENABLED\($cfg\)" "$cfile" 2>/dev/null | head -1) || true
+            emit_candidate "$cfile" "$sym" "$cfg" \
+                "$(basename "$cfile"):$evidence" \
+                "IS_ENABLED($cfg) without select in Kconfig"
+        done
     done
-done
+else
+    info "Pass 2 — skipped (IS_ENABLED checks have high false-positive rate; enable with PASS2=1)"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
