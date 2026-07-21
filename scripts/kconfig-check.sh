@@ -118,6 +118,12 @@ verify_build() {
     block=$(kconfig_block "$sym")
     grep -qP '\bdepends on\b.*\bOF\b' <<< "$block"           && dep_flags+=(--enable CONFIG_OF)
     grep -qP '\bCOMPILE_TEST\b'       <<< "$block"           && dep_flags+=(--enable CONFIG_COMPILE_TEST)
+    # Enable skipped symbols (gate symbols like GPIOLIB) so drivers that
+    # depend on them can appear in .config after olddefconfig.
+    local sc
+    for sc in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+        dep_flags+=(--enable "$sc")
+    done
     "$KERNEL_TREE/scripts/config" --file "$tmp/.config" \
         "${dep_flags[@]}" \
         --enable "CONFIG_$(config_sym "$SUBSYSTEM")" \
@@ -162,6 +168,9 @@ verify_build() {
                 printf 'scripts/config --enable CONFIG_OF\n'
             grep -qP '\bCOMPILE_TEST\b'         <<< "$block" && \
                 printf 'scripts/config --enable CONFIG_COMPILE_TEST\n'
+            for sc in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+                printf 'scripts/config --enable %s\n' "$sc"
+            done
             printf 'scripts/config --enable CONFIG_%s\n' "$(config_sym "$SUBSYSTEM")"
             printf 'scripts/config --enable CONFIG_%s\n' "$sym"
             printf 'make ARCH=%s%s olddefconfig\n' "$ARCH" "$cross_line"
