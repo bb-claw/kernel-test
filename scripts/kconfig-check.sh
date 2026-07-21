@@ -23,7 +23,7 @@ SKIP_CFGS=${SKIP_CFGS:-}
 GATE_CFGS=${GATE_CFGS:-}
 KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
-DRIVER=${DRIVER:-}
+DRIVER=${DRIVER%.c}
 
 case "$ARCH" in
     arm64) CROSS_COMPILE=aarch64-linux-gnu- ;;
