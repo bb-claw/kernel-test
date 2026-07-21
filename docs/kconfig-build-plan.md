@@ -49,12 +49,16 @@ Files/components changed:
 - `scripts/kconfig-enumerate.sh` — enumerates config entries from a subsystem
   Kconfig file; shared utility, usable by kconfig-check too
 - `lib/build-kconfig.sh` — drives per-option build loop; called by Makefile
+- `lib/vm.sh` — earlycon fix: x86/i386 now use `earlycon=uart8250,io,0x3f8`
+  (explicit COM1 ISA address) instead of bare `earlycon`; bare `earlycon` on
+  x86 with `CONFIG_SERIAL_EARLYCON=y` + `CONFIG_ACPI=n` silently drops all
+  console output; arm64 keeps bare `earlycon` (auto-detected from QEMU DT)
 - `Makefile` — new `kconfig-build` target + `randkconfigconfig` profile support
 - `configs/randkconfigconfig.config` — bootability fragment (same as
   rand500config.config; symlink or copy)
 - `CLAUDE.md` — update Key files table and CONFIGS list
 
-No changes to: `lib/build.sh`, `lib/vm.sh`, `lib/report.sh`, `scripts/config-archive.sh`
+No changes to: `lib/build.sh`, `lib/report.sh`, `scripts/config-archive.sh`
 (those work on the generated configs automatically).
 
 ---

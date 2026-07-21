@@ -406,8 +406,8 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap    Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
-  hooks        Activate git hooks only (no package install)
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
+  hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
   fetch-stable     Explicit stable tag fetch  (requires STABLE_RELEASE=; useful outside preset-managed clones)
@@ -417,22 +417,22 @@ Targets:
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
-  info         Show current tag/commit checked out in KERNEL_TREE
-  build        Build kernels for all CONFIGS × ARCHS
-  initramfs    Assemble Toybox cpio initramfs for each arch
-  test         Boot each (config, arch) in QEMU/KVM and run tests
-  report       Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
-  diff         Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
-  baseline     Pin the latest report dir as the regression baseline; auto-diff will compare against it
-  install      Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
-  dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
-  config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
-  replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
-  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 GATE_CFGS=)
-  kconfig-build  Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
-  clean        Remove build/ and cache/
-  distclean    Remove build/, cache/, and reports/
-  help         Show this message
+  info             Show current tag/commit checked out in KERNEL_TREE
+  build            Build kernels for all CONFIGS × ARCHS
+  initramfs        Assemble Toybox cpio initramfs for each arch
+  test             Boot each (config, arch) in QEMU/KVM and run tests
+  report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
+  diff             Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
+  baseline         Pin the latest report dir as the regression baseline; auto-diff will compare against it
+  install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
+  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
+  config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
+  replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
+  kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 GATE_CFGS=)
+  kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
+  clean            Remove build/ and cache/
+  distclean        Remove build/, cache/, and reports/
+  help             Show this message
 
 Config profiles (CONFIGS=):
   defconfig        Boot+test  Architecture default — broad baseline coverage
