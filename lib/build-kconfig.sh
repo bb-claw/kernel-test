@@ -101,14 +101,22 @@ setup_base() {
 
     [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
 
+    local tinylog
+    tinylog=$(mktemp)
     if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$arch" \
             ${cross_compile:+CROSS_COMPILE="$cross_compile"} tinyconfig \
-            >/dev/null 2>&1; then
+            >"$tinylog" 2>&1; then
+        if grep -q "source tree is not clean" "$tinylog"; then
+            rm -rf "$tmp" "$tinylog"
+            die "kernel source tree has in-tree build artifacts — run: make -C $KERNEL_TREE mrproper"
+        fi
         warn "base setup: tinyconfig failed for $arch — skipping arch"
-        rm -rf "$tmp"
+        grep -iE 'error:|fatal:' "$tinylog" | head -3 | sed 's/^/  /' >&2 || true
+        rm -rf "$tmp" "$tinylog"
         _BASE_TMP[$arch]=""
         return 1
     fi
+    rm -f "$tinylog"
 
     cat "$FRAGMENT" >> "$tmp/.config"
 
