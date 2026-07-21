@@ -20,6 +20,7 @@ SUBSYSTEM=${1:?usage: kconfig-check.sh <subsystem>}
 VERIFY=${VERIFY:-0}
 PASS2=${PASS2:-0}
 SKIP_CFGS=${SKIP_CFGS:-}
+GATE_CFGS=${GATE_CFGS:-}
 KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
 DRIVER=${DRIVER:-}
@@ -118,10 +119,10 @@ verify_build() {
     block=$(kconfig_block "$sym")
     grep -qP '\bdepends on\b.*\bOF\b' <<< "$block"           && dep_flags+=(--enable CONFIG_OF)
     grep -qP '\bCOMPILE_TEST\b'       <<< "$block"           && dep_flags+=(--enable CONFIG_COMPILE_TEST)
-    # Enable skipped symbols (gate symbols like GPIOLIB) so drivers that
-    # depend on them can appear in .config after olddefconfig.
+    # Enable gate symbols so drivers inside 'if SYMBOL endif' blocks can
+    # appear in .config after olddefconfig (e.g. GPIOLIB for gpio drivers).
     local sc
-    for sc in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+    for sc in "${GATE_CFGS_ARRAY[@]+"${GATE_CFGS_ARRAY[@]}"}"; do
         dep_flags+=(--enable "$sc")
     done
     "$KERNEL_TREE/scripts/config" --file "$tmp/.config" \
@@ -168,7 +169,7 @@ verify_build() {
                 printf 'scripts/config --enable CONFIG_OF\n'
             grep -qP '\bCOMPILE_TEST\b'         <<< "$block" && \
                 printf 'scripts/config --enable CONFIG_COMPILE_TEST\n'
-            for sc in "${SKIP_CFGS_ARRAY[@]+"${SKIP_CFGS_ARRAY[@]}"}"; do
+            for sc in "${GATE_CFGS_ARRAY[@]+"${GATE_CFGS_ARRAY[@]}"}"; do
                 printf 'scripts/config --enable %s\n' "$sc"
             done
             printf 'scripts/config --enable CONFIG_%s\n' "$(config_sym "$SUBSYSTEM")"
@@ -194,10 +195,14 @@ verify_build() {
 # subsystem symbol — skip it as a candidate to avoid mass false positives.
 SUBSYSTEM_CFG="CONFIG_$(config_sym "$SUBSYSTEM")"
 
-# Parse SKIP_CFGS comma-separated list into an array.
+# Parse SKIP_CFGS / GATE_CFGS comma-separated lists into arrays.
 SKIP_CFGS_ARRAY=()
 if [[ -n "$SKIP_CFGS" ]]; then
     IFS=',' read -ra SKIP_CFGS_ARRAY <<< "$SKIP_CFGS"
+fi
+GATE_CFGS_ARRAY=()
+if [[ -n "$GATE_CFGS" ]]; then
+    IFS=',' read -ra GATE_CFGS_ARRAY <<< "$GATE_CFGS"
 fi
 
 # True if cfg is in SKIP_CFGS_ARRAY.
@@ -215,6 +220,7 @@ info "              arch=$ARCH"
 [[ -n "$DRIVER" ]]    && info "              driver=$DRIVER"
 [[ $PASS2 -eq 1 ]]    && info "              pass2=enabled"
 [[ -n "$SKIP_CFGS" ]] && info "              skip=$SKIP_CFGS"
+[[ -n "$GATE_CFGS" ]] && info "              gate=$GATE_CFGS"
 info "Pass 1 — #ifdef guards in include/linux/$SUBSYSTEM/"
 
 HEADER_CFGS=()

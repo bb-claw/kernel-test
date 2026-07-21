@@ -38,7 +38,13 @@ kernel-test's rand500config arm64 sweep on v7.2-rc4.
 5. Optional `DRIVER=<stem>` restricts the scan to a single driver C file.
 6. Optional `PASS2=1` enables the IS_ENABLED() pass (off by default; high
    false-positive rate — IS_ENABLED is intentionally safe without select).
-7. Output is human-readable and grep-friendly.
+7. Optional `SKIP_CFGS=CONFIG_X,CONFIG_Y` skips symbols as missing-select
+   candidates (e.g. `CONFIG_DEBUG_FS` — intentionally optional in most drivers).
+8. Optional `GATE_CFGS=CONFIG_X` enables symbols in `verify_build` so drivers
+   inside `if SYMBOL ... endif` blocks appear in `.config` after `olddefconfig`
+   (e.g. `CONFIG_GPIOLIB` — the gpio subsystem gate, not auto-detected because
+   `config_sym("gpio")` = `GPIO` ≠ `GPIOLIB`).
+9. Output is human-readable and grep-friendly.
 
 ---
 
@@ -215,6 +221,13 @@ make kconfig-check SUBSYSTEM=pinctrl ARCHS=arm64 VERIFY=1
 
 # Full sweep including IS_ENABLED candidates
 make kconfig-check SUBSYSTEM=pinctrl ARCHS=arm64 VERIFY=1 PASS2=1
+
+# gpio subsystem: GPIOLIB is the gate but not auto-detected (GPIO≠GPIOLIB);
+# SKIP_CFGS suppresses it as a candidate; GATE_CFGS enables it in verify_build
+# so drivers inside 'if GPIOLIB endif' appear in .config after olddefconfig
+make kconfig-check SUBSYSTEM=gpio ARCHS=arm64 VERIFY=1 \
+    SKIP_CFGS=CONFIG_GPIOLIB,CONFIG_DEBUG_FS,CONFIG_PM \
+    GATE_CFGS=CONFIG_GPIOLIB
 
 # Standalone from kernel tree
 cd ~/git/linux
