@@ -428,7 +428,8 @@ Targets:
   dmesg        Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive  Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   replay       Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
-  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1)
+  kconfig-check  Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 GATE_CFGS=)
+  kconfig-build  Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
   clean        Remove build/ and cache/
   distclean    Remove build/, cache/, and reports/
   help         Show this message
@@ -444,6 +445,7 @@ Config profiles (CONFIGS=):
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
   allmodconfig     Build only All options as modules — catches build-time regressions
   randconfig       Build only Fully random config — catches compile-time regressions; constrained to exclude non-gzip compressors (BUILD_TIMEOUT capped)
+  randkconfigconfig-<OPT>  Boot+test  Generated per-option by kconfig-build sweep; not in default CONFIGS; one per subsystem config entry
 
 Variables (current values):
   KERNEL_TREE         = $(KERNEL_TREE)
@@ -466,9 +468,11 @@ Variables (current values):
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
   CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay CONFIG_FILE=<archive-path>))
   SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))
-  SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check SUBSYSTEM=<name>))
-  DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check to one driver: DRIVER=pinctrl-bm1880))
+  SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check/kconfig-build SUBSYSTEM=<name>))
+  DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check/kconfig-build to one driver: DRIVER=pinctrl-bm1880))
   VERIFY              = $(VERIFY)  (set to 1 to confirm kconfig-check candidates with an object build; arch from ARCHS)
+  DRY_RUN             = $(DRY_RUN)  (set to 1 to print kconfig-build option list without building)
+  GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — comma-separated extra symbols to enable for drivers inside nested if blocks))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -528,6 +532,16 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Re-test an archived config on the current kernel
   make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
   make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
+
+── Kconfig tools ───────────────────────────────────────────────────────────────
+
+  # Static analysis: find missing 'select' in a subsystem (object-build confirm)
+  make kconfig-check SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64 VERIFY=1
+
+  # Exhaustive build+boot sweep — dry run first, then single driver, then full
+  make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1
+  make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 KERNEL_TREE=~/git/linux-dev
+  make kconfig-build SUBSYSTEM=pinctrl ARCHS=arm64
 endef
 export HELP_TEXT
 
