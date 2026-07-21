@@ -159,14 +159,17 @@ For each candidate, `verify_build()`:
 6. If build fails → VERIFIED (real bug); if build passes → FALSE_POSITIVE
    (transitive select already resolved it).
 
-Logs saved to `build/kconfig-check-<ARCH>/<SYM>/<CFG>/`:
-- `tinyconfig.log` — config setup output (check here if tinyconfig fails)
-- `olddefconfig.log` — dependency resolution output
-- `.config` — the exact config used for the build
-- `build.log` — compiler output (VERIFIED candidates only)
-- `reproducer.sh` — self-contained shell script to recreate the failure;
+Logs saved under `build/kconfig-check-<ARCH>/<SYM>/`:
+- `tinyconfig.log` — config setup output (shared across all cfgs for this driver)
+- `olddefconfig.log` — dependency resolution output (shared)
+- `.config` — the exact config used for the build (shared)
+- `<CFG>/build.log` — compiler output (VERIFIED candidates only)
+- `<CFG>/reproducer.sh` — self-contained shell script to recreate the failure;
   includes `set -x`, only the dep enables actually needed, and grep checks
   to confirm the driver is =y and the missing dep is absent after olddefconfig
+
+The tinyconfig+olddefconfig setup is run once per driver and the build dir
+reused for all missing-select candidates of that driver.
 
 **Kernel source tree must be clean** for out-of-tree VERIFY builds. If
 `tinyconfig` fails with "source tree is not clean", run:
