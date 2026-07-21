@@ -43,6 +43,8 @@ SEED_CONFIG    ?=
 SUBSYSTEM      ?=
 DRIVER         ?=
 VERIFY         ?= 0
+DRY_RUN        ?= 0
+GATE_CFGS      ?=
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -78,7 +80,7 @@ export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
-export SUBSYSTEM DRIVER VERIFY
+export SUBSYSTEM DRIVER VERIFY DRY_RUN GATE_CFGS
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -91,7 +93,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -344,6 +346,13 @@ config-archive:
 kconfig-check:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-check SUBSYSTEM=<name>"; exit 1; }
 	$(Q)ARCH=$(firstword $(ARCHS)) scripts/kconfig-check.sh "$(SUBSYSTEM)"
+
+# Exhaustive per-option build+boot sweep for a kernel subsystem.
+# Enumerates all config entries in drivers/<SUBSYSTEM>/Kconfig and builds+boots each.
+# Usage: make kconfig-build SUBSYSTEM=pinctrl [ARCHS=arm64] [DRY_RUN=1] [GATE_CFGS=CONFIG_X]
+kconfig-build:
+	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-build SUBSYSTEM=<name>"; exit 1; }
+	$(Q)lib/build-kconfig.sh
 
 # ── Replay archived config ────────────────────────────────────────────────────
 
