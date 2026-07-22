@@ -463,7 +463,7 @@ if [[ "$RESULT_TYPE" == single ]]; then
         printf 'Minimal reproducer:  %s\n' "$REPRODUCER"
         printf 'Archived:            %s\n\n' "$archived_path"
         printf 'Draft FINDINGS.md entry:\n\n'
-        printf '- [ ] **%s causes %s on %s**\n' \
+        printf -- '- [ ] **%s causes %s on %s**\n' \
             "$SUSPECT" "$BISECT_FAILURE_TYPE" "$BISECT_ARCH"
         printf '  Kernel: %s. Found by config bisect from %s.\n' \
             "$KERNEL_VERSION" "$(basename "$CONFIG_FILE")"

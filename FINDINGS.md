@@ -837,11 +837,62 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-22 — v7.2-rc4 rand500config/i386: DEBUG_TEST_DRIVER_REMOVE breaks serial console
+
+### High — Kernel Bug (single-option reproducer, actionable)
+
+- [ ] **`CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` alone breaks serial console on i386 — BOOT_FAIL-no-console**
+  Kernel: v7.2-rc4. Arch: i386. Found by config bisect (`make bisect`) on
+  `kconfig-rand500config-i386-v7.2-rc4-b7e535b388917a55c2c870494459ea80668d073efe99d0760fabcaf5a3ec656d-BOOT_FAIL-no-console.config`.
+
+  **Bisect result:** `CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` confirmed as the sole responsible option.
+  Verified alone on a tinyconfig+bootability baseline: `BOOT_FAIL-no-console` reproduces with
+  only this one option added. No co-required options.
+
+  **Canary diagnosis:** `CANARY_EARLY=reached` — the raw UART `early_initcall` marker fired,
+  confirming the kernel ran past `do_initcalls()`. The kernel is alive; the serial console
+  driver was silently broken after the canary fired.
+
+  **Mechanism:** `CONFIG_DEBUG_TEST_DRIVER_REMOVE` calls `->remove()` immediately after each
+  successful `->probe()`, then re-probes. The 8250 UART driver (`CONFIG_SERIAL_8250_CONSOLE`)
+  is among the drivers probed during boot. When it is removed and re-probed, the console
+  registration (`console_tryregister()` / `uart_add_one_port()`) is apparently not re-established
+  correctly, leaving the serial console silent for the rest of boot.
+
+  **Relationship to prior finding (IIO interaction):** The previous `BOOT_FAIL-timeout`
+  (kernel boots but never reaches init, requires DEBUG_TEST_DRIVER_REMOVE + multiple IIO drivers)
+  is a separate failure mode — likely a deadlock or hang in an IIO driver's remove path. This
+  is a distinct, simpler bug: the remove+re-probe of the UART console driver itself breaks
+  console output, which is observable even without any IIO drivers present.
+
+  **Minimal reproducer archived:**
+  ```
+  configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-a036ae3817c6b36ee468e644441358abb6b52765d83ea5217b860bd07d613254-BOOT_FAIL-no-console-bisect-from-b7e535b388917a55c2c870494459ea80668d073efe99d0760fabcaf5a3ec656d.config
+  ```
+
+  **Reproduce:**
+  ```sh
+  make bisect CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-b7e535b388917a55c2c870494459ea80668d073efe99d0760fabcaf5a3ec656d-BOOT_FAIL-no-console.config
+  # or replay the minimal reproducer directly:
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-a036ae3817c6b36ee468e644441358abb6b52765d83ea5217b860bd07d613254-BOOT_FAIL-no-console-bisect-from-b7e535b388917a55c2c870494459ea80668d073efe99d0760fabcaf5a3ec656d.config CONFIGS=rand500config ARCHS=i386
+  ```
+
+  **Next steps:**
+  - Confirm on x86_64 to determine if the bug is i386-specific
+  - Reproduce with a manual tinyconfig + `CONFIG_SERIAL_8250_CONSOLE=y` + `CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` to get the minimal kernel config for LKML
+  - Inspect `drivers/tty/serial/8250/8250_core.c` remove/probe path for console re-registration
+  - File as a `CONFIG_DEBUG_TEST_DRIVER_REMOVE` + 8250 interaction bug
+
+  **Subsystem:** `drivers/tty/serial/8250/` or `drivers/base/` (driver core). Mailing list:
+  `linux-serial@vger.kernel.org`, `linux-kernel@vger.kernel.org`.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 4     |
+| Open   | 5     |
 | Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
