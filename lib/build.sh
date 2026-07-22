@@ -213,10 +213,11 @@ if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
 fi
 
 # Step 1b.2: inject boot diagnostic modules when CANARY=1.
-# Skipped for seed replay (archived config is self-contained).
+# Applied even for seed replay — the archived config won't have canary options,
+# and the point of CANARY=1 replay is to diagnose why the archived config fails.
 # Requires prior 'make canary-patch' to have patched the kernel tree.
 CANARY_FRAGMENT="$SCRIPT_DIR/configs/canary.config"
-if [[ "${CANARY:-0}" == 1 && -z "${SEED_CONFIG:-}" ]]; then
+if [[ "${CANARY:-0}" == 1 ]]; then
     info "Applying canary fragment (CANARY=1): $CANARY_FRAGMENT"
     cat "$CANARY_FRAGMENT" >> "$PWD/$OUT_DIR/.config"
     if ! kmake olddefconfig; then
