@@ -54,7 +54,7 @@ add_makefile_entry 'obj-$(CONFIG_DEBUG_42)    += debug_42.o'
 MISC_KC="$MISC_DIR/Kconfig"
 
 add_kconfig_entry() {
-    local sym="$1" desc="$2" help="$3"
+    local sym="$1" desc="$2" help="$3" depends="${4:-}"
 
     if grep -q "^config ${sym}$" "$MISC_KC"; then
         info "ok:   already in Kconfig: config $sym"
@@ -62,8 +62,13 @@ add_kconfig_entry() {
     fi
 
     local entry
-    entry=$(printf 'config %s\n\tbool "%s"\n\tdefault n\n\thelp\n\t  %s\n' \
-        "$sym" "$desc" "$help")
+    if [[ -n "$depends" ]]; then
+        entry=$(printf 'config %s\n\tbool "%s"\n\tdepends on %s\n\tdefault n\n\thelp\n\t  %s\n' \
+            "$sym" "$desc" "$depends" "$help")
+    else
+        entry=$(printf 'config %s\n\tbool "%s"\n\tdefault n\n\thelp\n\t  %s\n' \
+            "$sym" "$desc" "$help")
+    fi
 
     # Insert before the last 'endmenu' so the entry stays inside the menu
     local last_endmenu
@@ -92,7 +97,8 @@ add_kconfig_entry "DEBUG_42" \
     "Debug /proc entry returning 42 (boot verification)" \
     "Creates /proc/debug_42 at module_init time. The kernel-test harness
 	  reads it via test 250_debug-42 to confirm procfs is operational.
-	  Has no side effects; safe to leave enabled in test kernels."
+	  Has no side effects; safe to leave enabled in test kernels." \
+    "PROC_FS"
 
 printf '\n'
 info "kernel tree patched: $KERNEL_TREE"

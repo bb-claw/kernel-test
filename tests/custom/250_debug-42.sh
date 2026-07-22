@@ -7,7 +7,7 @@ fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 if [ ! -f /proc/debug_42 ]; then
-    skip "debug_42: /proc/debug_42 absent (CONFIG_DEBUG_42 not built in — rebuild with CANARY=1)"
+    skip "debug_42: /proc/debug_42 not available (CONFIG_DEBUG_42 or CONFIG_PROC_FS not built in — rebuild with CANARY=1)"
     exit 0
 fi
 
