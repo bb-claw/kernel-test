@@ -19,6 +19,17 @@ dmesg/
 # Machine-local Makefile overrides (user-specific; presets/ handles repo defaults)
 local.mk
 
+# Module build artifacts (out-of-tree builds from modules/*/Makefile)
+modules/*/*.o
+modules/*/*.ko
+modules/*/*.mod
+modules/*/*.mod.c
+modules/*/*.mod.o
+modules/*/Module.symvers
+modules/*/modules.order
+modules/*/.*.cmd
+modules/*/.module-common.o
+
 # Scratch / ad-hoc output files
 *.out
 todos

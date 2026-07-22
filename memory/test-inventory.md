@@ -43,8 +43,9 @@ and run in filename-sorted order by `/init`. Protocol:
 | `220_proc-net` | `/proc/net/dev`, `/proc/net/sockstat`, `/proc/net/protocols`, `/proc/net/if_inet6` |
 | `230_bind-mount` | `mount --bind` rootfs dirs; file visible at alias; `/proc/mounts` entry; umount cleanup |
 | `240_cgroups` | `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` (v2 only) |
+| `250_debug-42` | `/proc/debug_42` returns "42" — confirms CONFIG_DEBUG_42 built in and procfs operational; skips when not built in |
 
-Next available slot: **250_** — 26 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **260_** — 27 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 

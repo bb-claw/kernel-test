@@ -212,6 +212,21 @@ if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
     fi
 fi
 
+# Step 1b.2: inject boot diagnostic modules when CANARY=1.
+# Applied even for seed replay — the archived config won't have canary options,
+# and the point of CANARY=1 replay is to diagnose why the archived config fails.
+# Requires prior 'make canary-patch' to have patched the kernel tree.
+CANARY_FRAGMENT="$SCRIPT_DIR/configs/canary.config"
+if [[ "${CANARY:-0}" == 1 ]]; then
+    info "Applying canary fragment (CANARY=1): $CANARY_FRAGMENT"
+    cat "$CANARY_FRAGMENT" >> "$PWD/$OUT_DIR/.config"
+    if ! kmake olddefconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Canary config fragment failed — run 'make canary-patch' first to add CONFIG_BOOT_CANARY to the kernel tree"
+    fi
+fi
+
 # Step 1c: verify bootability floor for all bootable configs.
 # configs/tinyconfig.config is the authoritative minimum: PRINTK, TTY + arch serial,
 # initramfs, BINFMT_ELF/SCRIPT, TMPFS.  olddefconfig can silently drop these when a

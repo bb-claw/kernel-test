@@ -125,6 +125,7 @@ TESTS_TOTAL=0
 KUNIT_PASS=0
 KUNIT_FAIL=0
 FAILED_TESTS=''
+CANARY_EARLY=''
 
 if [[ -s $DMESG_FILE ]]; then
     grep -q  "BOOT_OK:"   "$DMESG_FILE" 2>/dev/null && BOOT_OK=1   || true
@@ -143,6 +144,15 @@ if [[ -s $DMESG_FILE ]]; then
     FAILED_TESTS=$(grep "^< TEST FAIL:" "$DMESG_FILE" 2>/dev/null \
         | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
     FAILED_TESTS=${FAILED_TESTS:-}
+
+    # Check for boot canary marker (CANARY=1 builds only).
+    if [[ "${CANARY:-0}" == 1 ]]; then
+        if grep -q '\[BOOT_CANARY\]' "$DMESG_FILE" 2>/dev/null; then
+            CANARY_EARLY=reached
+        else
+            CANARY_EARLY=missing
+        fi
+    fi
 
     # Count KUnit KTAP results.
     # The kernel emits KTAP lines with ANSI color codes (\e[32m prefix, \e[0m after
@@ -200,6 +210,7 @@ fi
     printf 'DURATION=%d\n'    "$(( $(date -u +%s) - VM_START_EPOCH ))"
     [[ -n $FAIL_REASON    ]] && printf 'FAIL_REASON=%s\n'    "$FAIL_REASON"
     [[ -n $FAILED_TESTS   ]] && printf 'FAILED_TESTS=%s\n'   "$FAILED_TESTS"
+    [[ -n $CANARY_EARLY   ]] && printf 'CANARY_EARLY=%s\n'   "$CANARY_EARLY"
 } > "$STATUS_FILE"
 
 # ── Report result ─────────────────────────────────────────────────────────────
@@ -229,5 +240,16 @@ if [[ $BOOT_STATUS == PASS ]]; then
     fi
 else
     warn "FAIL  $CONFIG / $ARCH — ${FAIL_REASON}"
+    if [[ "${CANARY:-0}" == 1 ]]; then
+        if [[ "$CANARY_EARLY" == reached ]]; then
+            warn "CANARY: early_initcall reached — kernel ran but console/earlycon produced no output"
+        else
+            warn "CANARY: [BOOT_CANARY] not found — kernel did not reach early_initcall"
+        fi
+    fi
     exit 1
+fi
+
+if [[ "${CANARY:-0}" == 1 && "$CANARY_EARLY" == missing && "$BOOT_STATUS" == PASS ]]; then
+    warn "CANARY: [BOOT_CANARY] not found despite successful boot — CONFIG_BOOT_CANARY may not be built in (run 'make canary-patch' first)"
 fi
