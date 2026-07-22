@@ -12,8 +12,10 @@ if [ ! -f /proc/debug_42 ]; then
 fi
 
 val=$(cat /proc/debug_42)
-[ "$val" = "42" ] \
-    && ok "debug_42: /proc/debug_42 returned '42'" \
-    || fail "debug_42: expected '42', got '$val'"
+if [ "$val" = "42" ]; then
+    ok "debug_42: /proc/debug_42 returned '42'"
+else
+    fail "debug_42: expected '42', got '$val'"
+fi
 
 [ $fails -eq 0 ] || exit 1
