@@ -90,6 +90,9 @@ Binary-searches candidate options (archived − tinyconfig+bootability baseline)
 Result types: `single` (confirmed alone), `suspect` (needs co-required option → use PINNED_OPTS),
 `interaction` (both halves pass → reports minimum known failing set).
 Artifacts in `bisect/<timestamp>-<config>-<arch>-<sha256>/` (gitignored). Resumes on interruption.
+Multi-pass tip: when `interaction` occurs, use the archived minimum-set config as the new
+`CONFIG_FILE` and pin the most suspicious option as `PINNED_OPTS`; repeat until single confirmed.
+The archived `-bisect-from-<sha>` suffix is always one level only (chaining is stripped).
 
 ### Kconfig subsystem sweep (kconfig-build)
 

@@ -577,11 +577,12 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Patch kernel tree once, then rebuild with CANARY=1
   make canary-patch                                    # copy modules into KERNEL_TREE/drivers/misc/
   make all NO_FETCH=1 CANARY=1 CONFIGS=tinyconfig      # rebuild + boot; check for [BOOT_CANARY] in dmesg
-  # Decision table (serial output after boot attempt):
-  #   [BOOT_CANARY] visible + dmesg present  → printk/earlycon working normally
-  #   [BOOT_CANARY] visible + no dmesg       → earlycon/console broken; kernel ran but output lost
-  #   neither visible                        → kernel hung before early_initcall
-  #   /proc/debug_42 returns 42              → procfs + VFS + module_init all functional
+  # Diagnose an archived BOOT_FAIL with empty dmesg
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-<sha>-BOOT_FAIL-timeout.config CANARY=1
+  # Decision table (CANARY_EARLY= in vmstatus-*.txt):
+  #   CANARY_EARLY=reached + timeout/no-console → earlycon/console broken; kernel alive
+  #   CANARY_EARLY=missing                      → kernel hung before early_initcall
+  #   /proc/debug_42 returns 42                 → procfs + VFS + module_init all functional
 
 ── Kconfig tools ───────────────────────────────────────────────────────────────
 

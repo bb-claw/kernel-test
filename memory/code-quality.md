@@ -50,6 +50,12 @@ Examples:
 
 ---
 
+## Bash Lib Script Pitfalls
+
+- **`printf` with format string starting with `-`** → bash's `printf` builtin tries to parse it as an option; produces `printf: - : invalid option`. Fix: `printf -- '- [ ] ...' args`. Affects any shell lib script (`lib/`, `scripts/`) where the format string is a literal dash-prefixed string (e.g., Markdown list items).
+
+---
+
 ## Toybox sh 0.8.9 Pitfalls (test scripts)
 
 - **`$_x` leading-underscore vars** → Toybox parses as `$_` + literal; use plain names (`fails`, not `_fails`)
