@@ -487,7 +487,8 @@ Variables (current values):
   SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check/kconfig-build SUBSYSTEM=<name>))
   DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check/kconfig-build to one driver: DRIVER=pinctrl-bm1880))
   VERIFY              = $(VERIFY)  (set to 1 to confirm kconfig-check candidates with an object build; arch from ARCHS)
-  DRY_RUN             = $(DRY_RUN)  (set to 1 to print kconfig-build option list without building)
+  DRY_RUN             = $(DRY_RUN)  (set to 1 to print bisect candidate list + time estimate, or kconfig-build option list, without building)
+  PINNED_OPTS         = $(if $(PINNED_OPTS),$(PINNED_OPTS),(not set — comma- or space-separated options injected into every bisect test step but not the baseline; used for multi-pass interaction bisect))
   PASS2               = $(PASS2)  (set to 1 to enable IS_ENABLED() pass in kconfig-check; high false-positive rate)
   SKIP_CFGS           = $(if $(SKIP_CFGS),$(SKIP_CFGS),(not set — skip symbols as candidates: SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM))
   GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — comma-separated extra symbols to enable for drivers inside nested if blocks))
@@ -550,6 +551,13 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Re-test an archived config on the current kernel
   make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc2-<sha256>.config
   make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
+
+  # Bisect a failing archived config to find the responsible option(s)
+  make bisect CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-<version>-<sha256>-BOOT_FAIL-timeout.config DRY_RUN=1
+  make bisect CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-<version>-<sha256>-BOOT_FAIL-timeout.config
+  # Multi-pass: pin first suspect, bisect remaining candidates for the co-required option
+  make bisect CONFIG_FILE=<path> PINNED_OPTS=CONFIG_DEBUG_TEST_DRIVER_REMOVE=y
+  make bisect CONFIG_FILE=<path> PINNED_OPTS=CONFIG_DEBUG_TEST_DRIVER_REMOVE=y,CONFIG_AD7405=y
 
 ── Kconfig tools ───────────────────────────────────────────────────────────────
 
