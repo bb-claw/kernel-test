@@ -443,11 +443,12 @@ if [[ "$RESULT_TYPE" == single ]]; then
     printf '%s\n' "$SUSPECT" > "$VERIFY_DIR/options.txt"
     generate_step_config "$BISECT_ARCH" "$VERIFY_DIR/options.txt" "$verify_seed"
 
-    verify_fails=0
-    run_step "$VERIFY_DIR" "$verify_seed" && true || verify_fails=1
+    verify_label="Verify (single)"
+    [[ -n "$PINNED_OPTS" ]] && verify_label="Verify (pinned+single)"
 
-    if [[ "$verify_fails" -eq 1 ]]; then
-        write_step_txt "$VERIFY_DIR" "Verify (single)" 1 "FAIL" "$SUSPECT confirmed alone"
+    if run_step "$VERIFY_DIR" "$verify_seed"; then
+        # run_step exits 0 = failure reproduced = suspect confirmed
+        write_step_txt "$VERIFY_DIR" "$verify_label" 1 "FAIL" "$SUSPECT confirmed alone"
         printf 'FAIL\n' > "$VERIFY_DIR/result"
 
         # Generate and archive minimal reproducer
@@ -471,8 +472,7 @@ if [[ "$RESULT_TYPE" == single ]]; then
         printf '  make bisect CONFIG_FILE=%s\n' "$archived_path"
         printf '  ```\n'
     else
-        verify_label="Verify (single)"
-        [[ -n "$PINNED_OPTS" ]] && verify_label="Verify (pinned+single)"
+        # run_step exits 1 = failure not reproduced = interaction required
         write_step_txt "$VERIFY_DIR" "$verify_label" 1 "PASS" \
             "does not reproduce alone — interaction required"
         printf 'PASS\n' > "$VERIFY_DIR/result"
