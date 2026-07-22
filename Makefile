@@ -95,7 +95,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -392,6 +392,19 @@ replay:
 	echo "[replay] config=$$config arch=$$arch version=$$version seed=$$seed"; \
 	$(MAKE) all NO_FETCH=1 CONFIGS="$$config" ARCHS="$$arch" SEED_CONFIG="$$seed"
 
+# Binary-search a failing archived config to isolate the responsible option(s).
+# Produces a minimal reproducer config and a draft FINDINGS.md entry.
+# Usage: make bisect CONFIG_FILE=configs/archive_failed/kconfig-<config>-<arch>-...-BOOT_FAIL-*.config
+#        make bisect CONFIG_FILE=<path> DRY_RUN=1     # preview plan without building
+bisect:
+	@if [[ -z "$(CONFIG_FILE)" ]]; then \
+	    echo "ERROR: CONFIG_FILE= is required."; \
+	    echo "  make bisect CONFIG_FILE=configs/archive_failed/kconfig-<config>-<arch>-<version>-<sha256>-<FAILURE>.config"; \
+	    exit 1; \
+	fi
+	$(Q)CONFIG_FILE="$(CONFIG_FILE)" DRY_RUN="$(DRY_RUN)" PINNED_OPTS="$(PINNED_OPTS)" \
+	    scripts/config-bisect.sh
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -430,6 +443,7 @@ Targets:
   dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
+  bisect           Binary-search a failing config to find the responsible option(s)  (requires CONFIG_FILE=; opt: DRY_RUN=1 PINNED_OPTS=CONFIG_X,CONFIG_Y)
   kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_X GATE_CFGS=CONFIG_X)
   kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
   clean            Remove build/ and cache/
@@ -468,7 +482,7 @@ Variables (current values):
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
   DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
-  CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay CONFIG_FILE=<archive-path>))
+  CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay/bisect CONFIG_FILE=<archive-path>))
   SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))
   SUBSYSTEM           = $(if $(SUBSYSTEM),$(SUBSYSTEM),(not set — required by: make kconfig-check/kconfig-build SUBSYSTEM=<name>))
   DRIVER              = $(if $(DRIVER),$(DRIVER),(not set — restrict kconfig-check/kconfig-build to one driver: DRIVER=pinctrl-bm1880))

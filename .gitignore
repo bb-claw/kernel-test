@@ -7,6 +7,9 @@ cache/
 # Test reports — generated on each run; share manually via summary.txt
 reports/
 
+# Config bisect runs — build artifacts per step; kept locally for analysis
+bisect/
+
 # Host dmesg captures and analysis files (make dmesg)
 dmesg/
 
