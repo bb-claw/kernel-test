@@ -47,6 +47,7 @@ DRY_RUN        ?= 0
 PASS2          ?= 0
 SKIP_CFGS      ?=
 GATE_CFGS      ?=
+CANARY         ?= 0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -82,7 +83,7 @@ export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
-export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS
+export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -95,7 +96,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -405,6 +406,16 @@ bisect:
 	$(Q)CONFIG_FILE="$(CONFIG_FILE)" DRY_RUN="$(DRY_RUN)" PINNED_OPTS="$(PINNED_OPTS)" \
 	    scripts/config-bisect.sh
 
+# ── Boot canary ───────────────────────────────────────────────────────────────
+
+# Patch KERNEL_TREE/drivers/misc/ with built-in diagnostic modules.
+# Copies modules/boot_canary/ and modules/debug_42/ sources, then adds
+# Kconfig entries and obj- lines to the kernel tree (idempotent).
+# Must be run once before 'make all CANARY=1'.
+# Usage: make canary-patch [KERNEL_TREE=~/git/linux]
+canary-patch:
+	$(Q)scripts/canary-patch.sh
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -444,6 +455,7 @@ Targets:
   config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
   replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
   bisect           Binary-search a failing config to find the responsible option(s)  (requires CONFIG_FILE=; opt: DRY_RUN=1 PINNED_OPTS=CONFIG_X,CONFIG_Y)
+  canary-patch     Patch KERNEL_TREE/drivers/misc/ with boot diagnostic modules; run once before 'make all CANARY=1'
   kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_X GATE_CFGS=CONFIG_X)
   kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
   clean            Remove build/ and cache/
@@ -492,6 +504,7 @@ Variables (current values):
   PASS2               = $(PASS2)  (set to 1 to enable IS_ENABLED() pass in kconfig-check; high false-positive rate)
   SKIP_CFGS           = $(if $(SKIP_CFGS),$(SKIP_CFGS),(not set — skip symbols as candidates: SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM))
   GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — comma-separated extra symbols to enable for drivers inside nested if blocks))
+  CANARY              = $(CANARY)  (set to 1 to inject CONFIG_BOOT_CANARY=y + CONFIG_DEBUG_42=y; requires prior 'make canary-patch')
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -558,6 +571,17 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   # Multi-pass: pin first suspect, bisect remaining candidates for the co-required option
   make bisect CONFIG_FILE=<path> PINNED_OPTS=CONFIG_DEBUG_TEST_DRIVER_REMOVE=y
   make bisect CONFIG_FILE=<path> PINNED_OPTS=CONFIG_DEBUG_TEST_DRIVER_REMOVE=y,CONFIG_AD7405=y
+
+── Boot canary (diagnosing silent boots) ────────────────────────────────────────
+
+  # Patch kernel tree once, then rebuild with CANARY=1
+  make canary-patch                                    # copy modules into KERNEL_TREE/drivers/misc/
+  make all NO_FETCH=1 CANARY=1 CONFIGS=tinyconfig      # rebuild + boot; check for [BOOT_CANARY] in dmesg
+  # Decision table (serial output after boot attempt):
+  #   [BOOT_CANARY] visible + dmesg present  → printk/earlycon working normally
+  #   [BOOT_CANARY] visible + no dmesg       → earlycon/console broken; kernel ran but output lost
+  #   neither visible                        → kernel hung before early_initcall
+  #   /proc/debug_42 returns 42              → procfs + VFS + module_init all functional
 
 ── Kconfig tools ───────────────────────────────────────────────────────────────
 

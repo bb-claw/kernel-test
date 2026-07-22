@@ -23,6 +23,7 @@
 | `DRY_RUN` | `0` | `DRY_RUN=1` — print bisect candidate list + time estimate, or kconfig-build list, without building |
 | `GATE_CFGS` | _(none)_ | `GATE_CFGS=CONFIG_X,CONFIG_Y` — extra gate symbols for drivers inside nested `if` blocks |
 | `PINNED_OPTS` | _(none)_ | `PINNED_OPTS=CONFIG_X,CONFIG_Y` — options injected into every bisect step but not baseline |
+| `CANARY` | `0` | `CANARY=1` — inject `CONFIG_BOOT_CANARY=y`+`CONFIG_DEBUG_42=y`; requires prior `make canary-patch` |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -98,6 +99,18 @@ make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64  # single
 make kconfig-build SUBSYSTEM=pinctrl                         # all options × all archs
 ```
 Per option: tinyconfig + `configs/randkconfigconfig.config` + `CONFIG_<OPT>=y` → build + boot.
+
+### Boot canary (diagnosing silent boots)
+
+```sh
+make canary-patch                                              # patch KERNEL_TREE/drivers/misc/ once
+make all NO_FETCH=1 CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64 # rebuild with canary built in
+grep CANARY_EARLY reports/<latest>/vmstatus-tinyconfig-x86_64.txt
+```
+
+`CANARY_EARLY=reached` → kernel ran past early_initcall (earlycon/console is the problem).
+`CANARY_EARLY=missing` → kernel hung before `do_initcalls()`.
+`/proc/debug_42` returning `42` in test `250_debug-42` → procfs + VFS functional.
 
 ### Capture and analyse host kernel dmesg
 
