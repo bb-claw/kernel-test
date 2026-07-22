@@ -270,7 +270,9 @@ archive_reproducer() {
     local config_file="$1"
     local sha256
     sha256="$(sha256sum "$config_file" | cut -d' ' -f1)"
-    local dest="$REPO_DIR/configs/archive_failed/kconfig-${BISECT_CONFIG}-${BISECT_ARCH}-${BISECT_VERSION:-unknown}-${sha256}-${BISECT_FAILURE_TYPE:-UNKNOWN}-bisect-from-${BISECT_SHA256}.config"
+    local base_failure="${BISECT_FAILURE_TYPE:-UNKNOWN}"
+    base_failure="${base_failure%%-bisect-from-*}"
+    local dest="$REPO_DIR/configs/archive_failed/kconfig-${BISECT_CONFIG}-${BISECT_ARCH}-${BISECT_VERSION:-unknown}-${sha256}-${base_failure}-bisect-from-${BISECT_SHA256}.config"
     cp "$config_file" "$dest"
     info "Minimal reproducer archived: $(basename "$dest")" >&2
     printf '%s\n' "$dest"

@@ -888,11 +888,72 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-22 — v7.2-rc3/rc4 rand500config/i386: REED_SOLOMON_DEC16 + SERIAL_8250_16550A_VARIANTS causes boot hang
+
+### Medium — Kernel Bug (4-option reproducer, likely 32-bit arithmetic)
+
+- [ ] **`CONFIG_REED_SOLOMON_DEC16=y` + `CONFIG_SERIAL_8250_16550A_VARIANTS=y` causes BOOT_FAIL on i386 — probable GF(2¹⁶) 32-bit overflow**
+  Kernel: v7.2-rc3 (found), v7.2-rc4 (confirmed). Arch: i386 only. Found by 5-pass config bisect.
+
+  **Minimal reproducer (4 options on tinyconfig+bootability base):**
+  ```
+  CONFIG_SERIAL_8250_16550A_VARIANTS=y
+  CONFIG_RUNTIME_TESTING_MENU=y   ← required dep: REED_SOLOMON_TEST depends on this
+  CONFIG_REED_SOLOMON_TEST=y
+  CONFIG_REED_SOLOMON_DEC16=y
+  ```
+
+  **Canary diagnosis:** `CANARY_EARLY=reached` — kernel ran past `early_initcall`. The last
+  console message is `printk: legacy bootconsole [uart8250] enabled`; nothing after.
+  Either the console is broken at that point (by `SERIAL_8250_16550A_VARIANTS` UART re-probe)
+  and the kernel runs silently past 60s, or the kernel hangs in the RS16 self-test.
+
+  **Mechanism hypothesis:** `REED_SOLOMON_DEC16` enables the GF(2¹⁶) Reed-Solomon decoder
+  (`lib/reed_solomon/`). `REED_SOLOMON_TEST` exercises it at `module_init()` time. On i386,
+  `unsigned long` is 32 bits — GF(2¹⁶) polynomial arithmetic may overflow or produce incorrect
+  results, causing the self-test to loop indefinitely or hang. This is the same class of 32-bit
+  truncation bug as the `gpu_buddy` `roundup_pow_of_two()` finding (see above). The role of
+  `SERIAL_8250_16550A_VARIANTS` is unclear: it may break console output at legacy console
+  registration, hiding any subsequent RS16 panic/hang output, or it may add enough boot-time
+  latency to push the total past 60s.
+
+  **Why SERIAL_8250_16550A_VARIANTS is needed:** Without it, the 3-option set
+  (RUNTIME_TESTING_MENU + REED_SOLOMON_TEST + REED_SOLOMON_DEC16) passes. It is a required
+  co-trigger, not a red herring — but its exact role in the interaction is unknown.
+
+  **Bisect chain:** 5 passes of `make bisect` with accumulating `PINNED_OPTS`:
+  original 159-option config → 80 → 6 → 6 → 5 → 4 (confirmed alone).
+  `CONFIG_SERIAL_SCCNXP=y` appeared in early passes but was confirmed as a red herring
+  (dropped when it was pinned and the same minimum set reproduced without it).
+
+  **Minimal reproducer archived:**
+  ```
+  configs/archive_failed/kconfig-rand500config-i386-v7.2-rc3-0bacb63c3fca296ff2d063a7a5378ab9dd7917b5a0c93f3b60a057482873d7bd-BOOT_FAIL-timeout-bisect-from-7d6c10ba6f8526542dc912aacb8e35453743a0f9d4a36c43b9fd5a4df019d70d.config
+  ```
+
+  **Reproduce:**
+  ```sh
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-rand500config-i386-v7.2-rc3-0bacb63c3fca296ff2d063a7a5378ab9dd7917b5a0c93f3b60a057482873d7bd-BOOT_FAIL-timeout-bisect-from-7d6c10ba6f8526542dc912aacb8e35453743a0f9d4a36c43b9fd5a4df019d70d.config CONFIGS=rand500config ARCHS=i386
+  ```
+
+  **Next steps:**
+  - Check `lib/reed_solomon/decode_rs.c` for `unsigned long` or `int` used where `u64` is needed
+    in GF(2¹⁶) polynomial multiply/divide on 32-bit arches — same pattern as the gpu_buddy fix
+  - Confirm whether `SERIAL_8250_16550A_VARIANTS` breaks console (canary replay with this
+    4-option config) or merely adds latency
+  - If RS16 arithmetic overflow confirmed: fix analogously to gpu_buddy (`BIT_ULL`/`u64` cast)
+  - Check if x86_64 is unaffected (expected: `unsigned long` is 64-bit there)
+
+  **Subsystem:** `lib/reed_solomon/`. Maintainer: Thomas Gleixner.
+  Mailing list: `linux-kernel@vger.kernel.org`.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 5     |
+| Open   | 6     |
 | Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
