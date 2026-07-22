@@ -117,7 +117,10 @@ make all NO_FETCH=1 CANARY=1 \
 
 **`lib/build.sh`** (step 1b.2): when `CANARY=1`, appends `configs/canary.config`
 (`CONFIG_BOOT_CANARY=y`, `CONFIG_DEBUG_42=y`) to `.config` and runs `olddefconfig`.
-Skipped for seed replay (`SEED_CONFIG` set).
+Applied even for seed replay (`SEED_CONFIG` set) — the archived config won't have
+canary options, and the point of `CANARY=1 make replay` is to diagnose why the
+archived config fails. Normal config fragment injection is skipped during seed replay
+but the canary injection runs unconditionally.
 
 **`lib/vm.sh`**: after serial capture, greps `dmesg.txt` for `\[BOOT_CANARY\]`
 when `CANARY=1`. Writes `CANARY_EARLY=reached|missing` to `vm.status`. Emits a
