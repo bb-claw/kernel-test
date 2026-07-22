@@ -534,11 +534,314 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-22 — Stable Kernel (7.1.x) KUnit: gpu_buddy 32-bit Bug
+
+### High — Kernel Bug (i386-only, deterministic)
+
+- [ ] **`gpu_test_buddy_alloc_exceeds_max_order` KUnit fails on i386 — `roundup_pow_of_two` silently truncates `u64` to 32-bit**
+  Kernel: stable v7.1.3 (first found), v7.1.4 (confirmed). Also present in mainline v7.2 (`drivers/gpu/buddy.c:1356`). Arch: i386 only. Found by kunitrandconfig/i386 sweep.
+
+  **Test failure output:**
+  ```
+  # KTAP version 1
+  # Subtest: gpu_buddy
+  not ok 15 gpu_test_buddy_alloc_exceeds_max_order
+  # EXPECTATION FAILED at drivers/gpu/tests/gpu_buddy_test.c:1379
+  # Expected err == -22, but err == 0 (0x0)
+  # gpu_buddy_fini:474: GPU BUG: assertion `gpu_buddy_block_is_free(mm->roots[i])` failed
+  # gpu_buddy_fini:482: GPU BUG: assertion `mm->avail == mm->size` failed
+  not ok 16 gpu_buddy
+  ```
+  Result: `KUNIT_FAIL-2-of-1749` on both v7.1.3 and v7.1.4. All other 1747 KUnit tests pass.
+
+  **Root cause — `roundup_pow_of_two` is not `u64`-safe on 32-bit systems:**
+
+  `gpu_buddy_alloc_blocks` (`drivers/gpu/buddy.c:1321`) calls:
+  ```c
+  u64 size = SZ_8G + SZ_1G;   /* 0x240000000 — a 64-bit value */
+  size = roundup_pow_of_two(size);  /* BUG: not u64-safe */
+  ```
+
+  `roundup_pow_of_two` dispatches to `__roundup_pow_of_two(unsigned long n)` (`include/linux/log2.h:55`).
+  On i386, `unsigned long` is 32 bits. The function argument conversion silently truncates
+  `0x240000000` → `0x40000000 = SZ_1G`.
+
+  **Execution trace on i386:**
+  | Step | Expected (64-bit) | Actual on i386 |
+  |------|-------------------|----------------|
+  | `roundup_pow_of_two(0x240000000)` | `0x400000000 = SZ_16G` | `0x40000000 = SZ_1G` (truncated) |
+  | `pages = size >> 12` | `0x400000` (order=22) | `0x40000` (order=18) |
+  | `order > mm->max_order(21)?` | TRUE → return -EINVAL | FALSE → continues |
+  | `size > mm->size(SZ_10G)?` | TRUE → return -EINVAL | FALSE (SZ_1G < SZ_10G) → continues |
+  | Return value | -EINVAL | 0 (allocation succeeds) |
+
+  Because the guard at `buddy.c:1335–1342` is never triggered, the function allocates
+  `SZ_1G` bytes instead of rejecting the over-limit request. `gpu_buddy_fini` then fires
+  internal assertions because the block was never freed (lines 474, 482 are secondary effects).
+
+  **Why x86_64 passes:** `unsigned long` is 64 bits on x86_64, so `roundup_pow_of_two` handles
+  `u64` correctly and the overflow guard fires as expected.
+
+  **Evidence — code references:**
+  - Test: `drivers/gpu/tests/gpu_buddy_test.c:1350–1382` (`gpu_test_buddy_alloc_exceeds_max_order`)
+  - Bug site: `drivers/gpu/buddy.c:1321` (stable), `drivers/gpu/buddy.c:1356` (mainline)
+  - Truncation: `include/linux/log2.h:55` (`__roundup_pow_of_two(unsigned long n)`)
+  - Guard that should fire: `drivers/gpu/buddy.c:1335–1342`
+
+  **Trigger configs (same logical bug, different random KUnit module sets):**
+  ```
+  kernel-test-stable/configs/archive_failed/kconfig-kunitrandconfig-i386-v7.1.3-35376dd938df26e368915a706ef26053aec3e6bee302d3825dc0a774007f46fa-KUNIT_FAIL-2-of-1749.config
+  ```
+  v7.1.4 replay config SHA: `fae25d2690989975c4845d09d204d61a64e7aa9fe4b01891e291bf848aa3652c` (same failure)
+
+  **Reproduce:**
+  ```sh
+  cd ~/git/kernel-test-stable
+  make checkout TAG=v7.1.4
+  make replay CONFIG_FILE=configs/archive_failed/kconfig-kunitrandconfig-i386-v7.1.3-35376dd938df26e368915a706ef26053aec3e6bee302d3825dc0a774007f46fa-KUNIT_FAIL-2-of-1749.config NO_FETCH=1
+  # Expect: kunit:1747/1749 FAIL — gpu_test_buddy_alloc_exceeds_max_order + gpu_buddy suite
+  ```
+
+  **Fix** — `drivers/gpu/buddy.c` (same line number differs by 35 between stable and mainline):
+  ```diff
+  -		size = roundup_pow_of_two(size);
+  +		size = BIT_ULL(fls64(size - 1));
+  ```
+  `BIT_ULL(fls64(size - 1))` is equivalent to `roundup_pow_of_two` but uses 64-bit
+  `fls64` instead of 32-bit `fls_long`, and `1ULL` instead of `1UL`. For the test case:
+  `fls64(0x23FFFFFFF) = 34` → `BIT_ULL(34) = 0x400000000 = SZ_16G` ✓
+
+  **Subsystem:** `drivers/gpu/` (GPU memory management). Maintainers: Christian König, Thomas Hellström.
+  Mailing lists: `dri-devel@lists.freedesktop.org`, `linux-kernel@vger.kernel.org`.
+  Cc `stable@vger.kernel.org` — same bug present in all stable branches that carry the gpu_buddy allocator.
+
+  **Patch recipients:**
+  ```
+  To:  Christian König <christian.koenig@amd.com>
+  To:  Thomas Hellström <thomas.hellstrom@linux.intel.com>
+  Cc:  dri-devel@lists.freedesktop.org
+  Cc:  linux-kernel@vger.kernel.org
+  Cc:  stable@vger.kernel.org
+  ```
+
+  **Tinyconfig reproducer:**
+
+  The kunitrandconfig trigger config is large (1749 tests, ~100 MB kernel). A minimal
+  reproducer isolates the failure to a single test suite and is better for LKML.
+
+  *Dependency chain* — why GATE_CFGS are needed:
+  ```
+  GPU_BUDDY_KUNIT_TEST  →  depends on GPU_BUDDY && KUNIT
+                                       |
+                               GPU_BUDDY (bool, no prompt — selected-only)
+                                       |
+                               selected by DRM_BUDDY (tristate, no prompt — hidden)
+                                       |
+                               depends on DRM (menuconfig, user-selectable on i386)
+                                       |
+                               depends on (AGP || AGP=n) && !EMULATED_CMPXCHG && HAS_DMA
+                                        ✓ all satisfied on i386
+  ```
+  `DRM_BUDDY` and `GPU_BUDDY` have no Kconfig `prompt` — they cannot be enabled by the
+  user via `make menuconfig` and are normally only pulled in by heavy GPU drivers (i915,
+  amdgpu, xe). However, `make olddefconfig` keeps any option in `.config` whose `depends on`
+  chain is satisfied, regardless of whether it has a prompt. Appending `CONFIG_DRM_BUDDY=y`
+  to the fragment before `olddefconfig` is enough — it stays because `depends on DRM` is met.
+
+  *Using the harness* — one command, fully automated:
+  ```sh
+  # In kernel-test or kernel-test-stable, after make checkout TAG=<version>:
+  make kconfig-build SUBSYSTEM=gpu ARCHS=i386 GATE_CFGS=CONFIG_DRM,CONFIG_DRM_BUDDY DRY_RUN=1
+  # Preview: shows CONFIG_GPU_BUDDY and CONFIG_GPU_BUDDY_KUNIT_TEST will be swept
+
+  make kconfig-build SUBSYSTEM=gpu ARCHS=i386 GATE_CFGS=CONFIG_DRM,CONFIG_DRM_BUDDY
+  # Runs: tinyconfig + randkconfigconfig.config + DRM=y + DRM_BUDDY=y + GPU_BUDDY_KUNIT_TEST=y
+  # Builds and boots each option; GPU_BUDDY_KUNIT_TEST will show KUNIT_FAIL-1/N
+  ```
+  The sweep generates one build per Kconfig entry in `drivers/gpu/Kconfig`. Only
+  `GPU_BUDDY_KUNIT_TEST` triggers a KUnit run; `GPU_BUDDY` is a plain bool with no test.
+
+  *Manual fragment* — for a standalone reproducer outside the harness (e.g. for LKML):
+  ```sh
+  # 1. Generate minimal base config for i386
+  make -C ~/git/linux-stable tinyconfig ARCH=i386 O=/tmp/repro-gpu-buddy
+
+  # 2. Apply bootability + KUnit + GPU buddy test
+  cat >> /tmp/repro-gpu-buddy/.config <<'EOF'
+  # Bootability (same as configs/randkconfigconfig.config)
+  CONFIG_TTY=y
+  CONFIG_SERIAL_8250=y
+  CONFIG_SERIAL_8250_CONSOLE=y
+  CONFIG_BLK_DEV_INITRD=y
+  CONFIG_BINFMT_ELF=y
+  CONFIG_BINFMT_SCRIPT=y
+  # KUnit framework
+  CONFIG_KUNIT=y
+  # Gate symbols (DRM + hidden DRM_BUDDY, which selects GPU_BUDDY)
+  CONFIG_DRM=y
+  CONFIG_DRM_BUDDY=y
+  # Target test
+  CONFIG_GPU_BUDDY_KUNIT_TEST=y
+  EOF
+
+  # 3. Resolve dependencies (olddefconfig keeps DRM_BUDDY=y because depends on DRM is met)
+  make -C ~/git/linux-stable ARCH=i386 O=/tmp/repro-gpu-buddy olddefconfig
+
+  # 4. Verify the key options survived
+  grep -E "CONFIG_(DRM|GPU_BUDDY|KUNIT)" /tmp/repro-gpu-buddy/.config
+
+  # 5. Build
+  make -C ~/git/linux-stable ARCH=i386 O=/tmp/repro-gpu-buddy -j$(nproc) bzImage
+
+  # 6. Boot in QEMU (minimal — no initramfs needed, KUnit runs before /init)
+  qemu-system-i386 -kernel /tmp/repro-gpu-buddy/arch/x86/boot/bzImage \
+    -append "console=ttyS0 earlycon=uart8250,io,0x3f8 panic=5" \
+    -serial stdio -display none -no-reboot -m 512
+  ```
+
+  *Expected output in QEMU serial log:*
+  ```
+  KTAP version 1
+  # Subtest: gpu_buddy
+  ok 1 gpu_test_buddy_alloc_limit
+  ...
+  not ok 15 gpu_test_buddy_alloc_exceeds_max_order
+  # EXPECTATION FAILED at drivers/gpu/tests/gpu_buddy_test.c:1379
+  # Expected err == -22, but err == 0 (0x0)
+  not ok 16 gpu_buddy
+  ```
+  Only 16 test cases run (the full `gpu_buddy` suite), compared to 1749 in kunitrandconfig —
+  output is unambiguous and the failure stands alone.
+
+  **Commit message:**
+  ```
+  Subject: [PATCH] drm/buddy: fix roundup_pow_of_two() truncation on 32-bit arches
+
+  gpu_buddy_alloc_blocks() rounds the requested allocation size up to
+  the nearest power of two using roundup_pow_of_two(), which internally
+  calls __roundup_pow_of_two(unsigned long). On 32-bit architectures,
+  unsigned long is 32 bits, so passing a u64 value larger than UINT32_MAX
+  silently truncates it before the rounding.
+
+  With mm_size = SZ_8G + SZ_2G and a CONTIGUOUS|RANGE request for
+  SZ_8G + SZ_1G:
+
+    Expected: roundup_pow_of_two(0x240000000) = 0x400000000 (SZ_16G)
+    Actual:   roundup_pow_of_two(0x040000000) = 0x040000000 (SZ_1G)
+              (0x240000000 truncated to 32-bit → 0x040000000)
+
+  After truncation, order=18 does not exceed max_order=21 and size=SZ_1G
+  does not exceed mm->size=SZ_10G, so the -EINVAL guard at line 1335 is
+  never reached. The allocation succeeds, and gpu_buddy_fini() subsequently
+  fires internal assertions because the block was never freed.
+
+  This is caught by the KUnit test gpu_test_buddy_alloc_exceeds_max_order,
+  which fails on i386 with:
+    Expected err == -22, but err == 0
+    gpu_buddy_fini:474: GPU BUG: assertion failed
+    gpu_buddy_fini:482: GPU BUG: assertion failed
+
+  Fix by using BIT_ULL(fls64(size - 1)) instead of roundup_pow_of_two(),
+  which performs the equivalent operation in 64 bits on all architectures.
+
+  Fixes: <commit that introduced gpu_buddy_alloc_blocks with CONTIGUOUS path>
+  Cc: stable@vger.kernel.org
+  Signed-off-by: Benjamin Boortz <benjamin.boortz@gmail.com>
+  ---
+   drivers/gpu/buddy.c | 2 +-
+   1 file changed, 1 insertion(+), 1 deletion(-)
+
+  diff --git a/drivers/gpu/buddy.c b/drivers/gpu/buddy.c
+  --- a/drivers/gpu/buddy.c
+  +++ b/drivers/gpu/buddy.c
+  @@ -1318,7 +1318,7 @@ int gpu_buddy_alloc_blocks(...)
+   	/* Roundup the size to power of 2 */
+   	if (flags & GPU_BUDDY_CONTIGUOUS_ALLOCATION) {
+  -		size = roundup_pow_of_two(size);
+  +		size = BIT_ULL(fls64(size - 1));
+   		min_block_size = size;
+  ```
+
+  **Status:** Not yet submitted. Find the exact `Fixes:` commit with:
+  ```sh
+  cd ~/git/linux
+  git log --oneline drivers/gpu/buddy.c | grep -i "contiguous\|round\|power"
+  ```
+
+---
+
+## 2026-07-22 — v7.2-rc4 rand500config Boot Failure: DEBUG_TEST_DRIVER_REMOVE + IIO drivers
+
+### Medium — Boot Failure (complex N-way interaction, not yet actionable for LKML)
+
+- [ ] **`CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` + multiple IIO drivers causes BOOT_FAIL on i386 — minimal reproducer not isolated**
+  Kernel: v7.2-rc4. Arch: i386. Found by config bisect (`make bisect`) on
+  `kconfig-rand500config-i386-v7.2-rc4-1130034ad8bb931d733ad604ddf6a0eec3d97fa5574b93987a3fa55fa933cb89-BOOT_FAIL-timeout.config`.
+
+  **What `CONFIG_DEBUG_TEST_DRIVER_REMOVE` does:** After each successful `->probe()`, immediately
+  calls `->remove()` then re-probes the driver. This stress-tests remove/re-probe paths and can
+  expose deadlocks or infinite loops in drivers that handle remove incorrectly.
+
+  **Failure symptom:** `Did not reach init (QEMU exit 0)` — QEMU exits cleanly before the kernel
+  reaches `/init`. No oops/panic on the console; the kernel likely stalled or halted during
+  a driver's remove+re-probe cycle.
+
+  **Trigger config:**
+  ```
+  configs/archive_failed/kconfig-rand500config-i386-v7.2-rc4-1130034ad8bb931d733ad604ddf6a0eec3d97fa5574b93987a3fa55fa933cb89-BOOT_FAIL-timeout.config
+  ```
+
+  **Multi-pass bisect result (6 passes, ~3 h total):**
+
+  Six rounds of `make bisect` with `PINNED_OPTS=` accumulating each suspect were run.
+  Every pass consistently narrowed to the left (alphabetically-first) half, indicating
+  all required options reside in the alphabetically-early part of the 150-option candidate space.
+
+  | Pass | Pinned | New suspect found | Verify alone |
+  |------|--------|-------------------|--------------|
+  | 1 | — | `CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` | PASS (needs more) |
+  | 2 | DEBUG_TEST_DRIVER_REMOVE | `CONFIG_AD7405=y` | PASS (needs more) |
+  | 3 | + AD7405 | `CONFIG_AD7606_IFACE_PARALLEL=y` | PASS (needs more) |
+  | 4 | + AD7606_IFACE_PARALLEL | `CONFIG_AD7606=y` | PASS (needs more) |
+  | 5 | + AD7606 | `CONFIG_AUTOFS_FS=y` | PASS (needs more) |
+  | 6 | + AUTOFS_FS | `CONFIG_BMC150_ACCEL=y` | PASS (needs more) |
+
+  **Pattern:** Four of the five co-suspects (AD7405, AD7606, AD7606_IFACE_PARALLEL, BMC150_ACCEL)
+  are all IIO (Industrial I/O) subsystem drivers from Analog Devices / Bosch. The bisect also found
+  `CONFIG_AUTOFS_FS=y`, which is unrelated to IIO and is likely a bisect artifact (it happened to be
+  alphabetically adjacent to the IIO drivers in the left half and was not individually required).
+
+  **Root cause hypothesis:** `CONFIG_DEBUG_TEST_DRIVER_REMOVE` exercises driver probe/remove
+  at boot. One or more IIO drivers (AD7405, AD7606, BMC150_ACCEL) have a buggy remove path on
+  i386 that hangs or panics, causing the guest to shut down before reaching `/init`. The IIO
+  infrastructure options (`CONFIG_IIO=y`, `CONFIG_IIO_BUFFER=y`, etc.) are also in the candidate
+  set and are likely auto-selected when the IIO drivers are present.
+
+  **Why the bisect did not converge:** The failure requires a combination of options that all
+  happen to reside in the same alphabetically-first half of the candidate space. The PINNED_OPTS
+  mechanism correctly identifies one option per pass, but when multiple co-required options are
+  concentrated in the same half, the bisect must do one pass per required option. With 4+ IIO
+  options needed, convergence would require additional passes with diminishing returns and no
+  guarantee the final set is minimal.
+
+  **Status:** Not actionable for LKML without a minimal 1–2 option reproducer. The interaction
+  is real (full config + pinned suspects reliably fails; baseline passes) but the exact minimal
+  set has not been isolated.
+
+  **Next steps if revisiting:**
+  - Test `CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` + `CONFIG_IIO=y` (framework only, no specific
+    driver) to see if the IIO core is sufficient without the AD7xxx drivers
+  - Test `CONFIG_DEBUG_TEST_DRIVER_REMOVE=y` + `CONFIG_AD7606=y` + `CONFIG_AD7606_IFACE_PARALLEL=y`
+    (a coherent driver + its interface option) to see if that pair is sufficient
+  - If either 2-option test reproduces, file as a driver remove path bug in the IIO subsystem
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 2     |
+| Open   | 4     |
 | Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
