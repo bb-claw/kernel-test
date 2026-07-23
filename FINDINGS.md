@@ -949,11 +949,72 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-23 — v7.1.5-rc2 allmodconfig Build Failure: myri10ge + arm64 + GCC 15
+
+### High — Build Failure (arm64 + GCC 15, actionable)
+
+- [ ] **`myri10ge_dummy_rdma()` sends uninitialized `buf[6..15]` — build error on arm64 with GCC 15 and `CONFIG_WERROR`**
+  Kernel: v7.1.5-rc2 (stable-rc) and v7.2-rc4 (mainline). Arch: arm64 cross-compile. Found by
+  `make all` full run (`allmodconfig` / `arm64`). Compiler: `aarch64-linux-gnu-gcc` = GCC 15.3.0.
+
+  **Build error:**
+  ```
+  In function '__const_memcpy_toio_aligned64',
+      inlined from '__iowrite64_copy' at arch/arm64/include/asm/io.h:252:3,
+      inlined from 'myri10ge_dummy_rdma' at drivers/net/ethernet/myricom/myri10ge/myri10ge.c:535:2:
+  arch/arm64/include/asm/io.h:209:17: error: '*(const u64 *)(&buf[6])' is used uninitialized
+    [-Werror=uninitialized]
+  myri10ge.c:511:16: note: '*(const u64 *)(&buf[6])' was declared here
+    __be32 buf[16] __attribute__ ((__aligned__(8)));
+  ```
+
+  **Root cause:** `myri10ge_dummy_rdma()` declares a 16-element `__be32` buffer but only
+  initializes elements 0–5. Elements 6–15 are intended as padding (device doesn't care about
+  their values) but are never zeroed. `myri10ge_pio_copy` maps to `__iowrite64_copy(to, from, size/8)`,
+  which on arm64 uses `__const_memcpy_toio_aligned64` — a vectorized inline that reads the buffer
+  in 64-bit chunks. GCC 15 traces through the three-level inline chain and detects that
+  `*(const u64 *)(&buf[6])` is read uninitialized.
+
+  `CONFIG_WERROR=y` (set by `allmodconfig`) promotes the warning to an error. Without it the
+  compiler warns but exits 0.
+
+  **Why only now:** GCC 15 tightened uninitialized-variable analysis to follow deeper inline
+  chains. On Arch Linux, `aarch64-linux-gnu-gcc` tracks the system GCC (currently 15). On
+  Debian/Ubuntu the cross package is typically GCC 13 or 14 — those systems will not see this failure.
+
+  **Proposed fix:**
+  ```diff
+  - __be32 buf[16] __attribute__ ((__aligned__(8)));
+  + __be32 buf[16] __attribute__ ((__aligned__(8))) = {};
+  ```
+
+  **Minimal reproducer** (from `~/git/linux-stable-rc`):
+  ```sh
+  make O=/tmp/myri-repro ARCH=arm64 tinyconfig
+  scripts/config --file /tmp/myri-repro/.config \
+      -e CONFIG_NET -e CONFIG_INET -e CONFIG_NETDEVICES \
+      -e CONFIG_ETHERNET -e CONFIG_PCI -e CONFIG_MYRI10GE \
+      -e CONFIG_WERROR
+  make O=/tmp/myri-repro ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+      CC=aarch64-linux-gnu-gcc olddefconfig
+  make O=/tmp/myri-repro ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+      CC=aarch64-linux-gnu-gcc \
+      drivers/net/ethernet/myricom/myri10ge/myri10ge.o
+  ```
+  Note: `CC=aarch64-linux-gnu-gcc` must be the full cross-compiler name — `CC=gcc-15` strips
+  the cross-compile prefix and the host x86 GCC rejects the arm64 flag `-mlittle-endian`.
+
+  **Subsystem:** `drivers/net/ethernet/myricom/myri10ge/` — legacy 10GbE driver.
+  Maintainers: `scripts/get_maintainer.pl drivers/net/ethernet/myricom/myri10ge/myri10ge.c`.
+  Mailing list: `netdev@vger.kernel.org`, `linux-kernel@vger.kernel.org`.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 6     |
+| Open   | 7     |
 | Resolved | 16  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
