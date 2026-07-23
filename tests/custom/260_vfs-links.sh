@@ -1,8 +1,7 @@
 #!/bin/sh
 # VFS path resolution: symlinks, hard links, named pipes (FIFOs).
 # tmpfs is always mounted at /tmp (forced by bootability fragment).
-# FIFO subtest skipped on arm64: background writer forks the shell process;
-# on arm64 QEMU TCG the COW fault on the full parent RSS immediately OOMs.
+# FIFO write+read uses exec 3<> (O_RDWR) — avoids blocking open and any fork.
 
 fails=0
 ok()   { printf 'ok: %s\n' "$*"; }
@@ -64,39 +63,36 @@ else
 fi
 
 printf 'line2\n' >> "$ORIG"
-content2=$(cat "$HARD" 2>/dev/null)
-if [ "$content2" = "line1
-line2" ]; then
+if grep -q "^line2$" "$HARD" 2>/dev/null; then
     ok "hard link: write to original visible through alias"
 else
-    fail "hard link: write not visible through alias (got '$content2')"
+    fail "hard link: write not visible through alias"
 fi
 
-# ── FIFO (named pipe) — skip on arm64 ─────────────────────────────────────────
+# ── FIFO (named pipe) ─────────────────────────────────────────────────────────
+# Open with exec 3<> (O_RDWR): avoids blocking open (no separate reader/writer
+# process needed) and avoids fork (safe on arm64 QEMU TCG).
 
-arch=$(uname -m 2>/dev/null)
-if [ "$arch" = "aarch64" ]; then
-    skip "FIFO: background fork OOMs on arm64 QEMU TCG"
+FIFO="$WORK/testfifo"
+mkfifo "$FIFO" 2>/dev/null || { fail "FIFO: mkfifo failed"; }
+
+if [ -p "$FIFO" ]; then
+    ok "FIFO: mkfifo created named pipe"
 else
-    FIFO="$WORK/testfifo"
-    mkfifo "$FIFO" 2>/dev/null || { fail "mkfifo failed"; }
+    fail "FIFO: named pipe not present after mkfifo"
+fi
 
-    if [ -p "$FIFO" ]; then
-        ok "FIFO: mkfifo created named pipe"
-    else
-        fail "FIFO: named pipe not present after mkfifo"
-    fi
-
-    printf 'ping\n' > "$FIFO" &
-    writer_pid=$!
-    result=$(cat "$FIFO" 2>/dev/null)
-    wait $writer_pid 2>/dev/null || true
-
+if exec 3<>"$FIFO" 2>/dev/null; then
+    printf 'ping\n' >&3
+    read result <&3 2>/dev/null
+    exec 3>&-
     if [ "$result" = "ping" ]; then
         ok "FIFO: write + read round-trip"
     else
-        fail "FIFO: got '$result', expected 'ping'"
+        fail "FIFO: round-trip failed (got '$result')"
     fi
+else
+    skip "FIFO: exec 3<> not supported"
 fi
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────

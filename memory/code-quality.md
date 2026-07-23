@@ -70,6 +70,8 @@ Examples:
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
 - **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
 - **`tr`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `sed 's/old/new/g'` for character substitution or `grep -o` for character filtering.
+- **Multi-line string comparison in `[ ]`** → Toybox sh 0.8.9 bug: `[ "$var" = "line1\nline2" ]` returns false even when `$var` is exactly that content. Fix: use `grep -q "^pattern$" file` or compare individual lines instead of comparing a multi-line captured variable against a literal multi-line string.
+- **FIFO blocking open with `&`** → `printf 'x' > "$FIFO" &` + `cat "$FIFO"`: both the background writer and the reader block in `open()` waiting for the other end; if the background fork is not scheduled before the reader, both deadlock until VM timeout. Fix: open the FIFO with `exec 3<>"$FIFO"` (O_RDWR) — both ends are the same process, open does not block, then use `printf >&3` + `read <&3`. No fork needed; safe on all arches including arm64 TCG.
 
 ---
 

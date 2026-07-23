@@ -34,16 +34,14 @@ FIFO pipe buffer — code that changes with each VFS locking or dentry refcount 
 
 **Skip guards:**
 
-- No top-level skip — tmpfs is always mounted; symlinks and hard links work on all
-  bootable configs.
-- FIFO subtest: skipped on `aarch64` via `uname -m` check. Background writer
-  (`echo ... > fifo &`) forks the shell process; on arm64 QEMU TCG the COW fault
-  on the parent's full RSS immediately OOMs the guest. Symlink and hard link
-  assertions still run on arm64.
+- No top-level skip — tmpfs is always mounted; VFS primitives work on all bootable
+  configs.
+- FIFO subtest: no arch-specific skip needed. The FIFO is opened with `exec 3<>`
+  (O_RDWR), which avoids blocking open (both read and write ends belong to the same
+  process) and avoids any fork (safe on arm64 QEMU TCG). A secondary skip fires if
+  `exec 3<>` is unsupported, but this is not observed in practice.
 
-**Coverage:** Fires on all 21 bootable config×arch combinations (tmpfs is forced
-on by the bootability fragment). FIFO fires on 14/21 (skipped on 3 arm64
-combinations).
+**Coverage:** Fires on all 21 bootable config×arch combinations.
 
 ---
 
