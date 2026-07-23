@@ -111,7 +111,7 @@ in rand500config.
 
 | Test | tinyconfig | defconfig / kunitconfig / randdefconfig | rand500config | arm64 |
 |---|---|---|---|---|
-| `260_vfs-links.sh` | **Full** | Full | Full | Partial (no FIFO) |
+| `260_vfs-links.sh` | **Full** | Full | Full | Full |
 | `270_proc-sys-vm.sh` | Skip | **Full** | ~35% | Full |
 | `280_proc-self-extended.sh` | Skip | **Full** | ~35% | Full |
 
