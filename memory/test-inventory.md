@@ -44,8 +44,11 @@ and run in filename-sorted order by `/init`. Protocol:
 | `230_bind-mount` | `mount --bind` rootfs dirs; file visible at alias; `/proc/mounts` entry; umount cleanup |
 | `240_cgroups` | `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` (v2 only) |
 | `250_debug-42` | `/proc/debug_42` returns "42" — confirms CONFIG_DEBUG_42 built in and procfs operational; skips when not built in |
+| `260_vfs-links` | Symlink create/readlink/dangling, hard link aliasing, FIFO mkfifo+type check+open/close via exec 3<> (O_RDWR — no fork, no blocking I/O, safe on all arches) |
+| `270_proc-sys-vm` | `/proc/sys/vm` range validation: overcommit_memory∈{0,1,2}, swappiness 0–200, dirty_ratio/dirty_background_ratio 1–100; /proc/buddyinfo + /proc/zoneinfo sanity; skips when procfs absent |
+| `280_proc-self-extended` | `/proc/self/fd` (stdin/stdout/stderr), `fdinfo/1` (pos/flags), `limits` (Max open files/processes), `io` (read_bytes/write_bytes); skips when procfs absent |
 
-Next available slot: **260_** — 27 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **290_** — 30 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -59,6 +62,9 @@ Next available slot: **260_** — 27 total (tests/001_smoke.sh + tests/custom/*.
 | 110–130 | PASS | PASS | PASS | PASS | PASS |
 | 140 sysctl | PASS | skip | skip | varies | PASS |
 | 150–190 | PASS | PASS/skip | PASS/skip | varies | PASS |
+| 260 vfs-links | PASS | PASS | PASS | PASS | PASS |
+| 270 proc-sys-vm | PASS | skip | skip | varies | PASS |
+| 280 proc-self | PASS | skip | skip | varies | PASS |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 

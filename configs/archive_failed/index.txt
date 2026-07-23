@@ -1,9 +1,13 @@
-Failed configs archive — 44 entries, 64 rows — generated 2026-07-23T12:46:35Z
+Failed configs archive — 46 entries, 70 rows — generated 2026-07-23T17:21:37Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON                                                                                     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-allmodconfig     arm64   v7.1.5-rc2  BUILD_TIMEOUT                                                                                      1     stable-rc  2026-07-23_08-10-49  stable-rc-7.1-2026-07-23_08-10-49-v7.1.5-rc2          6d4b38a7e043c04750bf846388f4ea00daaf965f2f815101c0e52293e22b4cd7
+allmodconfig     arm64   v7.1.5-rc2  BUILD_TIMEOUT                                                                                      3     stable-rc  2026-07-23_08-10-49  stable-rc-7.1-2026-07-23_08-10-49-v7.1.5-rc2          6d4b38a7e043c04750bf846388f4ea00daaf965f2f815101c0e52293e22b4cd7
     -> last: make[8]: *** [/home/benni/git/linux-stable-rc/scripts/Makefile.build:548: drivers/infiniband/hw/irdma] Terminated
+allmodconfig     arm64   v7.1.5-rc2  BUILD_TIMEOUT                                                                                      3     stable-rc  2026-07-23_16-12-34  stable-rc-7.1-2026-07-23_16-12-34-v7.1.5-rc2          6d4b38a7e043c04750bf846388f4ea00daaf965f2f815101c0e52293e22b4cd7
+    -> last: make[2]: Leaving directory '/home/benni/git/linux-stable-rc'
+allmodconfig     arm64   v7.1.5-rc2  BUILD_TIMEOUT                                                                                      3     stable-rc  2026-07-23_18-28-19  stable-rc-7.1-2026-07-23_18-28-19-v7.1.5-rc2          6d4b38a7e043c04750bf846388f4ea00daaf965f2f815101c0e52293e22b4cd7
+    -> last: make[3]: Leaving directory '/home/benni/git/linux-stable-rc'
 allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT                                                                                      2     mainline   2026-07-12_09-12-39  mainline-7.2-2026-07-12_09-12-39-v7.2-rc2             b3140ed196c6675d314227472346d03457d81d3a383a8a8b9ee0ea66e7506992
     -> last:   CC [M]  drivers/net/dsa/sja1105/sja1105_static_config.o
 allmodconfig     i386    v7.2-rc2    BUILD_TIMEOUT                                                                                      2     mainline   2026-07-12_09-14-55  mainline-7.2-2026-07-12_09-14-55-v7.2-rc2             b3140ed196c6675d314227472346d03457d81d3a383a8a8b9ee0ea66e7506992
@@ -18,7 +22,9 @@ allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout                          
 allmodconfig     x86_64  v7.2-rc2    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-12_20-41-21  mainline-7.2-2026-07-12_20-41-21-v7.2-rc2             f5294a0eadcaa11ec3561cde1dd8da90f69c948ea03235b5f491e2db2223a83f
     -> last: [   24.830716][    T1] cpufreq: Unable to obtain ARMCLK: -2
 kunitrandconfig  i386    v7.1.3      KUNIT_FAIL-2-of-1749                                                                               1     stable     2026-07-16_21-43-16  stable-7.1-2026-07-16_21-43-16-v7.1.3                 35376dd938df26e368915a706ef26053aec3e6bee302d3825dc0a774007f46fa
-kunitrandconfig  i386    v7.1.5-rc2  KUNIT_FAIL-2-of-1681                                                                               1     stable-rc  2026-07-23_08-10-49  stable-rc-7.1-2026-07-23_08-10-49-v7.1.5-rc2          c3aa2ed2977825407026f9720388a0c98aeaefb80f9989940feffbd36a4f70d9
+kunitrandconfig  i386    v7.1.5-rc2  KUNIT_FAIL-2-of-1681                                                                               3     stable-rc  2026-07-23_08-10-49  stable-rc-7.1-2026-07-23_08-10-49-v7.1.5-rc2          c3aa2ed2977825407026f9720388a0c98aeaefb80f9989940feffbd36a4f70d9
+kunitrandconfig  i386    v7.1.5-rc2  KUNIT_FAIL-2-of-1681                                                                               3     stable-rc  2026-07-23_15-57-03  stable-rc-7.1-2026-07-23_15-57-03-v7.1.5-rc2          c3aa2ed2977825407026f9720388a0c98aeaefb80f9989940feffbd36a4f70d9
+kunitrandconfig  i386    v7.1.5-rc2  KUNIT_FAIL-2-of-1681                                                                               3     stable-rc  2026-07-23_16-12-34  stable-rc-7.1-2026-07-23_16-12-34-v7.1.5-rc2          c3aa2ed2977825407026f9720388a0c98aeaefb80f9989940feffbd36a4f70d9
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-no-test-done                                                                             5     mainline   2026-07-20_00-04-45  mainline-7.2-2026-07-20_00-04-45-v7.2-rc3             4bf54fe716f9e83654ba73ea5512aa26b0d3a41bfcfbe0ffa2b399ce997b3810
     -> last: [32m[   10.818585] [33m# memmove_test[0m: ok: memmove() direct assig
 kunitrandconfig  i386    v7.2-rc3    BOOT_FAIL-no-test-done                                                                             5     mainline   2026-07-20_00-12-03  mainline-7.2-2026-07-20_00-12-03-v7.2-rc3             4bf54fe716f9e83654ba73ea5512aa26b0d3a41bfcfbe0ffa2b399ce997b3810
@@ -87,7 +93,11 @@ rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                          
     -> last: [BOOT_CANARY] early_initcall reached
 rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_22-50-50  mainline-7.2-2026-07-21_22-50-50-v7.2-rc4             1130034ad8bb931d733ad604ddf6a0eec3d97fa5574b93987a3fa55fa933cb89
     -> last: printk: legacy bootconsole [uart8250] enabled
+rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-22_18-20-26  mainline-7.2-2026-07-22_18-20-26-v7.2-rc4             2f9132c9712085bcb50629330a5f0ceedafb8ca03fae6571ed41b1f73a723519
+    -> last: printk: legacy bootconsole [uart8250] enabled
 rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_00-31-45  mainline-7.2-2026-07-21_00-31-45-v7.2-rc4             6ba1a7e48568d7fd2f73990b3d739499e5e0d452478f6302de70d351689cad98
+rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-22_18-23-54  mainline-7.2-2026-07-22_18-23-54-v7.2-rc4             6d9612ffa2d56b92d6555ed21eb8cc6288791e7b4215c5eaa589e8a1193f05b7
+    -> last: [BOOT_CANARY] early_initcall reached
 rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout-bisect-from-1130034a                                                             0                                                                                           a036ae3817c6b36ee468e644441358abb6b52765d83ea5217b860bd07d613254
 rand500config    i386    v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_15-05-55  mainline-7.2-2026-07-21_15-05-55-v7.2-rc4             f95e3422c7318feda65a04691e3b8e584f7e219f6ec2440f64b5d372ad492e67
     -> last: printk: legacy bootconsole [uart8250] enabled

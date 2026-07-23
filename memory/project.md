@@ -41,13 +41,13 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 | preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in mainline/stable/stable-rc clones; directory name selects presets/kernel-test-*.mk; `kernel-test-next` preset sets `LINUX_NEXT=1`, causing `make fetch` to error and redirect to `make fetch-next` |
 
-## Current State (2026-07-19)
+## Current State (2026-07-23)
 
 - **Architectures:** x86_64 + i386 + arm64 (all default); x86 uses KVM, arm64 uses TCG (requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
-- **Tests:** 26 total (1 smoke + 25 custom; see test-inventory.md); next slot: 250_
+- **Tests:** 30 total (1 smoke + 29 custom; see test-inventory.md); next slot: 290_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
-- **Current kernel (mainline clone):** v7.2-rc3 (stable-rc clone: v7.1.4-rc2)
+- **Current kernel (mainline clone):** v7.2-rc4
 
 ## Directory Structure
 
@@ -57,7 +57,7 @@ kernel-test/
 ├── lib/            fetch.sh fetch-next.sh fetch-stable-rc.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   └── custom/     001_print-dmesg + 010_ … 240_ (25 scripts)
+│   └── custom/     001_print-dmesg + 010_ … 280_ (29 scripts)
 ├── configs/        *.config fragments applied post-config; archive_passed/ + archive_failed/ (committed config archive)
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context
