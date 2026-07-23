@@ -30,7 +30,7 @@ FIFO pipe buffer — code that changes with each VFS locking or dentry refcount 
 | 2 | `readlink link` | returns exact target string |
 | 3 | Dangling symlink `-e` | reports false (target absent) |
 | 4 | Hard link write visible through alias | `cat hardlink` returns updated content |
-| 5 | FIFO write + read round-trip | reader receives exact byte sequence |
+| 5 | FIFO open and close | `exec 3<>` (O_RDWR, non-blocking) succeeds |
 
 **Skip guards:**
 
