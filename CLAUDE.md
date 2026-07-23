@@ -88,6 +88,9 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/custom/230_bind-mount.sh` | Bind mounts: `mount --bind` on initramfs rootfs dirs, alias file visibility, `/proc/mounts` entry, umount cleanup |
 | `tests/custom/240_cgroups.sh` | cgroups v2: `/sys/fs/cgroup/cgroup.controllers`, `cgroup.procs`, `cgroup.subtree_control` |
 | `tests/custom/250_debug-42.sh` | Reads `/proc/debug_42` and verifies it returns `"42"`; skips gracefully when `CONFIG_DEBUG_42` not built in (CANARY=1 not used); confirms procfs + VFS operational |
+| `tests/custom/260_vfs-links.sh` | VFS path resolution: symlink create/readlink/dangling, hard link write-visible-through-alias, FIFO mkfifo + type check + open/close via `exec 3<>` (O_RDWR, no fork); fires on all bootable configs |
+| `tests/custom/270_proc-sys-vm.sh` | `/proc/sys/vm` range validation: overcommit_memory∈{0,1,2}, swappiness 0–200, dirty_ratio/dirty_background_ratio 1–100; `/proc/buddyinfo` + `/proc/zoneinfo` sanity; skips when procfs absent |
+| `tests/custom/280_proc-self-extended.sh` | `/proc/self/fd` (stdin/stdout/stderr present), `fdinfo/1` (pos/flags), `limits` (Max open files/processes), `io` (read_bytes/write_bytes, skipped when CONFIG_TASK_IO_ACCOUNTING off); skips when procfs absent |
 | `.githooks/pre-commit` | Pre-commit hook: shellcheck on staged `.sh` files; executable bit on staged test scripts; guard against staged build artifacts; new test script → `memory/test-inventory.md` must also be staged |
 | `.githooks/commit-msg` | Commit-msg hook: enforces conventional commit format `<type>[(<scope>)]: <desc>` |
 | `.githooks/pre-push` | Pre-push hook: shellcheck on all tracked `.sh` files; executable bit on all test scripts; test-inventory coverage; design doc required on `feat/*`/`fix/*` branches; memory file sizes (≤ 150 lines); `awk` banned in VM test scripts |
@@ -132,7 +135,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## How to add a test
 
-1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `250_my-test.sh`)
+1. Create `tests/custom/NNN_my-test.sh` where `NNN` is a 3-digit number (e.g. `290_my-test.sh`)
    — tests run in filename-sort order; leave gaps (010, 020, …) so new tests can be inserted
 2. Exit 0 = pass, non-zero = fail; use `ok: msg` / `FAIL: msg` / `skip: msg` for assertion output
 3. The harness copies all `tests/custom/*.sh` into the initramfs and runs them in the VM
