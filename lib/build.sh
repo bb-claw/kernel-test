@@ -31,6 +31,12 @@ case "$ARCH" in
         KERNEL_CC="${CROSS_COMPILE}gcc"
         BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
         ;;
+    riscv)
+        CROSS_COMPILE='riscv64-linux-gnu-'
+        KERNEL_IMAGE_NAME=Image
+        KERNEL_CC="${CROSS_COMPILE}gcc"
+        BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
+        ;;
     *)
         die "Unsupported arch: $ARCH"
         ;;

@@ -6,6 +6,8 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
+ARCH="${1:?usage: bootstrap.sh <archs>}"
+
 # ── Distro / package-manager detection ───────────────────────────────────────
 
 detect_pm() {
@@ -33,8 +35,8 @@ install_packages() {
                 sudo pacman -S --needed --noconfirm gcc-multilib
             fi
             sudo pacman -S --needed --noconfirm \
-                gcc-multilib aarch64-linux-gnu-gcc make ccache \
-                qemu-system-x86 qemu-system-aarch64 \
+                gcc-multilib aarch64-linux-gnu-gcc riscv64-linux-gnu-gcc make ccache \
+                qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
                 bc flex bison libelf pahole
             ;;
@@ -75,52 +77,18 @@ install_packages
 
 # ── Toybox: download static binaries for each arch ───────────────────────────
 
-TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.9}
+TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.14}
 CACHE_DIR=${CACHE_DIR:-cache}
-TOYBOX_BASE_URL="https://www.landley.net/toybox/downloads/binaries/${TOYBOX_VERSION}"
 
 download_toybox() {
     mkdir -p "$CACHE_DIR"
-    local -a arches=(x86_64 i686 aarch64)
-    for ta in "${arches[@]}"; do
-        local dest="$CACHE_DIR/toybox-${ta}"
-        if [[ -f $dest && -x $dest ]]; then
-            info "toybox-${ta} already cached: $dest"
-            continue
-        fi
-        local url="${TOYBOX_BASE_URL}/toybox-${ta}"
-        info "Downloading toybox-${ta} ${TOYBOX_VERSION}..."
-        if command -v curl &>/dev/null; then
-            curl -fsSL --output "$dest" "$url" \
-                || die "Download failed: $url — check network or TOYBOX_VERSION=$TOYBOX_VERSION"
-        elif command -v wget &>/dev/null; then
-            wget -q --output-document="$dest" "$url" \
-                || die "Download failed: $url — check network or TOYBOX_VERSION=$TOYBOX_VERSION"
-        else
-            die "Neither curl nor wget found — cannot download Toybox"
-        fi
-        chmod +x "$dest"
-        info "Cached: $dest"
+    for ta in ${ARCH}; do
+        lib/download-toybox.sh "${ta}"
     done
-}
-
-check_toybox() {
-    local ok=1
-    for ta in x86_64 i686 aarch64; do
-        local dest="$CACHE_DIR/toybox-${ta}"
-        if [[ -f $dest && -x $dest ]]; then
-            info "toybox-${ta}: OK  ($dest)"
-        else
-            warn "toybox-${ta}: MISSING — run: make bootstrap"
-            ok=0
-        fi
-    done
-    [[ $ok -eq 1 ]]
 }
 
 info "Downloading Toybox ${TOYBOX_VERSION} static binaries..."
 download_toybox
-check_toybox || warn "Toybox binary missing — initramfs builds will fail"
 
 # ── KVM access ────────────────────────────────────────────────────────────────
 
@@ -162,9 +130,18 @@ else
     warn "arm64 is opt-in: use ARCHS=\"x86_64 i386 arm64\" to include it"
 fi
 
+# ── riscv64-linux-gnu-gcc sanity check (riscv kernel builds) ─────────────────
+
+if command -v riscv64-linux-gnu-gcc &>/dev/null; then
+    info "riscv64-linux-gnu-gcc: OK (riscv cross-compilation supported)"
+else
+    warn "riscv64-linux-gnu-gcc not found — riscv kernel builds will not work"
+    warn "riscv is opt-in: use ARCHS=\"x86_64 i386 arm64 riscv\" to include it"
+fi
+
 # ── Verify all required tools are present ────────────────────────────────────
 
-REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 qemu-system-aarch64 cpio git bc flex bison)
+REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 qemu-system-aarch64 qemu-system-riscv64 cpio git bc flex bison)
 missing=0
 info "Checking required tools:"
 for cmd in "${REQUIRED[@]}"; do

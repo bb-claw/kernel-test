@@ -19,6 +19,7 @@ case "$ARCH" in
     x86_64) TOYBOX_ARCH=x86_64  ;;
     i386)   TOYBOX_ARCH=i686    ;;
     arm64)  TOYBOX_ARCH=aarch64 ;;
+    riscv)  TOYBOX_ARCH=riscv64 ;;
     *)      die "Unsupported arch for initramfs: $ARCH (no Toybox binary mapping)" ;;
 esac
 
@@ -68,7 +69,7 @@ for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] || continue
     name=$(basename "$t" .sh)
     echo "> TEST RUN: $name"
-    if sh "$t"; then
+    if /bin/sh "$t"; then
         echo "< TEST PASS: $name"
     else
         echo "< TEST FAIL: $name"

@@ -43,6 +43,14 @@ case "$ARCH" in
         EARLYCON="earlycon"
         QEMU_CPU_FLAGS=(-cpu cortex-a57)
         ;;
+    riscv)
+        QEMU=qemu-system-riscv64
+        QEMU_MACHINE=virt
+        KERNEL_IMAGE="$OUT_DIR/arch/riscv/boot/Image"
+        CONSOLE=ttyS0
+        EARLYCON="earlycon"
+        QEMU_CPU_FLAGS=()
+        ;;
     *)
         die "Unsupported arch: $ARCH"
         ;;
@@ -70,8 +78,8 @@ case "$ARCH" in
             warn "KVM not available — running in TCG mode (expect slow boot)"
         fi
         ;;
-    arm64)
-        warn "arm64: KVM not used on x86 host — running in TCG mode (expect slow boot)"
+    arm64|riscv)
+        warn "$ARCH: KVM not used on x86 host — running in TCG mode (expect slow boot)"
         ;;
 esac
 
@@ -81,7 +89,7 @@ esac
 # large portion of the guest address space on arm64, OOMing in 512 M.
 
 case "$ARCH" in
-    arm64)
+    arm64|riscv)
         VM_TIMEOUT=$(( TIMEOUT * 2 ))
         VM_MEM=1G
         ;;

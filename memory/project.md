@@ -43,7 +43,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 ## Current State (2026-07-23)
 
-- **Architectures:** x86_64 + i386 + arm64 (all default); x86 uses KVM, arm64 uses TCG (requires `aarch64-linux-gnu-gcc`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64
+- **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM, arm64/riscv use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
 - **Tests:** 30 total (1 smoke + 29 custom; see test-inventory.md); next slot: 290_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`

@@ -56,6 +56,13 @@ Examples:
 
 ---
 
+## Toybox sh 0.8.11+ Breaking Changes (affects all versions ≥ 0.8.11)
+
+- **`sh` is a NOFORK builtin** — `sh script.sh` (bare name) runs the script recursively in the same process via "command recursion", bypassing fork+exec. The inner invocation uses a different output path that does not flush to the serial console. **Fix: always use `/bin/sh script.sh` (full path) in `/init` and in any test that forks a shell subprocess.** `/bin/sh` has a `/` in the path, which forces fork+exec and bypasses the NOFORK optimization.
+- **Block-buffered stdout** — default stdout buffer type switched from line-buffered to block-buffered. `printf` output may be lost on process exit if the buffer is not flushed. Resolved naturally when using `/bin/sh` (full path) since fork+exec runs in a separate process and flushes on exit.
+
+---
+
 ## Toybox sh 0.8.9 Pitfalls (test scripts)
 
 - **`$_x` leading-underscore vars** → Toybox parses as `$_` + literal; use plain names (`fails`, not `_fails`)
