@@ -1010,6 +1010,44 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-24 — riscv64 Integration
+
+### Low — Harness Issue (wasteful, not incorrect)
+
+- [x] **Boot baseline check in `build.sh` is not arch-aware — applies arm64 PL011 options to riscv/defconfig** ✅ resolved 2026-07-24
+  Observed during `make full` on the `feat/risc-architecture` branch. When building
+  `defconfig/riscv`, `build.sh` detected two options as missing from the boot baseline
+  and ran the auto-correct loop twice:
+
+  ```
+  WARN  Boot baseline options missing (pass 1) — auto-correcting: CONFIG_SERIAL_AMBA_PL011=y
+  INFO  Boot baseline corrected (pass 1): CONFIG_SERIAL_AMBA_PL011=y
+  WARN  Boot baseline options missing (pass 2) — auto-correcting: CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+  INFO  Boot baseline corrected (pass 2): CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+  ```
+
+  `CONFIG_SERIAL_AMBA_PL011` and `CONFIG_SERIAL_AMBA_PL011_CONSOLE` are the ARM PL011 UART
+  driver options — only meaningful on arm64 (where the QEMU virt machine exposes a PL011).
+  On riscv the QEMU virt machine uses NS16550, so `olddefconfig` immediately drops both options
+  after each auto-correct pass. The final config is correct; only two redundant
+  `make olddefconfig` cycles are wasted.
+
+  **Root cause:** The boot baseline options list in `lib/build.sh` is shared across all
+  architectures. It includes both the x86 8250 options and the arm64 PL011 options, and
+  the auto-correct loop does not filter by `$ARCH` before attempting to force an option.
+
+  **Impact:** Minor — two extra configuration passes (~5–10 s each) per riscv defconfig build.
+  No incorrect behavior: `olddefconfig` correctly ignores options that have no Kconfig entry
+  for the target arch.
+
+  **Fix:** `lib/build.sh` now defines `BOOT_BASELINE_OPTS` as an array populated per-arch
+  in a `case "$ARCH"` block — common options (PRINTK, TTY, INITRD, BINFMT, TMPFS) plus
+  arch-specific serial driver options. The correction loop iterates over the array instead
+  of reading from `configs/tinyconfig.config`. arm64 PL011 options are only checked on
+  arm64; riscv gets its own set (8250 + OF_PLATFORM + FPU). No file parsing needed.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
