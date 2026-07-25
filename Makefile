@@ -467,7 +467,7 @@ Config profiles (CONFIGS=):
   tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
   allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
   kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  kunitrandconfig  Build only defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run; KUnit KTAP tracked
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained: no sanitizers, torture tests, non-gzip compressors)
   randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off; KERNEL_GZIP pinned
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS

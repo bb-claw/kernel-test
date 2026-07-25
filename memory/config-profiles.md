@@ -8,7 +8,7 @@
 | `tinyconfig` | yes | minimal | `configs/tinyconfig.config` | Near-empty; fragment pins bootability options |
 | `allnoconfig` | yes | all-no | `configs/allnoconfig.config` | Absolute minimum boot path |
 | `kunitconfig` | yes | defconfig | `configs/kunitconfig.config` | KUnit framework + core test suites; KTAP results shown as kunit:N/N |
-| `kunitrandconfig` | no | defconfig | `configs/kunitrandconfig.config` | Build-only: all KUnit test modules available on defconfig base (enumerated from randconfig, olddefconfig drops invalid); random set per run — rebuild required each time; use `kunitconfig` for deterministic KUnit boot testing |
+| `kunitrandconfig` | yes | defconfig | `configs/kunitrandconfig.config` | defconfig + all available KUnit modules (enumerated from randconfig, olddefconfig drops unmet deps); random set per run — rebuild required each time; KUnit KTAP tracked; use `kunitconfig` for deterministic results |
 | `rand500config` | yes | tinyconfig | `configs/rand500config.config` | 500 random =y lines sampled from constrained randconfig |
 | `randdefconfig` | yes | defconfig | `configs/randdefconfig.config` | 300 random options disabled; heavy subsystems forced off |
 | `localconfig` | yes | /proc/config.gz | `configs/localconfig.config` | Daily-driver: full Manjaro config + laptop hardware fragment; `make install` deploys to /boot |
@@ -19,7 +19,7 @@
 Makefile variables:
 ```
 CONFIGS          = tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
-BUILD_ONLY_CONFIGS = allmodconfig randconfig kunitrandconfig
+BUILD_ONLY_CONFIGS = allmodconfig randconfig
 BOOT_CONFIGS       = (CONFIGS minus BUILD_ONLY_CONFIGS)
 ```
 
