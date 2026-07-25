@@ -356,7 +356,7 @@ kconfig-check:
 # Usage: make kconfig-build SUBSYSTEM=pinctrl [ARCHS=arm64] [DRY_RUN=1] [GATE_CFGS=CONFIG_X]
 kconfig-build:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-build SUBSYSTEM=<name>"; exit 1; }
-	$(Q)lib/build-kconfig.sh
+	$(Q)scripts/build-kconfig.sh
 
 # ── Replay archived config ────────────────────────────────────────────────────
 

@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-. "$SCRIPT_DIR/common.sh"
+. "$REPO_ROOT/lib/common.sh"
 
 cd "$REPO_ROOT"
 
@@ -173,7 +173,7 @@ generate_seed() {
 for arch in "${ARCHS_ARR[@]}"; do
     if [[ ! -f "$BUILD_DIR/initramfs-$arch.cpio.gz" ]]; then
         info "Building initramfs for $arch"
-        "$SCRIPT_DIR/initramfs.sh" "$arch"
+        "$REPO_ROOT/lib/initramfs.sh" "$arch"
     fi
 done
 
@@ -206,7 +206,7 @@ for arch in "${ARCHS_ARR[@]}"; do
             continue
         fi
 
-        if ! SEED_CONFIG="$seed" "$SCRIPT_DIR/build.sh" "$cfg_name" "$arch"; then
+        if ! SEED_CONFIG="$seed" "$REPO_ROOT/lib/build.sh" "$cfg_name" "$arch"; then
             warn "  BUILD_FAIL — $opt $arch"
             FAIL=$(( FAIL + 1 ))
             continue
@@ -220,7 +220,7 @@ for arch in "${ARCHS_ARR[@]}"; do
             continue
         fi
 
-        if "$SCRIPT_DIR/vm.sh" "$cfg_name" "$arch"; then
+        if "$REPO_ROOT/lib/vm.sh" "$cfg_name" "$arch"; then
             info "  PASS — $opt $arch"
             PASS=$(( PASS + 1 ))
         else
