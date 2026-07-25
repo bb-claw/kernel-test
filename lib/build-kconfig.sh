@@ -100,6 +100,7 @@ setup_base() {
     tmp=$(mktemp -d)
 
     [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
+    [[ $arch == riscv  ]] && cross_compile="riscv64-linux-gnu-"
 
     local tinylog
     tinylog=$(mktemp)
@@ -148,6 +149,7 @@ generate_seed() {
     cp "$base/.config" "$tmp/.config"
 
     [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
+    [[ $arch == riscv  ]] && cross_compile="riscv64-linux-gnu-"
 
     local sc
     local enables=(--enable CONFIG_OF --enable CONFIG_COMPILE_TEST
