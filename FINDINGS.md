@@ -1048,11 +1048,154 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-25 — v7.2-rc4 allmodconfig Build Failures
+
+### High — Build Failure (arm64 + GCC 16, actionable)
+
+- [ ] **`security/landlock/fs.c`: three `struct layer_masks` variables used uninitialized — build error on arm64 with GCC 16 and `CONFIG_WERROR`**
+  Kernel: v7.2-rc4 (mainline). Arch: arm64 cross-compile. Found by
+  `make all CONFIGS=allmodconfig BUILD_TIMEOUT=3600`. Compiler: `aarch64-linux-gnu-gcc` = GCC 16.1.0.
+
+  **Build error:**
+  ```
+  security/landlock/fs.c: In function 'is_access_to_paths_allowed':
+  security/landlock/fs.c:767:28: error: '_layer_masks_child1' is used uninitialized [-Werror=uninitialized]
+    767 |         struct layer_masks _layer_masks_child1, _layer_masks_child2;
+        |                            ^~~~~~~~~~~~~~~~~~~
+  security/landlock/fs.c:767:49: error: '_layer_masks_child2' is used uninitialized [-Werror=uninitialized]
+    767 |         struct layer_masks _layer_masks_child1, _layer_masks_child2;
+        |                                                 ^~~~~~~~~~~~~~~~~~~
+  security/landlock/fs.c: In function 'hook_unix_find':
+  security/landlock/fs.c:1649:28: error: 'layer_masks' is used uninitialized [-Werror=uninitialized]
+   1649 |         struct layer_masks layer_masks;
+        |                            ^~~~~~~~~~~
+  cc1: all warnings being treated as errors
+  ```
+
+  **Root cause:** Two functions declare `struct layer_masks` variables without a zero-initializer:
+  - `is_access_to_paths_allowed()` at line 767: `_layer_masks_child1` and `_layer_masks_child2` are
+    assigned conditionally (via `layer_masks_child1 = &_layer_masks_child1` only inside
+    `if (unlikely(dentry_child1))`). GCC 16's uninitialized-variable analysis recognises that on the
+    path where neither `dentry_child1` nor `dentry_child2` is set, the structs are read through the
+    pointer without ever being written.
+  - `hook_unix_find()` at line 1649: `layer_masks` is declared without initializer; GCC 16 flags it
+    uninitialized before its first conditional use.
+
+  `CONFIG_WERROR=y` (set by `allmodconfig`) promotes these warnings to errors.
+
+  **Why only now:** GCC 16 improved uninitialized-variable analysis compared to GCC 15 (which caught
+  the `myri10ge` case but not this one). The pattern was always latently wrong but older compilers
+  didn't catch it.
+
+  **Proposed fix:**
+  ```diff
+  - struct layer_masks _layer_masks_child1, _layer_masks_child2;
+  + struct layer_masks _layer_masks_child1 = {}, _layer_masks_child2 = {};
+  ```
+  and at line 1649:
+  ```diff
+  - struct layer_masks layer_masks;
+  + struct layer_masks layer_masks = {};
+  ```
+
+  **Minimal reproducer** (from `~/git/linux`):
+  ```sh
+  make O=/tmp/landlock-repro ARCH=arm64 tinyconfig
+  scripts/config --file /tmp/landlock-repro/.config \
+      -e CONFIG_SECURITY -e CONFIG_SECURITY_LANDLOCK \
+      -e CONFIG_NETWORK_FILESYSTEMS -e CONFIG_NET -e CONFIG_UNIX \
+      -e CONFIG_WERROR
+  make O=/tmp/landlock-repro ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+      CC=aarch64-linux-gnu-gcc olddefconfig
+  make O=/tmp/landlock-repro ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+      CC=aarch64-linux-gnu-gcc security/landlock/fs.o
+  ```
+
+  **Subsystem:** `security/landlock/` — Landlock LSM.
+  Maintainer: `Mickaël Salaün <mic@digikod.net>`.
+  Mailing list: `linux-security-module@vger.kernel.org`, `linux-kernel@vger.kernel.org`.
+
+---
+
+### High — Build Failure (riscv allmodconfig, actionable)
+
+- [ ] **`arch/riscv/kernel/signal.c`: `__vdso_rt_sigreturn_cfi_offset` undeclared when `CONFIG_RISCV_USER_CFI=y`**
+  Kernel: v7.2-rc4 (mainline). Arch: riscv cross-compile. Found by
+  `make all CONFIGS=allmodconfig BUILD_TIMEOUT=3600`. Compiler: `riscv64-linux-gnu-gcc` = GCC 15.1.0,
+  linker: `riscv64-linux-gnu-ld` = Binutils 2.44.
+
+  **Build sequence:**
+  ```
+    VDSOLD  arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
+  riscv64-linux-gnu-ld: warning: rt_sigreturn.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  riscv64-linux-gnu-ld: warning: vgettimeofday.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  [... similar warnings for all vdso_cfi objects ...]
+    VDSOSYM include/generated/vdso-cfi-offsets.h
+  riscv64-linux-gnu-nm: 'arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg': No such file
+  ```
+
+  **Build error:**
+  ```
+  In file included from arch/riscv/kernel/signal.c:18:
+  arch/riscv/kernel/signal.c: In function 'setup_rt_frame':
+  arch/riscv/include/asm/vdso.h:31:51: error: '__vdso_rt_sigreturn_cfi_offset' undeclared
+    (first use in this function); did you mean 'compat__vdso_rt_sigreturn_offset'?
+     31 |           (void __user *)((unsigned long)(base) + __vdso_##name##_cfi_offset) : \
+        |                                                   ^~~~~~~
+  arch/riscv/kernel/signal.c:438:35: note: in expansion of macro 'VDSO_SYMBOL'
+    438 |         regs->ra = (unsigned long)VDSO_SYMBOL(
+        |                                   ^~~~~~~~~~~
+  ```
+
+  **Root cause (two-stage failure):**
+
+  1. **`VDSOLD` step:** `riscv64-linux-gnu-ld` (Binutils 2.44) emits `unsupported GNU_PROPERTY_TYPE (5)
+     type: 0xc0000000` warnings for every riscv64 vDSO CFI object. These notes are CFI-related GNU
+     property annotations emitted by GCC 15 for riscv — Binutils 2.44 does not understand them. The
+     ld command fails or the output `.so.dbg` is not produced (the `&&`-chained objcopy step never
+     runs), so `vdso-cfi.so.dbg` does not exist after the `VDSOLD` step.
+
+  2. **`VDSOSYM` step:** The `gen_vdso_offsets.sh` script runs `nm` on the missing `.so.dbg` — `nm`
+     reports "No such file" and exits non-zero. The generated `include/generated/vdso-cfi-offsets.h`
+     is either empty or incomplete — `__vdso_rt_sigreturn_cfi_offset` is absent.
+
+  3. **`signal.c` compile:** `arch/riscv/include/asm/vdso.h` includes
+     `<generated/vdso-cfi-offsets.h>` when `CONFIG_RISCV_USER_CFI=y` and expands `VDSO_SYMBOL` to
+     reference `__vdso_rt_sigreturn_cfi_offset` — which was never defined.
+
+  **Why only riscv allmodconfig:** `CONFIG_RISCV_USER_CFI` is only selectable on riscv and is enabled
+  by `allmodconfig`. Toolchain constraint: the Arch Linux `riscv64-linux-gnu-ld` (Binutils 2.44)
+  does not yet support the CFI GNU property type emitted by `riscv64-linux-gnu-gcc` 15.
+
+  **Proposed fix:** Either (a) update Binutils for the riscv64 cross-toolchain to a version that
+  handles the CFI GNU property type, or (b) strip unsupported property types from the linker
+  command via `--no-warn-rwx-segments` / property filtering flags, or (c) guard the CFI vDSO path
+  on a Binutils capability check in `arch/riscv/kernel/vdso_cfi/Makefile`.
+
+  **Minimal reproducer** (from `~/git/linux`):
+  ```sh
+  make O=/tmp/riscvcfi-repro ARCH=riscv allmodconfig
+  make O=/tmp/riscvcfi-repro ARCH=riscv \
+      CROSS_COMPILE=riscv64-linux-gnu- CC=riscv64-linux-gnu-gcc \
+      arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
+  # Shows ld warnings + missing .dbg; then:
+  make O=/tmp/riscvcfi-repro ARCH=riscv \
+      CROSS_COMPILE=riscv64-linux-gnu- CC=riscv64-linux-gnu-gcc \
+      arch/riscv/kernel/signal.o
+  ```
+
+  **Subsystem:** `arch/riscv/` — RISC-V architecture signal/vDSO.
+  Maintainers: `Paul Walmsley <pjw@kernel.org>`, `Palmer Dabbelt <palmer@dabbelt.com>`,
+  `Albert Ou <aou@eecs.berkeley.edu>`.
+  Mailing list: `linux-riscv@lists.infradead.org`, `linux-kernel@vger.kernel.org`.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 7     |
-| Resolved | 16  |
+| Open   | 9     |
+| Resolved | 18  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
