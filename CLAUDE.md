@@ -111,6 +111,7 @@ The goal is systematic community verification of each -rc kernel.
 
 ## Conventions
 
+- `lib/` contains the **core pipeline** scripts (fetch, build, initramfs, vm, report, diff, install, dmesg, checkout, common.sh); `scripts/` contains **on-demand tools** invoked explicitly (kconfig-check, kconfig-enumerate, build-kconfig, config-archive, config-bisect, canary-patch, migrate-reports); both directories use the same Bash conventions; the distinction is semantic, not about who calls them
 - Git hooks are in `.githooks/`; activate with `make hooks` (or automatically via `make bootstrap`); `pre-commit` checks staged files (shellcheck, executable bit, artifact guard, inventory sync); `commit-msg` enforces conventional commit format; `pre-push` sweeps all tracked files (shellcheck, executable bit, inventory coverage, design doc, memory sizes, `awk` ban in VM tests)
 - All scripts use `#!/bin/bash` and `set -euo pipefail`
 - Functions are lowercase_snake_case
