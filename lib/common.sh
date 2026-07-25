@@ -78,6 +78,18 @@ arch_cross_compile() {
     esac
 }
 
+# arch_toybox_name <arch>
+# Prints the Toybox binary suffix for an arch (matches landley.net download names).
+arch_toybox_name() {
+    case "$1" in
+        x86_64) printf '%s' "x86_64"  ;;
+        i386)   printf '%s' "i686"    ;;
+        arm64)  printf '%s' "aarch64" ;;
+        riscv)  printf '%s' "riscv64" ;;
+        *)      die "Unsupported arch for Toybox: $1 (no binary mapping)" ;;
+    esac
+}
+
 # apply_arch_overlay <dot_config> <configs_dir> <profile> <arch>
 # Silently appends <configs_dir>/<profile>-<arch>.config to <dot_config> if the file exists.
 apply_arch_overlay() {

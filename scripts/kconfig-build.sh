@@ -20,10 +20,10 @@ KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
 GATE_CFGS=${GATE_CFGS:-}
 
+CROSS_COMPILE=$(arch_cross_compile "$ARCH")
 case "$ARCH" in
-    arm64) CROSS_COMPILE=aarch64-linux-gnu-; IMAGE=Image   ;;
-    i386)  CROSS_COMPILE=;                   IMAGE=bzImage ;;
-    *)     CROSS_COMPILE=;                   IMAGE=bzImage ;;
+    arm64|riscv) IMAGE=Image   ;;
+    *)           IMAGE=bzImage ;;
 esac
 
 DRIVER_DIR="$KERNEL_TREE/drivers/$SUBSYSTEM"

@@ -13,15 +13,8 @@ STAGE="$BUILD_DIR/initramfs-$ARCH"
 OUTPUT="$BUILD_DIR/initramfs-$ARCH.cpio.gz"
 
 # ── Locate Toybox binary for this arch ───────────────────────────────────────
-# Map kernel arch name → Toybox binary name (matches landley.net download names).
 
-case "$ARCH" in
-    x86_64) TOYBOX_ARCH=x86_64  ;;
-    i386)   TOYBOX_ARCH=i686    ;;
-    arm64)  TOYBOX_ARCH=aarch64 ;;
-    riscv)  TOYBOX_ARCH=riscv64 ;;
-    *)      die "Unsupported arch for initramfs: $ARCH (no Toybox binary mapping)" ;;
-esac
+TOYBOX_ARCH=$(arch_toybox_name "$ARCH")
 
 TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
 [[ -f $TOYBOX && -x $TOYBOX ]] || \
