@@ -49,7 +49,7 @@ skip).
 | Apply order | base → arch overlay → `olddefconfig` |
 | Build-only profiles | Yes — overlays applied to ALL profiles |
 | localconfig | Strip arm64/riscv sections from base; no overlay (x86_64-only) |
-| BOOT_BASELINE_OPTS | Deferred — decide before opening PR |
+| BOOT_BASELINE_OPTS | Remove arch-specific entries only — serial/FPU now owned by overlays; 7 arch-neutral options remain |
 | Overlay loader | `lib/build.sh` (alongside existing fragment logic) |
 | x86_64 vs i386 | Separate files (allow future divergence) |
 | Config archive regen | No — SHA256 archive is independent |

@@ -70,9 +70,12 @@ generate_baseline_options() {
     tmp="$(mktemp -d)"
     local make_args=(-C "$KERNEL_TREE" "O=$tmp" "ARCH=$arch")
     [[ "$arch" == arm64 ]] && make_args+=("CROSS_COMPILE=aarch64-linux-gnu-")
+    [[ "$arch" == riscv ]] && make_args+=("CROSS_COMPILE=riscv64-linux-gnu-")
 
     make "${make_args[@]}" tinyconfig >> "$tmp/gen.log" 2>&1
     cat "$REPO_DIR/configs/rand500config.config" >> "$tmp/.config"
+    local arch_overlay="$REPO_DIR/configs/rand500config-${arch}.config"
+    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
     make "${make_args[@]}" olddefconfig >> "$tmp/gen.log" 2>&1
     grep "^CONFIG_[A-Z0-9_]*=y" "$tmp/.config" | sort > "$out"
     rm -rf "$tmp"
@@ -98,9 +101,12 @@ generate_step_config() {
     tmp="$(mktemp -d)"
     local make_args=(-C "$KERNEL_TREE" "O=$tmp" "ARCH=$arch")
     [[ "$arch" == arm64 ]] && make_args+=("CROSS_COMPILE=aarch64-linux-gnu-")
+    [[ "$arch" == riscv ]] && make_args+=("CROSS_COMPILE=riscv64-linux-gnu-")
 
     make "${make_args[@]}" tinyconfig >> "$tmp/gen.log" 2>&1
     cat "$REPO_DIR/configs/rand500config.config" >> "$tmp/.config"
+    local arch_overlay="$REPO_DIR/configs/rand500config-${arch}.config"
+    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
     if [[ -n "$PINNED_OPTS" && "$with_pinned" == 1 ]]; then
         tr ',[:space:]' '\n' <<< "$PINNED_OPTS" | grep -v '^$' >> "$tmp/.config"
     fi
