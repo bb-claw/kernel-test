@@ -25,10 +25,7 @@ KERNEL_TREE=${KERNEL_TREE:-$(pwd)}
 ARCH=${ARCH:-x86_64}
 DRIVER=${DRIVER%.c}
 
-case "$ARCH" in
-    arm64) CROSS_COMPILE=aarch64-linux-gnu- ;;
-    *)     CROSS_COMPILE= ;;
-esac
+CROSS_COMPILE=$(arch_cross_compile "$ARCH")
 
 HEADER_DIR="$KERNEL_TREE/include/linux/$SUBSYSTEM"
 DRIVER_DIR="$KERNEL_TREE/drivers/$SUBSYSTEM"
