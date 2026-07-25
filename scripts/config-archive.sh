@@ -419,7 +419,7 @@ generate_index() {
             version=$(grep -oE 'v[0-9]+\.[0-9]+(\.[0-9]+)?(-rc[0-9]+)?$' <<< "$rest" || true)
             config_arch="${rest%-${version}}"
             cfg=""; arc=""
-            for known in x86_64 i386 arm64 riscv; do
+            for known in ${ARCHS_ALL:-x86_64 i386 arm64 riscv}; do
                 if [[ "$config_arch" == *"-${known}" ]]; then
                     arc="$known"; cfg="${config_arch%-${known}}"; break
                 fi

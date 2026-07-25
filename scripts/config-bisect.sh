@@ -45,7 +45,7 @@ parse_archive_filename() {
     before="${before%-}"         # strip trailing dash
 
     local arch=""
-    for a in x86_64 arm64 i386; do
+    for a in ${ARCHS_ALL:-x86_64 i386 arm64 riscv}; do
         if [[ "$before" == *"-$a-"* || "$before" == *"-$a" ]]; then
             arch="$a"; break
         fi
