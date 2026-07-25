@@ -66,16 +66,15 @@ is_build_failure() { [[ "$BISECT_FAILURE_TYPE" == BUILD_FAIL* || "$BISECT_FAILUR
 
 generate_baseline_options() {
     local arch="$1" out="$2"
-    local tmp
+    local tmp cross_compile
     tmp="$(mktemp -d)"
+    cross_compile=$(arch_cross_compile "$arch")
     local make_args=(-C "$KERNEL_TREE" "O=$tmp" "ARCH=$arch")
-    [[ "$arch" == arm64 ]] && make_args+=("CROSS_COMPILE=aarch64-linux-gnu-")
-    [[ "$arch" == riscv ]] && make_args+=("CROSS_COMPILE=riscv64-linux-gnu-")
+    [[ -n "$cross_compile" ]] && make_args+=("CROSS_COMPILE=$cross_compile")
 
     make "${make_args[@]}" tinyconfig >> "$tmp/gen.log" 2>&1
     cat "$REPO_DIR/configs/rand500config.config" >> "$tmp/.config"
-    local arch_overlay="$REPO_DIR/configs/rand500config-${arch}.config"
-    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
+    apply_arch_overlay "$tmp/.config" "$REPO_DIR/configs" "rand500config" "$arch"
     make "${make_args[@]}" olddefconfig >> "$tmp/gen.log" 2>&1
     grep "^CONFIG_[A-Z0-9_]*=y" "$tmp/.config" | sort > "$out"
     rm -rf "$tmp"
@@ -97,16 +96,15 @@ extract_candidates() {
 
 generate_step_config() {
     local arch="$1" options_file="$2" out="$3" with_pinned="${4:-1}"
-    local tmp
+    local tmp cross_compile
     tmp="$(mktemp -d)"
+    cross_compile=$(arch_cross_compile "$arch")
     local make_args=(-C "$KERNEL_TREE" "O=$tmp" "ARCH=$arch")
-    [[ "$arch" == arm64 ]] && make_args+=("CROSS_COMPILE=aarch64-linux-gnu-")
-    [[ "$arch" == riscv ]] && make_args+=("CROSS_COMPILE=riscv64-linux-gnu-")
+    [[ -n "$cross_compile" ]] && make_args+=("CROSS_COMPILE=$cross_compile")
 
     make "${make_args[@]}" tinyconfig >> "$tmp/gen.log" 2>&1
     cat "$REPO_DIR/configs/rand500config.config" >> "$tmp/.config"
-    local arch_overlay="$REPO_DIR/configs/rand500config-${arch}.config"
-    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
+    apply_arch_overlay "$tmp/.config" "$REPO_DIR/configs" "rand500config" "$arch"
     if [[ -n "$PINNED_OPTS" && "$with_pinned" == 1 ]]; then
         tr ',[:space:]' '\n' <<< "$PINNED_OPTS" | grep -v '^$' >> "$tmp/.config"
     fi

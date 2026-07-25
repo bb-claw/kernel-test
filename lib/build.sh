@@ -14,25 +14,13 @@ GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
 
 # ── Architecture-specific settings ───────────────────────────────────────────
 
+CROSS_COMPILE=$(arch_cross_compile "$ARCH")
 case "$ARCH" in
-    x86_64)
-        CROSS_COMPILE=''
+    x86_64|i386)
         KERNEL_IMAGE_NAME=bzImage
         KERNEL_CC="$GCC"
         ;;
-    i386)
-        CROSS_COMPILE=''
-        KERNEL_IMAGE_NAME=bzImage
-        KERNEL_CC="$GCC"
-        ;;
-    arm64)
-        CROSS_COMPILE='aarch64-linux-gnu-'
-        KERNEL_IMAGE_NAME=Image
-        KERNEL_CC="${CROSS_COMPILE}gcc"
-        BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
-        ;;
-    riscv)
-        CROSS_COMPILE='riscv64-linux-gnu-'
+    arm64|riscv)
         KERNEL_IMAGE_NAME=Image
         KERNEL_CC="${CROSS_COMPILE}gcc"
         BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))

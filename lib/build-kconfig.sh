@@ -96,11 +96,9 @@ setup_base() {
     local arch=$1
     [[ -v _BASE_TMP[$arch] ]] && return 0
 
-    local tmp cross_compile=""
+    local cross_compile tmp
+    cross_compile=$(arch_cross_compile "$arch")
     tmp=$(mktemp -d)
-
-    [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
-    [[ $arch == riscv  ]] && cross_compile="riscv64-linux-gnu-"
 
     local tinylog
     tinylog=$(mktemp)
@@ -120,8 +118,7 @@ setup_base() {
     rm -f "$tinylog"
 
     cat "$FRAGMENT" >> "$tmp/.config"
-    local arch_overlay="$REPO_ROOT/configs/randkconfigconfig-${arch}.config"
-    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
+    apply_arch_overlay "$tmp/.config" "$REPO_ROOT/configs" "randkconfigconfig" "$arch"
 
     if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$arch" \
             ${cross_compile:+CROSS_COMPILE="$cross_compile"} olddefconfig \
@@ -140,16 +137,13 @@ setup_base() {
 # Returns 1 if opt is absent from .config after olddefconfig (arch mismatch / bad deps).
 generate_seed() {
     local opt=$1 arch=$2 out_path=$3
-    local base="${_BASE_TMP[$arch]}" tmp cross_compile=""
-
+    local base="${_BASE_TMP[$arch]}" tmp cross_compile
+    cross_compile=$(arch_cross_compile "$arch")
     tmp=$(mktemp -d)
     # shellcheck disable=SC2064
     trap "rm -rf $tmp" RETURN
 
     cp "$base/.config" "$tmp/.config"
-
-    [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
-    [[ $arch == riscv  ]] && cross_compile="riscv64-linux-gnu-"
 
     local sc
     local enables=(--enable CONFIG_OF --enable CONFIG_COMPILE_TEST

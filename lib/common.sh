@@ -68,6 +68,24 @@ write_kernel_version() {
     printf '%s\n' "$KERNEL_VERSION" > "$BUILD_DIR/.kernel-version"
 }
 
+# arch_cross_compile <arch>
+# Prints the CROSS_COMPILE prefix for cross-compile arches, or "" for native (x86_64, i386).
+arch_cross_compile() {
+    case "$1" in
+        arm64) printf '%s' "aarch64-linux-gnu-" ;;
+        riscv) printf '%s' "riscv64-linux-gnu-" ;;
+        *)     printf '%s' "" ;;
+    esac
+}
+
+# apply_arch_overlay <dot_config> <configs_dir> <profile> <arch>
+# Silently appends <configs_dir>/<profile>-<arch>.config to <dot_config> if the file exists.
+apply_arch_overlay() {
+    local dot_config="$1" configs_dir="$2" profile="$3" arch="$4"
+    local overlay="${configs_dir}/${profile}-${arch}.config"
+    [[ -f "$overlay" ]] && cat "$overlay" >> "$dot_config"
+}
+
 # Usage: is_build_only <config>
 # Returns 0 if config is in BUILD_ONLY_CONFIGS, 1 otherwise.
 is_build_only() {
