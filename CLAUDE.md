@@ -25,7 +25,7 @@ The goal is systematic community verification of each -rc kernel.
   - `randdefconfig` — uses `defconfig` as base, randomly disables 300 `=[ym]` options, applies a fragment that forces heavy subsystems off and re-pins bootability options including `CONFIG_KERNEL_GZIP=y` (prevents a non-standard compressor being auto-selected if GZIP is disabled); stays reliably under 5 minutes
   - `localconfig` — uses `/proc/config.gz` (running Manjaro kernel) as base + `configs/localconfig.config` fragment; for daily-driver builds; `make install` deploys to `/boot` via mkinitcpio + GRUB; x86_64 only
   - `randconfig` is constrained by `configs/randconfig.config` (disables modules + 5 heaviest subsystems + sanitizers + torture tests + non-gzip kernel compression) and subject to `BUILD_TIMEOUT` (default 1200 s); exits with `STATUS=TIMEOUT` if exceeded
-  - Config fragments in `configs/<profile>.config` are appended post-config and resolved via `olddefconfig`; used to re-enable the minimum options (TTY, serial, initramfs, BINFMT_ELF/SCRIPT) that stripped configs disable
+  - Config fragments: `configs/<profile>.config` (arch-neutral base: PRINTK, TTY, INITRD, BINFMT, TMPFS) + optional `configs/<profile>-<arch>.config` (arch overlay: serial driver, FPU); both appended to `.config` and resolved with one `olddefconfig` pass; absent overlay is silently skipped; `localconfig` has no overlay (x86_64-only)
 
 ## Key files
 
@@ -103,6 +103,7 @@ The goal is systematic community verification of each -rc kernel.
 | `configs/randdefconfig.config` | Heavy subsystem force-off + bootability fragment for randdefconfig; pins `CONFIG_KERNEL_GZIP=y` so a non-standard compressor is not auto-selected if GZIP is randomly disabled |
 | `configs/randconfig.config` | Constraint fragment for randconfig and rand500config sampling pool: MODULE=n, heavy subsystems off, sanitizers off, RCU/lock torture tests off, KUNIT=n, non-gzip kernel compression off |
 | `configs/randkconfigconfig.config` | Bootability fragment for `kconfig-build` exhaustive sweeps (TTY, serial, initramfs); applied to tinyconfig base before enabling the option under test; identical content to `rand500config.config` |
+| `configs/<profile>-<arch>.config` | Arch overlay for one profile+arch pair; appended after the base fragment, resolved in the same `olddefconfig` pass; arch names match `$ARCH`: `x86_64`, `i386`, `arm64`, `riscv`; absent overlay is silently skipped; `localconfig` has no overlay (x86_64-only, 8250 stays in its base) |
 | `configs/localconfig.config` | Hardware fragment for Lenovo AMD Ryzen 7 5800H (NVMe, MT7921 WiFi, BT, AMD_PMC, AES-NI, BTRFS); applied on top of `/proc/config.gz` |
 | `docs/config-bisect-plan.md` | Design doc for `make bisect`: algorithm, step directory structure, decision table, usage examples |
 | `docs/boot-canary-plan.md` | Design doc for `make canary-patch` + `CANARY=1`: problem statement, two-tier diagnostic approach, architecture notes, decision table, harness integration |

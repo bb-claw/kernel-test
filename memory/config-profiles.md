@@ -87,22 +87,22 @@ Excludes:
 
 ---
 
-## Bootability Fragment Contents (shared pattern)
+## Config Fragment + Arch Overlay (two-layer pattern)
 
-All bootable configs that need a fragment pin these options:
-```
-CONFIG_PRINTK=y
-CONFIG_TTY=y
-CONFIG_SERIAL_8250=y
-CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_BLK_DEV_INITRD=y
-CONFIG_RD_GZIP=y
-CONFIG_BINFMT_ELF=y
-CONFIG_BINFMT_SCRIPT=y
-CONFIG_TMPFS=y
-```
+Each config profile uses up to two fragment files applied in order:
 
-`randdefconfig.config` adds the heavy subsystem disables on top of this.
+1. **`configs/<profile>.config`** — arch-neutral base: PRINTK, TTY, INITRD, BINFMT, TMPFS.
+2. **`configs/<profile>-<arch>.config`** — arch overlay: serial driver + FPU (absent = silently skipped).
+
+Both are appended to `.config` before one `make olddefconfig` resolves them.
+
+**Arch overlay contents:**
+- `*-x86_64.config` / `*-i386.config`: `CONFIG_SERIAL_8250=y` + `CONFIG_SERIAL_8250_CONSOLE=y`
+- `*-arm64.config`: `CONFIG_SERIAL_AMBA_PL011=y` + `CONFIG_SERIAL_AMBA_PL011_CONSOLE=y`
+- `*-riscv.config`: 8250 + `CONFIG_SERIAL_OF_PLATFORM=y` + `CONFIG_FPU=y`
+
+`localconfig` has no overlay (x86_64-only; 8250 options kept in its base).
+`randdefconfig.config` adds heavy subsystem disables on top of its base.
 
 ---
 

@@ -119,6 +119,8 @@ setup_base() {
     rm -f "$tinylog"
 
     cat "$FRAGMENT" >> "$tmp/.config"
+    local arch_overlay="$REPO_ROOT/configs/randkconfigconfig-${arch}.config"
+    [[ -f "$arch_overlay" ]] && cat "$arch_overlay" >> "$tmp/.config"
 
     if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$arch" \
             ${cross_compile:+CROSS_COMPILE="$cross_compile"} olddefconfig \

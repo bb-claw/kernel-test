@@ -204,18 +204,29 @@ elif ! kmake "$CONFIG"; then
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-# Step 1b: apply config fragment (skip for seed replay — fragment is already baked
-# into the archived config; re-applying would overwrite options the original run set).
-# KCONFIG_ALLCONFIG is NOT used here because some targets (e.g. tinyconfig)
-# explicitly override it internally, silently discarding our fragment.
-# Appending to .config + olddefconfig is reliable for every kernel target.
-if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
-    info "Applying config fragment: $FRAGMENT"
-    cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
-    if ! kmake olddefconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-        die "Config fragment failed: $FRAGMENT — see $LOG_FILE"
+# Step 1b: apply config fragment + arch overlay, then resolve with one olddefconfig.
+# Skip for seed replay — the archived config already has both baked in.
+# KCONFIG_ALLCONFIG is NOT used because some targets (e.g. tinyconfig) override it
+# internally, silently discarding our fragment.  cat >> .config is reliable for all.
+ARCH_OVERLAY="$SCRIPT_DIR/configs/${CONFIG}-${ARCH}.config"
+if [[ -z "${SEED_CONFIG:-}" ]]; then
+    _applied=0
+    if [[ -f $FRAGMENT ]]; then
+        info "Applying config fragment: $FRAGMENT"
+        cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
+        _applied=1
+    fi
+    if [[ -f "$ARCH_OVERLAY" ]]; then
+        info "Applying arch overlay: $ARCH_OVERLAY"
+        cat "$ARCH_OVERLAY" >> "$PWD/$OUT_DIR/.config"
+        _applied=1
+    fi
+    if [[ $_applied -eq 1 ]]; then
+        if ! kmake olddefconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config fragment/overlay failed: $CONFIG/$ARCH — see $LOG_FILE"
+        fi
     fi
 fi
 
