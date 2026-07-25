@@ -8,14 +8,15 @@ fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # Single fork+exec+wait
-if sh -c 'exit 0' 2>/dev/null; then
+# Use /bin/sh (full path) to force fork+exec; bare 'sh' is a NOFORK builtin in Toybox 0.8.11+.
+if /bin/sh -c 'exit 0' 2>/dev/null; then
     ok "fork/exec single subprocess"
 else
     fail "fork/exec single subprocess failed"
 fi
 
 # Exit code propagation
-sh -c 'exit 42' 2>/dev/null; rc=$?
+/bin/sh -c 'exit 42' 2>/dev/null; rc=$?
 if [ "$rc" -eq 42 ]; then
     ok "subprocess exit code propagated ($rc)"
 else

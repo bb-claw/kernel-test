@@ -60,12 +60,12 @@ _signal_test() {
     wait "$bg_pid" 2>/dev/null || true
 }
 
-# SIGTERM/SIGKILL/SIGUSR1 — arm64 TCG: fork() faults in parent's full COW RSS,
-# OOMing the 1G guest; skip all busyloop-based delivery tests on aarch64.
-if [ "$ARCH" = "aarch64" ]; then
-    skip "SIGTERM: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
-    skip "SIGKILL: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
-    skip "SIGUSR1: busyloop skipped on aarch64 (fork OOMs QEMU TCG guest)"
+# SIGTERM/SIGKILL/SIGUSR1 — TCG arches (aarch64, riscv64): fork() faults in
+# parent's full COW RSS, OOMing the 1G guest; skip busyloop-based tests.
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "riscv64" ]; then
+    skip "SIGTERM: busyloop skipped on $ARCH (fork OOMs QEMU TCG guest)"
+    skip "SIGKILL: busyloop skipped on $ARCH (fork OOMs QEMU TCG guest)"
+    skip "SIGUSR1: busyloop skipped on $ARCH (fork OOMs QEMU TCG guest)"
 else
     # SIGTERM — default termination signal
     _signal_test -TERM

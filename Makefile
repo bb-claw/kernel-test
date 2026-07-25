@@ -25,17 +25,17 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
-ARCHS         ?= x86_64 i386 arm64
+ARCHS         ?= x86_64 i386 arm64 riscv
 CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
-BUILD_TIMEOUT ?= 1200
+BUILD_TIMEOUT ?= 1800
 GCC           ?= gcc
 REPORT_DIR    ?= reports
 V             ?= 0
 NO_FETCH      ?= 0
 NO_BUILD      ?= 0
 LINUX_NEXT    ?= 0
-TOYBOX_VERSION ?= 0.8.9
+TOYBOX_VERSION ?= 0.8.14
 DMESG_LABEL    ?= mainline
 LABEL          ?=
 CONFIG_FILE    ?=
@@ -120,7 +120,7 @@ $(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 bootstrap:
-	$(Q)lib/bootstrap.sh
+	$(Q)lib/bootstrap.sh "$(ARCHS)"
 
 hooks:
 	@git config core.hooksPath .githooks

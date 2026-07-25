@@ -83,8 +83,8 @@ fi
 if [ -r "$SYSCTL/arch" ] || [ -r /proc/cpuinfo ]; then
     arch=$(uname -m 2>/dev/null || echo unknown)
     case "$arch" in
-        x86_64|i386|i686|arm64|aarch64) ok "arch=$arch" ;;
-        *)                  fail "unexpected arch: $arch" ;;
+        x86_64|i386|i686|arm64|aarch64|riscv64) ok "arch=$arch" ;;
+        *) fail "unexpected arch: $arch" ;;
     esac
 fi
 

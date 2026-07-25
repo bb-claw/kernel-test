@@ -31,6 +31,12 @@ case "$ARCH" in
         KERNEL_CC="${CROSS_COMPILE}gcc"
         BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
         ;;
+    riscv)
+        CROSS_COMPILE='riscv64-linux-gnu-'
+        KERNEL_IMAGE_NAME=Image
+        KERNEL_CC="${CROSS_COMPILE}gcc"
+        BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
+        ;;
     *)
         die "Unsupported arch: $ARCH"
         ;;
@@ -229,16 +235,33 @@ if [[ "${CANARY:-0}" == 1 ]]; then
 fi
 
 # Step 1c: verify bootability floor for all bootable configs.
-# configs/tinyconfig.config is the authoritative minimum: PRINTK, TTY + arch serial,
-# initramfs, BINFMT_ELF/SCRIPT, TMPFS.  olddefconfig can silently drop these when a
-# dependency chain changes between kernel versions.
+# olddefconfig can silently drop required options when a dependency chain changes
+# between kernel versions.  Defined per-arch so that arm64 PL011 options are never
+# applied to riscv (and vice-versa), avoiding spurious correction passes.
 # Only flag options that exist in this arch's Kconfig (disabled = problem;
 # completely absent from .config = not supported by this arch, skip).
 # Loop up to 3 passes: enabling a parent option (e.g. TTY) makes previously
 # absent child options (e.g. SERIAL_AMBA_PL011) visible as disabled on the next pass.
-BOOT_BASELINE="$SCRIPT_DIR/configs/tinyconfig.config"
+BOOT_BASELINE_OPTS=(
+    CONFIG_PRINTK=y
+    CONFIG_TTY=y
+    CONFIG_BLK_DEV_INITRD=y
+    CONFIG_RD_GZIP=y
+    CONFIG_BINFMT_ELF=y
+    CONFIG_BINFMT_SCRIPT=y
+    CONFIG_TMPFS=y
+)
+case "$ARCH" in
+    x86_64|i386)
+        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y ) ;;
+    arm64)
+        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_AMBA_PL011=y CONFIG_SERIAL_AMBA_PL011_CONSOLE=y ) ;;
+    riscv)
+        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y
+                               CONFIG_SERIAL_OF_PLATFORM=y CONFIG_FPU=y ) ;;
+esac
 CONFIG_CORRECTED=0
-if ! is_build_only "$CONFIG" && [[ -f $BOOT_BASELINE ]]; then
+if ! is_build_only "$CONFIG"; then
     _correction_pass=0
     while [[ $_correction_pass -lt 3 ]]; do
         _correction_pass=$(( _correction_pass + 1 ))
@@ -249,7 +272,7 @@ if ! is_build_only "$CONFIG" && [[ -f $BOOT_BASELINE ]]; then
                 grep -q "^# ${key} is not set" "$PWD/$OUT_DIR/.config" \
                     && missing+=("$opt") || true
             fi
-        done < <(grep '^CONFIG_[A-Z0-9_]*=y' "$BOOT_BASELINE")
+        done < <(printf '%s\n' "${BOOT_BASELINE_OPTS[@]}")
 
         [[ ${#missing[@]} -eq 0 ]] && break
 
