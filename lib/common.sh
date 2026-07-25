@@ -78,6 +78,15 @@ arch_cross_compile() {
     esac
 }
 
+# arch_kernel_image <arch>
+# Prints the kernel image filename for an arch (bzImage for x86; Image for arm64/riscv).
+arch_kernel_image() {
+    case "$1" in
+        arm64|riscv) printf '%s' "Image"   ;;
+        *)           printf '%s' "bzImage" ;;
+    esac
+}
+
 # arch_toybox_name <arch>
 # Prints the Toybox binary suffix for an arch (matches landley.net download names).
 arch_toybox_name() {

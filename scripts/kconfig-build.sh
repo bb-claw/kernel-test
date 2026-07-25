@@ -21,10 +21,7 @@ ARCH=${ARCH:-x86_64}
 GATE_CFGS=${GATE_CFGS:-}
 
 CROSS_COMPILE=$(arch_cross_compile "$ARCH")
-case "$ARCH" in
-    arm64|riscv) IMAGE=Image   ;;
-    *)           IMAGE=bzImage ;;
-esac
+IMAGE=$(arch_kernel_image "$ARCH")
 
 DRIVER_DIR="$KERNEL_TREE/drivers/$SUBSYSTEM"
 KCONFIG="$DRIVER_DIR/Kconfig"
