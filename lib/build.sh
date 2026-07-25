@@ -247,12 +247,13 @@ fi
 
 # Step 1c: verify bootability floor for all bootable configs.
 # olddefconfig can silently drop required options when a dependency chain changes
-# between kernel versions.  Defined per-arch so that arm64 PL011 options are never
-# applied to riscv (and vice-versa), avoiding spurious correction passes.
+# between kernel versions.  Arch-specific serial/FPU options are now owned by
+# the arch overlay (configs/<profile>-<arch>.config) and excluded here to avoid
+# duplication.  Only arch-neutral options that apply identically on every arch.
 # Only flag options that exist in this arch's Kconfig (disabled = problem;
 # completely absent from .config = not supported by this arch, skip).
-# Loop up to 3 passes: enabling a parent option (e.g. TTY) makes previously
-# absent child options (e.g. SERIAL_AMBA_PL011) visible as disabled on the next pass.
+# Loop up to 3 passes: enabling a parent (e.g. TTY) makes previously absent
+# children visible as disabled on the next pass.
 BOOT_BASELINE_OPTS=(
     CONFIG_PRINTK=y
     CONFIG_TTY=y
@@ -262,15 +263,6 @@ BOOT_BASELINE_OPTS=(
     CONFIG_BINFMT_SCRIPT=y
     CONFIG_TMPFS=y
 )
-case "$ARCH" in
-    x86_64|i386)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y ) ;;
-    arm64)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_AMBA_PL011=y CONFIG_SERIAL_AMBA_PL011_CONSOLE=y ) ;;
-    riscv)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y
-                               CONFIG_SERIAL_OF_PLATFORM=y CONFIG_FPU=y ) ;;
-esac
 CONFIG_CORRECTED=0
 if ! is_build_only "$CONFIG"; then
     _correction_pass=0
