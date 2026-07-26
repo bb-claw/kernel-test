@@ -87,10 +87,15 @@ install_packages() {
                 warn "Fix with: sudo apt-get install -f && sudo apt-get install gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu"
             }
 
-            # dwarves from backports only — explicit -t overrides the pin
+            # Install dwarves and qemu-system-misc from backports via explicit -t.
+            # dwarves: bookworm ships 1.24; ≥1.25 needed for BTF on kernels ≥6.0.
+            # qemu-system-misc: bookworm QEMU 7.2 has riscv64 ISA gaps — the
+            # B-extension (zba/zbb/zbs) used by Toybox 0.8.14 is not emulated,
+            # causing SIGILL in init. Backports ships QEMU ≥8.x which emulates
+            # these instructions correctly.
             if [[ -n ${CODENAME:-} ]] && [[ -f /etc/apt/sources.list.d/${CODENAME}-backports.list ]]; then
-                $SUDO apt-get install -y -t "${CODENAME}-backports" dwarves || \
-                    warn "Could not upgrade dwarves from backports — BTF may not work on kernels ≥6.0"
+                $SUDO apt-get install -y -t "${CODENAME}-backports" dwarves qemu-system-misc || \
+                    warn "Could not upgrade from backports — BTF and/or riscv64 QEMU may not work correctly"
             else
                 $SUDO apt-get install -y dwarves
             fi

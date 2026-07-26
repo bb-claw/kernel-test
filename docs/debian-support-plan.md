@@ -30,12 +30,16 @@ regular users get `sudo` as before. The `kvm` group setup is skipped when root.
 - Add `gcc-riscv64-linux-gnu` — riscv cross-compiler
 - Keep `gcc-multilib` — required for `gcc -m32` (i386 kernel builds)
 - Add `libssl-dev` — kernel `CONFIG_SYSTEM_TRUSTED_KEYS` dependency
-- Add `qemu-system-misc` to main package list — provides `qemu-system-riscv64`
-  (bookworm ships QEMU 7.2; sufficient for riscv64 TCG)
+- Add `qemu-system-misc` to main package list — baseline install for riscv64 QEMU
 - Detect `VERSION_CODENAME` from `/etc/os-release`; add
   `${CODENAME}-backports` with an **apt preferences pin at priority 100**
   (idempotent — skips if already present)
-- Upgrade `dwarves` via explicit `-t ${CODENAME}-backports`
+- Upgrade `dwarves` **and** `qemu-system-misc` via explicit `-t ${CODENAME}-backports`
+
+**Why qemu-system-misc from backports**: bookworm ships QEMU 7.2. Its riscv64
+TCG does not emulate the B-extension (zba/zbb/zbs) used by Toybox 0.8.14,
+causing SIGILL in init. Confirmed via OpenSBI: `Boot HART Base ISA: rv64imafdch`
+— no B bit. Backports ships QEMU ≥8.x which emulates these instructions.
 
 **Backports pin is critical**: adding backports without pinning causes apt to
 see a newer `gcc-aarch64-linux-gnu` from backports and try to upgrade it;

@@ -72,10 +72,7 @@ case "$ARCH" in
         KERNEL_IMAGE="$OUT_DIR/arch/riscv/boot/Image"
         CONSOLE=ttyS0
         EARLYCON="earlycon"
-        # Enable B-extension (zba/zbb/zbs) explicitly: QEMU 7.2's default riscv CPU
-        # may not expose bit-manipulation instructions that Toybox 0.8.14 was compiled with,
-        # causing SIGILL in init. Newer QEMU (≥8.x) enables these by default.
-        QEMU_CPU_FLAGS=(-cpu "rv64,zba=true,zbb=true,zbs=true")
+        QEMU_CPU_FLAGS=()
         warn "riscv: KVM not used on x86 host — running in TCG mode (expect slow boot)"
         KVM_FLAGS=()
         VM_TIMEOUT=$(( TIMEOUT * 2 ))
