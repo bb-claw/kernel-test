@@ -2,11 +2,20 @@
 # Install all dependencies required to run the kernel-test harness.
 # Detects the distribution and uses the appropriate package manager.
 # Idempotent — safe to run multiple times.
+# Safe to run as root (e.g. Ansible) or as a regular user (uses sudo when needed).
 # Usage: make bootstrap
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
 ARCH="${1:?usage: bootstrap.sh <archs>}"
+
+# ── Root vs sudo ──────────────────────────────────────────────────────────────
+# Ansible or other root-context runners have EUID=0; regular users need sudo.
+if [[ $EUID -eq 0 ]]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
 
 # ── Distro / package-manager detection ───────────────────────────────────────
 
@@ -32,9 +41,9 @@ install_packages() {
             # Remove gcc first if present to avoid the conflict.
             if pacman -Q gcc &>/dev/null && ! pacman -Q gcc-multilib &>/dev/null; then
                 info "Replacing gcc with gcc-multilib for i386 support"
-                sudo pacman -S --needed --noconfirm gcc-multilib
+                $SUDO pacman -S --needed --noconfirm gcc-multilib
             fi
-            sudo pacman -S --needed --noconfirm \
+            $SUDO pacman -S --needed --noconfirm \
                 gcc-multilib aarch64-linux-gnu-gcc riscv64-linux-gnu-gcc make ccache \
                 qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
@@ -42,16 +51,58 @@ install_packages() {
             ;;
 
         apt)
-            sudo apt-get update -qq
-            sudo apt-get install -y \
-                gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
-                qemu-system-x86 qemu-system-arm \
-                cpio git lzop \
-                bc flex bison libelf-dev dwarves
+            # Detect Debian codename for backports source entry.
+            CODENAME=$(. /etc/os-release 2>/dev/null && echo "${VERSION_CODENAME:-}" || echo "")
+
+            # Add ${CODENAME}-backports for dwarves ≥1.25
+            # (bookworm ships 1.24; kernels ≥6.0 need ≥1.25 for BTF generation).
+            # Pin at priority 100 (below main's 500) so apt NEVER auto-selects
+            # backports packages — without the pin, apt may try to upgrade
+            # gcc-aarch64-linux-gnu to a backports version whose deps are
+            # not satisfiable from main, causing the whole install to fail.
+            if [[ -n $CODENAME ]]; then
+                BACKPORTS_FILE="/etc/apt/sources.list.d/${CODENAME}-backports.list"
+                if [[ ! -f $BACKPORTS_FILE ]]; then
+                    info "Adding ${CODENAME}-backports (dwarves ≥1.25)..."
+                    echo "deb http://deb.debian.org/debian ${CODENAME}-backports main" | \
+                        $SUDO tee "$BACKPORTS_FILE" > /dev/null
+                    printf 'Package: *\nPin: release a=%s-backports\nPin-Priority: 100\n' \
+                        "$CODENAME" | \
+                        $SUDO tee "/etc/apt/preferences.d/${CODENAME}-backports-pin" > /dev/null
+                fi
+            fi
+
+            $SUDO apt-get update -qq
+            # Base packages from main; qemu-system-misc provides qemu-system-riscv64
+            $SUDO apt-get install -y \
+                gcc gcc-multilib make ccache \
+                qemu-system-x86 qemu-system-arm qemu-system-misc \
+                cpio git lzop libssl-dev \
+                bc flex bison libelf-dev
+
+            # Cross-compilers in a separate step so a broken pre-existing package
+            # state does not abort the rest of bootstrap.
+            $SUDO apt-get install -y gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu || {
+                warn "Cross-compiler install failed — arm64/riscv kernel builds will not work"
+                warn "Fix with: sudo apt-get install -f && sudo apt-get install gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu"
+            }
+
+            # Install dwarves and qemu-system-misc from backports via explicit -t.
+            # dwarves: bookworm ships 1.24; ≥1.25 needed for BTF on kernels ≥6.0.
+            # qemu-system-misc: bookworm QEMU 7.2 has riscv64 ISA gaps — the
+            # B-extension (zba/zbb/zbs) used by Toybox 0.8.14 is not emulated,
+            # causing SIGILL in init. Backports ships QEMU ≥8.x which emulates
+            # these instructions correctly.
+            if [[ -n ${CODENAME:-} ]] && [[ -f /etc/apt/sources.list.d/${CODENAME}-backports.list ]]; then
+                $SUDO apt-get install -y -t "${CODENAME}-backports" dwarves qemu-system-misc || \
+                    warn "Could not upgrade from backports — BTF and/or riscv64 QEMU may not work correctly"
+            else
+                $SUDO apt-get install -y dwarves
+            fi
             ;;
 
         dnf)
-            sudo dnf install -y \
+            $SUDO dnf install -y \
                 gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
                 qemu-system-x86 qemu-system-aarch64 \
                 cpio git lzop \
@@ -59,7 +110,7 @@ install_packages() {
             ;;
 
         zypper)
-            sudo zypper install -y \
+            $SUDO zypper install -y \
                 gcc gcc-multilib cross-aarch64-linux-gnu-gcc make ccache \
                 qemu-x86 qemu-arm \
                 cpio git lzop \
@@ -99,11 +150,17 @@ setup_kvm() {
         return
     fi
 
+    # Running as root: /dev/kvm is accessible directly; no group setup needed.
+    if [[ $EUID -eq 0 ]]; then
+        info "Running as root — /dev/kvm accessible, skipping kvm group setup"
+        return
+    fi
+
     if groups | grep -qw kvm; then
         info "User '$USER' is already in the kvm group"
     else
         info "Adding '$USER' to the kvm group..."
-        sudo usermod -aG kvm "$USER"
+        $SUDO usermod -aG kvm "$USER"
         warn "Group change takes effect on next login. To apply now without logout:"
         warn "  newgrp kvm"
     fi
@@ -117,7 +174,8 @@ if printf 'int main(){}' | gcc -m32 -x c - -o /dev/null 2>/dev/null; then
     info "gcc -m32: OK (i386 kernel builds supported)"
 else
     warn "gcc -m32 failed — i386 kernel builds will not work"
-    warn "On Arch: sudo pacman -S gcc-multilib lib32-glibc"
+    warn "On Arch:   sudo pacman -S gcc-multilib lib32-glibc"
+    warn "On Debian: sudo apt-get install gcc-multilib"
     warn "Continuing with x86_64 only: make ARCHS=x86_64"
 fi
 
@@ -139,27 +197,52 @@ else
     warn "riscv is in the default ARCHS — exclude it with ARCHS=\"x86_64 i386 arm64\" or install riscv64-linux-gnu-gcc"
 fi
 
-# ── Verify all required tools are present ────────────────────────────────────
+# ── pahole version check (BTF/debug info for kernels ≥6.0) ───────────────────
 
-REQUIRED=(gcc make ccache qemu-system-x86_64 qemu-system-i386 qemu-system-aarch64 qemu-system-riscv64 cpio git bc flex bison)
+check_pahole_version() {
+    if ! command -v pahole &>/dev/null; then
+        warn "pahole not found — BTF/debug info will be unavailable for recent kernels"
+        return
+    fi
+    local ver major minor
+    ver=$(pahole --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "0.0")
+    major=${ver%%.*}
+    minor=${ver##*.}
+    if [[ $major -lt 1 ]] || { [[ $major -eq 1 ]] && [[ $minor -lt 25 ]]; }; then
+        warn "pahole ${ver} detected — ≥1.25 required for BTF in kernels ≥6.0"
+        warn "On Debian: sudo apt-get install -t bookworm-backports dwarves"
+    else
+        info "pahole ${ver}: OK (BTF generation supported)"
+    fi
+}
+
+check_pahole_version
+
+# ── Verify all required tools are present ────────────────────────────────────
+# Core tools always checked; arch-specific QEMU binaries and cross-compilers
+# gated on the ARCHS passed to bootstrap so a partial-arch setup is valid.
+
+REQUIRED=(gcc make ccache cpio git bc flex bison lzop)
+for a in ${ARCH}; do
+    case "$a" in
+        x86_64) REQUIRED+=(qemu-system-x86_64) ;;
+        i386)   REQUIRED+=(qemu-system-i386) ;;
+        arm64)  REQUIRED+=(qemu-system-aarch64 aarch64-linux-gnu-gcc) ;;
+        riscv)  REQUIRED+=(qemu-system-riscv64 riscv64-linux-gnu-gcc) ;;
+    esac
+done
+
 missing=0
-info "Checking required tools:"
+info "Checking required tools (ARCHS: ${ARCH}):"
 for cmd in "${REQUIRED[@]}"; do
     path=$(command -v "$cmd" 2>/dev/null || true)
     if [[ -n $path ]]; then
-        printf '  %-26s %s\n' "$cmd" "$path"
+        printf '  %-32s %s\n' "$cmd" "$path"
     else
-        printf '  %-26s MISSING\n' "$cmd"
+        printf '  %-32s MISSING\n' "$cmd"
         missing=$((missing + 1))
     fi
 done
-
-# pahole is optional but strongly recommended — provides BTF/debug info for recent kernels.
-# It is the binary name on all distros (package is called 'pahole' on Arch, 'dwarves' on Debian).
-cmd=pahole
-command -v "$cmd" &>/dev/null && \
-    printf '  %-26s %s  (optional)\n' "$cmd" "$(command -v "$cmd")" || \
-    printf '  %-26s missing (optional — needed for BTF/debug info in recent kernels)\n' "$cmd"
 
 echo ""
 

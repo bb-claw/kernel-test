@@ -31,10 +31,12 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
-        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
-        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm); VM_TIMEOUT=$TIMEOUT
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+            KVM_FLAGS=(); VM_TIMEOUT=$(( TIMEOUT * 2 ))
         fi
-        VM_TIMEOUT=$TIMEOUT
         VM_MEM=512M
         ;;
     i386)
@@ -44,10 +46,12 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
-        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
-        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm); VM_TIMEOUT=$TIMEOUT
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+            KVM_FLAGS=(); VM_TIMEOUT=$(( TIMEOUT * 2 ))
         fi
-        VM_TIMEOUT=$TIMEOUT
         VM_MEM=512M
         ;;
     arm64)
