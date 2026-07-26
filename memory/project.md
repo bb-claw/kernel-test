@@ -48,6 +48,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 - **Tests:** 30 total (1 smoke + 29 custom; see test-inventory.md); next slot: 290_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
 - **Current kernel (mainline clone):** v7.2-rc4
+- **Hetzner-staging (stable-rc clone):** first full run 2026-07-26, v7.1.5-rc2, PASS 30/30 all 8 combos (tinyconfig+defconfig × 4 archs); TCG timings: i386 ~6 min (slowest), x86_64 ~2.5 min, arm64/riscv ~3–8 s (backports QEMU ≥8.x)
 
 ## Directory Structure
 
