@@ -11,7 +11,7 @@
 | `ARCHS_ALL` | `x86_64 i386 arm64 riscv` | fixed constant; not user-settable; exported to scripts for filename parsing |
 | `ARCHS` | `$(ARCHS_ALL)` | `ARCHS=x86_64` |
 | `CONFIGS` | all 9 profiles | `CONFIGS=defconfig` |
-| `TIMEOUT` | `180` | `TIMEOUT=600` |
+| `TIMEOUT` | `360` | `TIMEOUT=600` |
 | `BUILD_TIMEOUT` | `1800` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
 | `NO_FETCH` | `0` | `NO_FETCH=1` |
 | `NO_BUILD` | `0` | `NO_BUILD=1` |
