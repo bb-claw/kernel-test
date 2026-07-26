@@ -31,10 +31,12 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
-        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
-        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm); VM_TIMEOUT=$TIMEOUT
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+            KVM_FLAGS=(); VM_TIMEOUT=$(( TIMEOUT * 2 ))
         fi
-        VM_TIMEOUT=$TIMEOUT
         VM_MEM=512M
         ;;
     i386)
@@ -44,10 +46,12 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
-        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
-        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        if [[ -r /dev/kvm ]]; then
+            KVM_FLAGS=(-enable-kvm); VM_TIMEOUT=$TIMEOUT
+        else
+            warn "KVM not available — running in TCG mode (expect slow boot)"
+            KVM_FLAGS=(); VM_TIMEOUT=$(( TIMEOUT * 2 ))
         fi
-        VM_TIMEOUT=$TIMEOUT
         VM_MEM=512M
         ;;
     arm64)
@@ -68,7 +72,10 @@ case "$ARCH" in
         KERNEL_IMAGE="$OUT_DIR/arch/riscv/boot/Image"
         CONSOLE=ttyS0
         EARLYCON="earlycon"
-        QEMU_CPU_FLAGS=()
+        # Enable B-extension (zba/zbb/zbs) explicitly: QEMU 7.2's default riscv CPU
+        # may not expose bit-manipulation instructions that Toybox 0.8.14 was compiled with,
+        # causing SIGILL in init. Newer QEMU (≥8.x) enables these by default.
+        QEMU_CPU_FLAGS=(-cpu "rv64,zba=true,zbb=true,zbs=true")
         warn "riscv: KVM not used on x86 host — running in TCG mode (expect slow boot)"
         KVM_FLAGS=()
         VM_TIMEOUT=$(( TIMEOUT * 2 ))
