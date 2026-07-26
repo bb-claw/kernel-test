@@ -30,14 +30,23 @@ regular users get `sudo` as before. The `kvm` group setup is skipped when root.
 - Add `gcc-riscv64-linux-gnu` — riscv cross-compiler
 - Keep `gcc-multilib` — required for `gcc -m32` (i386 kernel builds)
 - Add `libssl-dev` — kernel `CONFIG_SYSTEM_TRUSTED_KEYS` dependency
-- Detect `VERSION_CODENAME` from `/etc/os-release` and add
-  `${CODENAME}-backports` to apt sources (idempotent — skips if already present)
-- Install `dwarves` and `qemu-system-misc` via `-t ${CODENAME}-backports`
+- Add `qemu-system-misc` to main package list — provides `qemu-system-riscv64`
+  (bookworm ships QEMU 7.2; sufficient for riscv64 TCG)
+- Detect `VERSION_CODENAME` from `/etc/os-release`; add
+  `${CODENAME}-backports` with an **apt preferences pin at priority 100**
+  (idempotent — skips if already present)
+- Upgrade `dwarves` via explicit `-t ${CODENAME}-backports`
 
-Backports rationale:
-- **dwarves**: bookworm ships 1.24; backports provides 1.25+ needed for BTF
-- **qemu-system-misc**: provides `qemu-system-riscv64`; backports version
-  is tested against recent kernels and preferred over the bookworm default
+**Backports pin is critical**: adding backports without pinning causes apt to
+see a newer `gcc-aarch64-linux-gnu` from backports and try to upgrade it;
+that version depends on `gcc-12-aarch64-linux-gnu` from backports which is
+not satisfiable from main, aborting the entire install. Pin priority 100 <
+main 500 prevents any auto-selection from backports; `-t backports` still
+works for explicit installs.
+
+Cross-compilers are installed in a **separate** `apt-get install` step with
+`|| warn` so a pre-existing broken package state (held packages) does not
+abort the rest of bootstrap.
 
 ### 3. REQUIRED check — dynamic, arch-gated
 

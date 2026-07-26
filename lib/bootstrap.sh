@@ -54,30 +54,45 @@ install_packages() {
             # Detect Debian codename for backports source entry.
             CODENAME=$(. /etc/os-release 2>/dev/null && echo "${VERSION_CODENAME:-}" || echo "")
 
-            # Add ${CODENAME}-backports for:
-            #   dwarves ≥1.25  — bookworm ships 1.24; BTF generation fails on kernels ≥6.0
-            #   qemu-system-misc — provides qemu-system-riscv64
+            # Add ${CODENAME}-backports for dwarves ≥1.25
+            # (bookworm ships 1.24; kernels ≥6.0 need ≥1.25 for BTF generation).
+            # Pin at priority 100 (below main's 500) so apt NEVER auto-selects
+            # backports packages — without the pin, apt may try to upgrade
+            # gcc-aarch64-linux-gnu to a backports version whose deps are
+            # not satisfiable from main, causing the whole install to fail.
             if [[ -n $CODENAME ]]; then
                 BACKPORTS_FILE="/etc/apt/sources.list.d/${CODENAME}-backports.list"
                 if [[ ! -f $BACKPORTS_FILE ]]; then
-                    info "Adding ${CODENAME}-backports (dwarves ≥1.25 + qemu-system-misc)..."
+                    info "Adding ${CODENAME}-backports (dwarves ≥1.25)..."
                     echo "deb http://deb.debian.org/debian ${CODENAME}-backports main" | \
                         $SUDO tee "$BACKPORTS_FILE" > /dev/null
+                    printf 'Package: *\nPin: release a=%s-backports\nPin-Priority: 100\n' \
+                        "$CODENAME" | \
+                        $SUDO tee "/etc/apt/preferences.d/${CODENAME}-backports-pin" > /dev/null
                 fi
             fi
 
             $SUDO apt-get update -qq
+            # Base packages from main; qemu-system-misc provides qemu-system-riscv64
             $SUDO apt-get install -y \
-                gcc gcc-multilib gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu make ccache \
-                qemu-system-x86 qemu-system-arm \
+                gcc gcc-multilib make ccache \
+                qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev
 
-            # dwarves and qemu-system-misc via backports when available
+            # Cross-compilers in a separate step so a broken pre-existing package
+            # state does not abort the rest of bootstrap.
+            $SUDO apt-get install -y gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu || {
+                warn "Cross-compiler install failed — arm64/riscv kernel builds will not work"
+                warn "Fix with: sudo apt-get install -f && sudo apt-get install gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu"
+            }
+
+            # dwarves from backports only — explicit -t overrides the pin
             if [[ -n ${CODENAME:-} ]] && [[ -f /etc/apt/sources.list.d/${CODENAME}-backports.list ]]; then
-                $SUDO apt-get install -y -t "${CODENAME}-backports" dwarves qemu-system-misc
+                $SUDO apt-get install -y -t "${CODENAME}-backports" dwarves || \
+                    warn "Could not upgrade dwarves from backports — BTF may not work on kernels ≥6.0"
             else
-                $SUDO apt-get install -y dwarves qemu-system-misc
+                $SUDO apt-get install -y dwarves
             fi
             ;;
 
