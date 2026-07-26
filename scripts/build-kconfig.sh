@@ -11,13 +11,13 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-. "$SCRIPT_DIR/common.sh"
+. "$REPO_ROOT/lib/common.sh"
 
 cd "$REPO_ROOT"
 
 require_env SUBSYSTEM KERNEL_TREE BUILD_DIR
 
-ARCHS_RAW=${ARCHS:-x86_64 i386 arm64}
+ARCHS_RAW=${ARCHS:-${ARCHS_ALL:-x86_64 i386 arm64 riscv}}
 DRY_RUN=${DRY_RUN:-0}
 GATE_CFGS=${GATE_CFGS:-}
 DRIVER=${DRIVER:-}
@@ -96,10 +96,9 @@ setup_base() {
     local arch=$1
     [[ -v _BASE_TMP[$arch] ]] && return 0
 
-    local tmp cross_compile=""
+    local cross_compile tmp
+    cross_compile=$(arch_cross_compile "$arch")
     tmp=$(mktemp -d)
-
-    [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
 
     local tinylog
     tinylog=$(mktemp)
@@ -119,6 +118,7 @@ setup_base() {
     rm -f "$tinylog"
 
     cat "$FRAGMENT" >> "$tmp/.config"
+    apply_arch_overlay "$tmp/.config" "$REPO_ROOT/configs" "randkconfigconfig" "$arch"
 
     if ! make -C "$KERNEL_TREE" O="$tmp" ARCH="$arch" \
             ${cross_compile:+CROSS_COMPILE="$cross_compile"} olddefconfig \
@@ -137,15 +137,13 @@ setup_base() {
 # Returns 1 if opt is absent from .config after olddefconfig (arch mismatch / bad deps).
 generate_seed() {
     local opt=$1 arch=$2 out_path=$3
-    local base="${_BASE_TMP[$arch]}" tmp cross_compile=""
-
+    local base="${_BASE_TMP[$arch]}" tmp cross_compile
+    cross_compile=$(arch_cross_compile "$arch")
     tmp=$(mktemp -d)
     # shellcheck disable=SC2064
     trap "rm -rf $tmp" RETURN
 
     cp "$base/.config" "$tmp/.config"
-
-    [[ $arch == arm64 ]] && cross_compile="aarch64-linux-gnu-"
 
     local sc
     local enables=(--enable CONFIG_OF --enable CONFIG_COMPILE_TEST
@@ -175,7 +173,7 @@ generate_seed() {
 for arch in "${ARCHS_ARR[@]}"; do
     if [[ ! -f "$BUILD_DIR/initramfs-$arch.cpio.gz" ]]; then
         info "Building initramfs for $arch"
-        "$SCRIPT_DIR/initramfs.sh" "$arch"
+        "$REPO_ROOT/lib/initramfs.sh" "$arch"
     fi
 done
 
@@ -208,7 +206,7 @@ for arch in "${ARCHS_ARR[@]}"; do
             continue
         fi
 
-        if ! SEED_CONFIG="$seed" "$SCRIPT_DIR/build.sh" "$cfg_name" "$arch"; then
+        if ! SEED_CONFIG="$seed" "$REPO_ROOT/lib/build.sh" "$cfg_name" "$arch"; then
             warn "  BUILD_FAIL — $opt $arch"
             FAIL=$(( FAIL + 1 ))
             continue
@@ -222,7 +220,7 @@ for arch in "${ARCHS_ARR[@]}"; do
             continue
         fi
 
-        if "$SCRIPT_DIR/vm.sh" "$cfg_name" "$arch"; then
+        if "$REPO_ROOT/lib/vm.sh" "$cfg_name" "$arch"; then
             info "  PASS — $opt $arch"
             PASS=$(( PASS + 1 ))
         else

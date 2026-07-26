@@ -17,6 +17,11 @@ QEMU_LOG="$OUT_DIR/qemu.log"
 STATUS_FILE="$OUT_DIR/vm.status"
 
 # ── Architecture-specific settings ───────────────────────────────────────────
+# KVM is only available when the guest ISA matches the host; arm64/riscv run
+# in TCG (software emulation) on x86 hosts — expect ~5× slower boots.
+# TCG arches get 2× timeout and 1 G RAM: COW fork OOMs in 512 M on arm64.
+# x86 earlycon uses an explicit COM1 address; bare earlycon silently breaks
+# when CONFIG_SERIAL_EARLYCON=y but CONFIG_ACPI=n.
 
 case "$ARCH" in
     x86_64)
@@ -26,6 +31,11 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
+        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
+        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        fi
+        VM_TIMEOUT=$TIMEOUT
+        VM_MEM=512M
         ;;
     i386)
         QEMU=qemu-system-i386
@@ -34,6 +44,11 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon=uart8250,io,0x3f8"
         QEMU_CPU_FLAGS=()
+        if [[ -r /dev/kvm ]]; then KVM_FLAGS=(-enable-kvm)
+        else warn "KVM not available — running in TCG mode (expect slow boot)"; KVM_FLAGS=()
+        fi
+        VM_TIMEOUT=$TIMEOUT
+        VM_MEM=512M
         ;;
     arm64)
         QEMU=qemu-system-aarch64
@@ -42,6 +57,10 @@ case "$ARCH" in
         CONSOLE=ttyAMA0
         EARLYCON="earlycon"
         QEMU_CPU_FLAGS=(-cpu cortex-a57)
+        warn "arm64: KVM not used on x86 host — running in TCG mode (expect slow boot)"
+        KVM_FLAGS=()
+        VM_TIMEOUT=$(( TIMEOUT * 2 ))
+        VM_MEM=1G
         ;;
     riscv)
         QEMU=qemu-system-riscv64
@@ -50,52 +69,13 @@ case "$ARCH" in
         CONSOLE=ttyS0
         EARLYCON="earlycon"
         QEMU_CPU_FLAGS=()
-        ;;
-    *)
-        die "Unsupported arch: $ARCH"
-        ;;
-esac
-
-# ── Pre-flight checks ─────────────────────────────────────────────────────────
-
-command -v "$QEMU" &>/dev/null  || die "$QEMU not found in PATH"
-[[ -f $KERNEL_IMAGE ]]          || die "Kernel image not found: $KERNEL_IMAGE (did 'make build' succeed?)"
-[[ -f $INITRAMFS ]]             || die "initramfs not found: $INITRAMFS (did 'make initramfs' succeed?)"
-
-mkdir -p "$OUT_DIR"
-: > "$DMESG_FILE"
-
-# ── KVM availability ──────────────────────────────────────────────────────────
-# KVM only accelerates VMs whose ISA matches the host. arm64 guests on an x86
-# host must use TCG (software emulation); KVM is skipped unconditionally.
-
-KVM_FLAGS=()
-case "$ARCH" in
-    x86_64|i386)
-        if [[ -r /dev/kvm ]]; then
-            KVM_FLAGS=(-enable-kvm)
-        else
-            warn "KVM not available — running in TCG mode (expect slow boot)"
-        fi
-        ;;
-    arm64|riscv)
-        warn "$ARCH: KVM not used on x86 host — running in TCG mode (expect slow boot)"
-        ;;
-esac
-
-# ── Arch-specific VM settings ─────────────────────────────────────────────────
-# arm64 in TCG mode is ~5× slower than KVM; multiply timeout to ensure all
-# tests complete.  Also allocate more RAM: the signal busyloop COW-faults a
-# large portion of the guest address space on arm64, OOMing in 512 M.
-
-case "$ARCH" in
-    arm64|riscv)
+        warn "riscv: KVM not used on x86 host — running in TCG mode (expect slow boot)"
+        KVM_FLAGS=()
         VM_TIMEOUT=$(( TIMEOUT * 2 ))
         VM_MEM=1G
         ;;
     *)
-        VM_TIMEOUT=$TIMEOUT
-        VM_MEM=512M
+        die "Unsupported arch: $ARCH"
         ;;
 esac
 

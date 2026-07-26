@@ -17,14 +17,15 @@ a structured test report to the community.
 ## 2. Scope
 
 **In scope:**
-- Fetching the latest upstream -rc tag automatically
-- Building the kernel for x86_64 and i386 under eight config profiles
-- Booting each build in QEMU/KVM with a minimal initramfs
-- Running a boot smoke test and functional kernel-path tests inside the VM (network, RNG, tmpfs stress, fork/exec, sysctl)
-- Writing a pass/fail report as local HTML and plain text
+- Fetching the latest upstream -rc tag automatically (mainline, stable, stable-rc, linux-next)
+- Building the kernel for x86_64, i386, arm64, and riscv under nine config profiles
+- Booting each build in QEMU/KVM (x86) or TCG (arm64/riscv) with a minimal Toybox initramfs
+- Running a boot smoke test and 29 functional kernel-path tests inside the VM
+- KUnit KTAP output parsed and reported alongside shell tests
+- Writing a pass/fail report as local HTML and plain text (LKML-ready preamble)
+- Config archive, binary bisect, and per-option kconfig sweep for root-cause analysis
 
 **Out of scope (for now):**
-- ARM64 / RISC-V builds
 - Kernel selftests (`tools/testing/selftests`) — too heavyweight for the initial scope
 - LTP — requires a larger rootfs
 - Automated email submission to LKML
@@ -70,7 +71,7 @@ Makefile  (make all / make fetch / make checkout / make info / make build / ...)
     │                     write build/<config>-<arch>/build.status (PASS|FAIL|TIMEOUT)
     │
     ├── make initramfs → lib/initramfs.sh  (for each arch)
-    │                     copy BusyBox static binary
+    │                     copy Toybox static binary
     │                     generate /init shell script with > TEST RUN / < TEST PASS/FAIL markers
     │                     copy tests/001_smoke.sh + tests/custom/NNN_*.sh (in filename order)
     │                     pack with cpio + gzip → initramfs-<arch>.cpio.gz
@@ -137,20 +138,16 @@ Each (config, arch) pair gets an isolated out-of-tree build directory:
 build/
   defconfig-x86_64/         # build.status, .config, dmesg.txt, vm.status
   defconfig-i386/
+  defconfig-arm64/          # TCG boot (slower); 1G RAM
+  defconfig-riscv/
   tinyconfig-x86_64/
-  tinyconfig-i386/
-  allnoconfig-x86_64/
-  allnoconfig-i386/
+  …
   kunitconfig-x86_64/       # boot+test; vm.status includes KUNIT_PASS/KUNIT_FAIL
-  kunitconfig-i386/
   rand500config-x86_64/     # also: rand-source.config, rand-sampled.config
-  rand500config-i386/
   randdefconfig-x86_64/     # also: randdef-disabled.config
-  randdefconfig-i386/
   allmodconfig-x86_64/      # build-only: build.log instead of dmesg.txt/vm.status
-  allmodconfig-i386/
   randconfig-x86_64/
-  randconfig-i386/
+  …
 ```
 
 Build command (x86_64 example):
@@ -241,7 +238,7 @@ The initramfs is built once per architecture (shared across config variants):
 
 ```
 initramfs-<arch>/
-  bin/          # busybox + symlinks (sh, ls, cat, dmesg, ...)
+  bin/          # toybox + symlinks (sh, ls, cat, dmesg, ...)
   dev/          # null, console (mknod fallback if devtmpfs unavailable)
   proc/
   sys/
@@ -302,7 +299,9 @@ Note: `-display none` is used instead of `-nographic`. With `-nographic`, QEMU i
 binds serial0 to stdio, causing `-serial file:` to register as serial1 — kernel output
 would go to /dev/null instead of the capture file.
 
-i386 uses `qemu-system-i386` with `ARCH=i386` kernel and the same flags.
+i386 uses `qemu-system-i386` with `ARCH=i386` and the same flags.
+arm64 uses `qemu-system-aarch64 -M virt -cpu cortex-a57` with `Image` kernel, `earlycon`, 1G RAM, and no KVM (TCG on x86 host; `VM_TIMEOUT×2`).
+riscv uses `qemu-system-riscv64 -M virt` with `Image` kernel, `earlycon`, 1G RAM, and no KVM (TCG on x86 host; `VM_TIMEOUT×2`).
 
 **Boot detection** (parsed from `$DMESG_FILE`):
 - `BOOT_OK:` line present → kernel reached `/init`
@@ -400,7 +399,7 @@ Reports directory is gitignored. Users choose what to share publicly.
 | `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit; verifies Makefile version |
 | `make info` | Show HEAD commit, git tag, kernel Makefile version, and version file |
 | `make build` | Build kernels for all `CONFIGS` × `ARCHS` |
-| `make initramfs` | Assemble the BusyBox cpio initramfs for each arch |
+| `make initramfs` | Assemble the Toybox cpio initramfs for each arch |
 | `make test` | Boot each (config, arch) in QEMU and run tests |
 | `make report` | Aggregate results into HTML and plain-text report |
 | `make install` | Install built kernel to `/boot`; reads `KERNEL_TREE` from `build.status`; modules, custom mkinitcpio conf (`MODULES=()`) + preset, grub-mkconfig (Arch/Manjaro, needs sudo) |
@@ -453,7 +452,7 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 | `STABLE_RELEASE` | _(none)_ | Stable series to fetch, e.g. `7.1`; triggers stable mode in `fetch.sh` and overrides `KERNEL_TREE` to `STABLE_KERNEL_TREE` |
 | `TAG` | _(none)_ | Tag or commit for `make checkout`; ignored by all other targets |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
-| `ARCHS` | `x86_64 i386` | Space-separated architectures to test |
+| `ARCHS` | `x86_64 i386 arm64 riscv` | Space-separated architectures to test |
 | `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated config profiles |
 | `TIMEOUT` | `60` | VM boot timeout in seconds |
 | `BUILD_TIMEOUT` | `1200` | bzImage build timeout in seconds; exit 124 → `STATUS=TIMEOUT`; set to `0` for localconfig |
@@ -471,8 +470,10 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 | gcc | 12.0 | C23 features used by recent kernels |
 | gcc-multilib | — | i386 cross-compile on x86_64 host |
 | ccache | 3.7 | Compiler cache |
-| qemu-system-x86 | 6.0 | `-enable-kvm`, `-serial file:` |
-| busybox | 1.35 (static) | Initramfs userland |
+| qemu-system-x86 | 6.0 | `-enable-kvm`, `-serial file:` (x86_64 + i386) |
+| qemu-system-aarch64 | 6.0 | TCG on x86 host; arm64 |
+| qemu-system-riscv64 | 6.0 | TCG on x86 host; riscv |
+| toybox | 0.8.14 (static) | Initramfs userland (downloaded by `make bootstrap`) |
 | cpio | — | Initramfs packing |
 | git | 2.30 | `git -C`, `--sort=version:refname` |
 
@@ -489,15 +490,12 @@ make V=1 KERNEL_TREE=~/git/linux-stable                  # verbose output
 
 ## 9. Future Work
 
-The following are deferred and out of scope for v0.1:
-
 | Feature | Rationale for deferral |
 |---|---|
-| ARM64 / RISC-V | Requires cross-toolchain setup |
+| GitHub Actions CI | Per-user infra varies; TCG arm64/riscv is slow in CI |
 | Kernel selftests | Needs larger initramfs + more packages |
 | LTP | Same; also requires a full rootfs |
 | Automated LKML email | Out-of-scope; user reviews before sending |
-| CI integration | Per-user infra varies too much |
 | `allmodconfig` boot test | Image too large for minimal initramfs |
 | Multiple -rc versions side-by-side | Not needed for community reporting use case |
 

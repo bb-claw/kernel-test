@@ -8,10 +8,11 @@
 | `STABLE_KERNEL_TREE` | `~/git/linux-stable` | — |
 | `STABLE_RELEASE` | _(none)_ | `STABLE_RELEASE=7.1` |
 | `TAG` | _(none)_ | `TAG=v7.2-rc2` (used by `make checkout` only) |
-| `ARCHS` | `x86_64 i386 arm64` | `ARCHS=x86_64` |
+| `ARCHS_ALL` | `x86_64 i386 arm64 riscv` | fixed constant; not user-settable; exported to scripts for filename parsing |
+| `ARCHS` | `$(ARCHS_ALL)` | `ARCHS=x86_64` |
 | `CONFIGS` | all 9 profiles | `CONFIGS=defconfig` |
 | `TIMEOUT` | `60` | `TIMEOUT=120` |
-| `BUILD_TIMEOUT` | `1200` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
+| `BUILD_TIMEOUT` | `1800` | `BUILD_TIMEOUT=0` (no limit — use for localconfig) |
 | `NO_FETCH` | `0` | `NO_FETCH=1` |
 | `NO_BUILD` | `0` | `NO_BUILD=1` |
 | `V` | `0` | `V=1` |
@@ -101,7 +102,7 @@ make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1              # list options witho
 make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64  # single driver
 make kconfig-build SUBSYSTEM=pinctrl                         # all options × all archs
 ```
-Per option: tinyconfig + `configs/randkconfigconfig.config` + `CONFIG_<OPT>=y` → build + boot.
+Per option: tinyconfig + `configs/randkconfigconfig.config` + `configs/randkconfigconfig-<arch>.config` (arch overlay) + `CONFIG_<OPT>=y` → build + boot.
 
 ### Boot canary (diagnosing silent boots)
 

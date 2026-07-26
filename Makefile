@@ -25,7 +25,8 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
-ARCHS         ?= x86_64 i386 arm64 riscv
+ARCHS_ALL     := x86_64 i386 arm64 riscv
+ARCHS         ?= $(ARCHS_ALL)
 CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 60
 BUILD_TIMEOUT ?= 1800
@@ -78,7 +79,7 @@ endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
-export ARCHS CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
+export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
@@ -355,7 +356,7 @@ kconfig-check:
 # Usage: make kconfig-build SUBSYSTEM=pinctrl [ARCHS=arm64] [DRY_RUN=1] [GATE_CFGS=CONFIG_X]
 kconfig-build:
 	@test -n "$(SUBSYSTEM)" || { echo "ERROR: SUBSYSTEM= is required — usage: make kconfig-build SUBSYSTEM=<name>"; exit 1; }
-	$(Q)lib/build-kconfig.sh
+	$(Q)scripts/build-kconfig.sh
 
 # ── Replay archived config ────────────────────────────────────────────────────
 
@@ -372,7 +373,7 @@ replay:
 	base=$$(basename "$(CONFIG_FILE)" .config); \
 	rest=$${base#kconfig-}; \
 	config=""; arch=""; \
-	for arch_try in x86_64 i386 arm64; do \
+	for arch_try in $(ARCHS_ALL); do \
 	    if [[ "$$rest" == *"-$$arch_try-"* ]]; then \
 	        config=$${rest%%-$$arch_try-*}; \
 	        arch=$$arch_try; \
@@ -467,7 +468,7 @@ Config profiles (CONFIGS=):
   tinyconfig       Boot+test  Minimal kernel — tests lower bound of functionality
   allnoconfig      Boot+test  Everything disabled — absolute minimum boot path
   kunitconfig      Boot+test  defconfig + KUnit framework; KTAP results shown as kunit:N/N
-  kunitrandconfig  Build only defconfig + all available KUnit test modules (random set per run); requires rebuild each run
+  kunitrandconfig  Boot+test  defconfig + all available KUnit test modules (random set per run); requires rebuild each run; KUnit KTAP tracked
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained: no sanitizers, torture tests, non-gzip compressors)
   randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off; KERNEL_GZIP pinned
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
@@ -481,6 +482,7 @@ Variables (current values):
   STABLE_RELEASE      = $(if $(STABLE_RELEASE),$(STABLE_RELEASE),(not set — mainline rc mode))
   STABLE_RC_BRANCH    = $(if $(STABLE_RC_BRANCH),$(STABLE_RC_BRANCH),(not set — used by: make fetch-stable-rc))
   TAG                 = $(if $(TAG),$(TAG),(not set — used by: make checkout TAG=v7.2-rc2))
+  ARCHS_ALL           = $(ARCHS_ALL)  (fixed set of all supported arches; used internally for filename parsing in config-archive/bisect/replay)
   ARCHS               = $(ARCHS)
   CONFIGS             = $(CONFIGS)
   TIMEOUT             = $(TIMEOUT)s    (VM boot timeout per config)

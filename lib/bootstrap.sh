@@ -127,7 +127,7 @@ if command -v aarch64-linux-gnu-gcc &>/dev/null; then
     info "aarch64-linux-gnu-gcc: OK (arm64 cross-compilation supported)"
 else
     warn "aarch64-linux-gnu-gcc not found — arm64 kernel builds will not work"
-    warn "arm64 is opt-in: use ARCHS=\"x86_64 i386 arm64\" to include it"
+    warn "arm64 is in the default ARCHS — exclude it with ARCHS=\"x86_64 i386 riscv\" or install aarch64-linux-gnu-gcc"
 fi
 
 # ── riscv64-linux-gnu-gcc sanity check (riscv kernel builds) ─────────────────
@@ -136,7 +136,7 @@ if command -v riscv64-linux-gnu-gcc &>/dev/null; then
     info "riscv64-linux-gnu-gcc: OK (riscv cross-compilation supported)"
 else
     warn "riscv64-linux-gnu-gcc not found — riscv kernel builds will not work"
-    warn "riscv is opt-in: use ARCHS=\"x86_64 i386 arm64 riscv\" to include it"
+    warn "riscv is in the default ARCHS — exclude it with ARCHS=\"x86_64 i386 arm64\" or install riscv64-linux-gnu-gcc"
 fi
 
 # ── Verify all required tools are present ────────────────────────────────────

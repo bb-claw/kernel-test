@@ -7,34 +7,32 @@ back to the Linux kernel community.
 ## What it does
 
 1. Fetches the latest `-rc` tag from Linus's upstream tree (or a stable point release)
-2. Builds the kernel under seven configuration profiles: `defconfig`, `tinyconfig`, `allnoconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`
-3. Constructs a minimal Toybox initramfs (cpio)
-4. Boots each bootable kernel variant in QEMU/KVM for both `x86_64` and `i386`
-5. Runs numbered test scripts inside the VM in order; each test emits structured pass/fail output
+2. Builds the kernel under nine configuration profiles: `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `kunitrandconfig`, `allmodconfig`, `randconfig`, `rand500config`, `randdefconfig`
+3. Constructs a minimal Toybox initramfs (cpio) for each architecture
+4. Boots each bootable kernel variant in QEMU/KVM for `x86_64`, `i386`, `arm64`, and `riscv` (arm64/riscv run in TCG on an x86 host)
+5. Runs numbered test scripts inside the VM in order; each test emits structured pass/fail output; KUnit KTAP results also parsed
 6. Writes a pass/fail report as a local HTML/text file — always written even on build or test failure
 
 ## Prerequisites
 
+`make bootstrap` installs all dependencies automatically (distro-aware: pacman/apt/dnf/zypper):
+
+```sh
+make bootstrap   # needs sudo once; also activates git hooks
+```
+
 | Tool | Purpose |
 |---|---|
 | `gcc` + `gcc-multilib` | Build kernels for x86_64 and i386 |
-| `make` | Kernel build system |
+| `aarch64-linux-gnu-gcc` | Cross-compile for arm64 |
+| `riscv64-linux-gnu-gcc` | Cross-compile for riscv |
 | `ccache` | Compiler cache for incremental builds |
-| `qemu-system-x86` | VM execution (KVM acceleration required) |
-| `busybox` (static) | Minimal userland inside the initramfs |
-| `cpio`, `gzip` | Initramfs packing |
-| `git` | Fetching the upstream kernel tree |
-| `bc`, `flex`, `bison`, `libelf` | Kernel build dependencies |
-
-On Arch/Manjaro:
-```sh
-sudo pacman -S gcc gcc-multilib make ccache qemu-system-x86 busybox cpio git bc flex bison libelf
-```
-
-On Debian/Ubuntu:
-```sh
-sudo apt install gcc gcc-multilib make ccache qemu-system-x86 busybox-static cpio git bc flex bison libelf-dev
-```
+| `qemu-system-x86` | VM execution for x86_64 / i386 (KVM acceleration) |
+| `qemu-system-aarch64` | VM execution for arm64 (TCG on x86 host) |
+| `qemu-system-riscv64` | VM execution for riscv (TCG on x86 host) |
+| `cpio`, `gzip`, `lzop` | Initramfs packing + kernel LZO compression |
+| `bc`, `flex`, `bison`, `libelf`, `pahole` | Kernel build dependencies |
+| Toybox static binary | Minimal userland inside the initramfs (downloaded by `make bootstrap`) |
 
 ## Quick Start
 
@@ -126,46 +124,38 @@ make all NO_FETCH=1 KERNEL_TREE=~/git/linux-stable V=1
 ```
 kernel-test/
 ├── Makefile              # Main entry point — all commands go through make
-├── lib/
-│   ├── common.sh         # Shared helpers: log/info/warn/die, require_env
+├── lib/                  # Core pipeline scripts (fetch → build → initramfs → vm → report)
+│   ├── common.sh         # Shared helpers + arch helpers (arch_cross_compile, arch_kernel_image, ...)
 │   ├── fetch.sh          # Fetch latest -rc tag from upstream
-│   ├── checkout.sh       # Fetch and checkout a specific tag or commit
 │   ├── build.sh          # Kernel build (ccache, out-of-tree O=)
 │   ├── initramfs.sh      # Build Toybox cpio initramfs + inject tests
 │   ├── vm.sh             # QEMU/KVM launch and serial console capture
 │   ├── report.sh         # Aggregate results into HTML/text report
-│   ├── install.sh        # Install kernel to /boot (Arch/Manjaro): modules, dkms autoinstall, mkinitcpio, GRUB
-│   └── bootstrap.sh      # Install build/test dependencies (distro-aware)
+│   ├── diff.sh           # Compare two report dirs for regressions/fixes
+│   ├── install.sh        # Install kernel to /boot (Arch/Manjaro)
+│   ├── dmesg.sh          # Capture and analyse host kernel dmesg
+│   └── bootstrap.sh      # Install build/test dependencies + Toybox binaries
+├── scripts/              # On-demand tools (kconfig sweep, bisect, archive, canary)
+│   ├── build-kconfig.sh  # Exhaustive per-option build+boot sweep (make kconfig-build)
+│   ├── config-bisect.sh  # Binary-search a failing archived config (make bisect)
+│   ├── config-archive.sh # Archive passing/failing configs by SHA256 (make config-archive)
+│   ├── kconfig-check.sh  # Static analysis for missing Kconfig selects (make kconfig-check)
+│   └── canary-patch.sh   # Patch kernel tree with boot canary module (make canary-patch)
 ├── tests/
 │   ├── 001_smoke.sh      # Boot smoke test (reaches init, no oops/panic)
-│   ├── custom/           # Functional kernel-path tests (run in NNN_ order)
-│   │   ├── 010_check-proc.sh
-│   │   ├── 020_check-sysfs.sh
-│   │   ├── 030_check-dmesg.sh
-│   │   ├── 040_check-devnodes.sh
-│   │   ├── 050_check-kernel.sh
-│   │   ├── 060_check-tmpfs.sh
-│   │   ├── 070_check-proc-interrupts.sh
-│   │   ├── 080_check-slabinfo.sh
-│   │   ├── 090_check-clocksource.sh
-│   │   ├── 100_network-loopback.sh
-│   │   ├── 110_tmpfs-stress.sh
-│   │   ├── 120_rng.sh
-│   │   ├── 130_fork-exec.sh
-│   │   ├── 140_sysctl.sh
-│   │   ├── 150_mmap.sh
-│   │   ├── 160_signal.sh
-│   │   ├── 170_pipe.sh
-│   │   ├── 180_timer.sh
-│   │   └── 190_scheduler.sh
+│   ├── custom/           # Functional kernel-path tests (run in NNN_ order; next: 290_)
+│   │   ├── 010_check-proc.sh  … 280_proc-self-extended.sh
 │   └── hardware/
 │       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/
-│   ├── pre-commit        # shellcheck + executable bit on staged files; artifact guard
-│   └── pre-push          # shellcheck + executable bit on all tracked files
-├── configs/              # Config fragments applied after kernel config targets
-├── reports/              # Output directory for test reports
-└── cache/                # ccache directory (gitignored)
+│   ├── pre-commit        # shellcheck + executable bit; artifact guard; inventory sync
+│   ├── commit-msg        # Enforce conventional commit format
+│   └── pre-push          # Full repo sweep; design doc check; memory size check; awk ban
+├── configs/              # Config fragments + arch overlays; archive_passed/ + archive_failed/
+├── docs/                 # Per-feature design docs (<slug>-plan.md) + workflow guides
+├── memory/               # Persistent AI context (auto-memory for Claude Code)
+├── reports/              # gitignored; HTML + text reports per run
+└── cache/                # gitignored; ccache
 ```
 
 ## Make Targets
@@ -176,10 +166,20 @@ kernel-test/
 | `make fetch` | Fetch and checkout the latest -rc tag automatically |
 | `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit |
 | `make info` | Show current tag/commit and kernel Makefile version |
+| `make smoke` | Quick sanity: kunitconfig + tinyconfig, all archs |
+| `make full` | Broader: 5 bootable configs, all archs |
 | `make build` | Build kernels for all configs × archs |
 | `make initramfs` | Assemble the Toybox cpio initramfs |
 | `make test` | Boot VMs and run tests |
 | `make report` | Generate the HTML/text report from last test results |
+| `make diff` | Compare latest two same-label report runs for regressions |
+| `make baseline` | Pin current run as baseline for future diffs |
+| `make config-archive` | Scan reports and populate `configs/archive_passed/` + `configs/archive_failed/` |
+| `make replay CONFIG_FILE=` | Replay a specific archived `.config` through the pipeline |
+| `make bisect CONFIG_FILE=` | Binary-search a failing archived config for the responsible option |
+| `make kconfig-build SUBSYSTEM=` | Exhaustive per-option build+boot sweep for a subsystem Kconfig |
+| `make kconfig-check SUBSYSTEM=` | Static analysis for missing Kconfig `select` dependencies |
+| `make canary-patch` | Patch kernel tree with boot canary built-in module |
 | `make install` | Install built kernel to `/boot`; update mkinitcpio + GRUB (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
 | `make hooks` | Activate git hooks only (no package install) |
@@ -247,9 +247,10 @@ Override on the command line:
 | `STABLE_RELEASE` | _(none)_ | Stable series to fetch, e.g. `7.1`; selects latest `v7.1.*` tag and switches to `STABLE_KERNEL_TREE` |
 | `TAG` | _(none)_ | Exact tag or commit for `make checkout` |
 | `NO_FETCH` | `0` | Set to `1` to skip `make fetch` and use the current checkout |
-| `ARCHS` | `x86_64 i386` | Space-separated list of target architectures |
-| `CONFIGS` | `tinyconfig allnoconfig defconfig kunitconfig allmodconfig randconfig rand500config randdefconfig` | Space-separated list of config profiles (`localconfig` not in default list — requires `/proc/config.gz`) |
-| `TIMEOUT` | `60` | VM boot timeout in seconds |
+| `NO_BUILD` | `0` | Set to `1` to skip kernel build and reuse existing `build/<config>-<arch>/` artifacts |
+| `ARCHS` | `x86_64 i386 arm64 riscv` | Space-separated list of target architectures |
+| `CONFIGS` | all 9 profiles | Space-separated list of config profiles (`localconfig` not in default list — requires `/proc/config.gz`) |
+| `TIMEOUT` | `60` | VM boot timeout in seconds (arm64/riscv automatically doubled) |
 | `BUILD_TIMEOUT` | `1200` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT`; set to `0` for localconfig |
 | `GCC` | `gcc` | Compiler binary; e.g. `GCC=gcc-15` for stable kernels that predate GCC 16 |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
@@ -263,7 +264,8 @@ Override on the command line:
 | `tinyconfig` | yes | Minimal kernel — tests lower bound of functionality |
 | `allnoconfig` | yes | Everything disabled — tests absolute minimum boot path |
 | `kunitconfig` | yes | `defconfig` base + KUnit framework + core test suites; KTAP output parsed and reported as `kunit:N/N` |
-| `rand500config` | yes | `tinyconfig` base + 500 random `=y` options sampled from a constrained randconfig; fast, varied, reproducibly bootable |
+| `kunitrandconfig` | yes | `defconfig` base + all available KUnit modules; random set per run (rebuild required); KTAP tracked |
+| `rand500config` | yes | `tinyconfig` base + 500 random `=y` options from a constrained randconfig; fast, varied, reproducibly bootable |
 | `randdefconfig` | yes | `defconfig` base with 300 randomly disabled options; heavy subsystems forced off to stay under 5 min |
 | `localconfig` | yes | `/proc/config.gz` base (running distro kernel) + hardware fragment; daily-driver builds; install with `make install`; not in the default CONFIGS list |
 | `allmodconfig` | no (build only) | All options as modules — catches build-time regressions |

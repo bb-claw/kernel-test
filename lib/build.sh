@@ -14,26 +14,13 @@ GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
 
 # ── Architecture-specific settings ───────────────────────────────────────────
 
+CROSS_COMPILE=$(arch_cross_compile "$ARCH")
+KERNEL_IMAGE_NAME=$(arch_kernel_image "$ARCH")
 case "$ARCH" in
-    x86_64)
-        CROSS_COMPILE=''
-        KERNEL_IMAGE_NAME=bzImage
+    x86_64|i386)
         KERNEL_CC="$GCC"
         ;;
-    i386)
-        CROSS_COMPILE=''
-        KERNEL_IMAGE_NAME=bzImage
-        KERNEL_CC="$GCC"
-        ;;
-    arm64)
-        CROSS_COMPILE='aarch64-linux-gnu-'
-        KERNEL_IMAGE_NAME=Image
-        KERNEL_CC="${CROSS_COMPILE}gcc"
-        BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
-        ;;
-    riscv)
-        CROSS_COMPILE='riscv64-linux-gnu-'
-        KERNEL_IMAGE_NAME=Image
+    arm64|riscv)
         KERNEL_CC="${CROSS_COMPILE}gcc"
         BUILD_TIMEOUT=$(( BUILD_TIMEOUT * 2 ))
         ;;
@@ -204,18 +191,29 @@ elif ! kmake "$CONFIG"; then
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
 fi
 
-# Step 1b: apply config fragment (skip for seed replay — fragment is already baked
-# into the archived config; re-applying would overwrite options the original run set).
-# KCONFIG_ALLCONFIG is NOT used here because some targets (e.g. tinyconfig)
-# explicitly override it internally, silently discarding our fragment.
-# Appending to .config + olddefconfig is reliable for every kernel target.
-if [[ -z "${SEED_CONFIG:-}" ]] && [[ -f $FRAGMENT ]]; then
-    info "Applying config fragment: $FRAGMENT"
-    cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
-    if ! kmake olddefconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-        die "Config fragment failed: $FRAGMENT — see $LOG_FILE"
+# Step 1b: apply config fragment + arch overlay, then resolve with one olddefconfig.
+# Skip for seed replay — the archived config already has both baked in.
+# KCONFIG_ALLCONFIG is NOT used because some targets (e.g. tinyconfig) override it
+# internally, silently discarding our fragment.  cat >> .config is reliable for all.
+ARCH_OVERLAY="$SCRIPT_DIR/configs/${CONFIG}-${ARCH}.config"
+if [[ -z "${SEED_CONFIG:-}" ]]; then
+    _applied=0
+    if [[ -f $FRAGMENT ]]; then
+        info "Applying config fragment: $FRAGMENT"
+        cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
+        _applied=1
+    fi
+    if [[ -f "$ARCH_OVERLAY" ]]; then
+        info "Applying arch overlay: $ARCH_OVERLAY"
+        cat "$ARCH_OVERLAY" >> "$PWD/$OUT_DIR/.config"
+        _applied=1
+    fi
+    if [[ $_applied -eq 1 ]]; then
+        if ! kmake olddefconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config fragment/overlay failed: $CONFIG/$ARCH — see $LOG_FILE"
+        fi
     fi
 fi
 
@@ -236,12 +234,13 @@ fi
 
 # Step 1c: verify bootability floor for all bootable configs.
 # olddefconfig can silently drop required options when a dependency chain changes
-# between kernel versions.  Defined per-arch so that arm64 PL011 options are never
-# applied to riscv (and vice-versa), avoiding spurious correction passes.
+# between kernel versions.  Arch-specific serial/FPU options are now owned by
+# the arch overlay (configs/<profile>-<arch>.config) and excluded here to avoid
+# duplication.  Only arch-neutral options that apply identically on every arch.
 # Only flag options that exist in this arch's Kconfig (disabled = problem;
 # completely absent from .config = not supported by this arch, skip).
-# Loop up to 3 passes: enabling a parent option (e.g. TTY) makes previously
-# absent child options (e.g. SERIAL_AMBA_PL011) visible as disabled on the next pass.
+# Loop up to 3 passes: enabling a parent (e.g. TTY) makes previously absent
+# children visible as disabled on the next pass.
 BOOT_BASELINE_OPTS=(
     CONFIG_PRINTK=y
     CONFIG_TTY=y
@@ -251,15 +250,6 @@ BOOT_BASELINE_OPTS=(
     CONFIG_BINFMT_SCRIPT=y
     CONFIG_TMPFS=y
 )
-case "$ARCH" in
-    x86_64|i386)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y ) ;;
-    arm64)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_AMBA_PL011=y CONFIG_SERIAL_AMBA_PL011_CONSOLE=y ) ;;
-    riscv)
-        BOOT_BASELINE_OPTS+=( CONFIG_SERIAL_8250=y CONFIG_SERIAL_8250_CONSOLE=y
-                               CONFIG_SERIAL_OF_PLATFORM=y CONFIG_FPU=y ) ;;
-esac
 CONFIG_CORRECTED=0
 if ! is_build_only "$CONFIG"; then
     _correction_pass=0

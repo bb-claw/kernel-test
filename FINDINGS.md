@@ -1189,6 +1189,15 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
   `Albert Ou <aou@eecs.berkeley.edu>`.
   Mailing list: `linux-riscv@lists.infradead.org`, `linux-kernel@vger.kernel.org`.
 
+
+- [ ] **CONFIG_ARM64_16K_PAGES=y causes BOOT_FAIL-timeout on arm64**
+  Kernel: v7.2-rc4. Found by config bisect from kconfig-rand500config-arm64-v7.2-rc3-7d9b39f86d0e9106b0750c12b024216a1ba1a3297adc7c1dd957daf0525f5485-BOOT_FAIL-timeout.config.
+  **Reproduce:**
+  ```sh
+  make bisect CONFIG_FILE=/home/benni/git/kernel-test/configs/archive_failed/kconfig-rand500config-arm64-v7.2-rc3-207fc28107009142b5b2c6fba12e910d0b4e42462897d911c2f2ffe22332b1a1-BOOT_FAIL-timeout-bisect-from-7d9b39f86d0e9106b0750c12b024216a1ba1a3297adc7c1dd957daf0525f5485.config
+  ```
+
+
 ---
 
 ## Finding Status Summary

@@ -68,6 +68,45 @@ write_kernel_version() {
     printf '%s\n' "$KERNEL_VERSION" > "$BUILD_DIR/.kernel-version"
 }
 
+# arch_cross_compile <arch>
+# Prints the CROSS_COMPILE prefix for cross-compile arches, or "" for native (x86_64, i386).
+arch_cross_compile() {
+    case "$1" in
+        arm64) printf '%s' "aarch64-linux-gnu-" ;;
+        riscv) printf '%s' "riscv64-linux-gnu-" ;;
+        *)     printf '%s' "" ;;
+    esac
+}
+
+# arch_kernel_image <arch>
+# Prints the kernel image filename for an arch (bzImage for x86; Image for arm64/riscv).
+arch_kernel_image() {
+    case "$1" in
+        arm64|riscv) printf '%s' "Image"   ;;
+        *)           printf '%s' "bzImage" ;;
+    esac
+}
+
+# arch_toybox_name <arch>
+# Prints the Toybox binary suffix for an arch (matches landley.net download names).
+arch_toybox_name() {
+    case "$1" in
+        x86_64) printf '%s' "x86_64"  ;;
+        i386)   printf '%s' "i686"    ;;
+        arm64)  printf '%s' "aarch64" ;;
+        riscv)  printf '%s' "riscv64" ;;
+        *)      die "Unsupported arch for Toybox: $1 (no binary mapping)" ;;
+    esac
+}
+
+# apply_arch_overlay <dot_config> <configs_dir> <profile> <arch>
+# Silently appends <configs_dir>/<profile>-<arch>.config to <dot_config> if the file exists.
+apply_arch_overlay() {
+    local dot_config="$1" configs_dir="$2" profile="$3" arch="$4"
+    local overlay="${configs_dir}/${profile}-${arch}.config"
+    [[ -f "$overlay" ]] && cat "$overlay" >> "$dot_config"
+}
+
 # Usage: is_build_only <config>
 # Returns 0 if config is in BUILD_ONLY_CONFIGS, 1 otherwise.
 is_build_only() {

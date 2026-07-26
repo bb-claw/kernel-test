@@ -41,10 +41,10 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 | preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in mainline/stable/stable-rc clones; directory name selects presets/kernel-test-*.mk; `kernel-test-next` preset sets `LINUX_NEXT=1`, causing `make fetch` to error and redirect to `make fetch-next` |
 
-## Current State (2026-07-23)
+## Current State (2026-07-26)
 
 - **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM, arm64/riscv use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64`); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64
-- **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig)
+- **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig); each uses two-layer fragments: arch-neutral base (`configs/<profile>.config`) + arch overlay (`configs/<profile>-<arch>.config` — serial driver, FPU; absent = silently skipped)
 - **Tests:** 30 total (1 smoke + 29 custom; see test-inventory.md); next slot: 290_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
 - **Current kernel (mainline clone):** v7.2-rc4
@@ -54,11 +54,12 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            fetch.sh fetch-next.sh fetch-stable-rc.sh build.sh initramfs.sh vm.sh report.sh diff.sh common.sh checkout.sh install.sh dmesg.sh
+├── lib/            core pipeline: fetch.sh fetch-next.sh fetch-stable-rc.sh checkout.sh build.sh initramfs.sh vm.sh report.sh diff.sh install.sh dmesg.sh + common.sh (shared arch helpers)
+├── scripts/        on-demand tools: kconfig-check.sh kconfig-enumerate.sh build-kconfig.sh config-archive.sh config-bisect.sh canary-patch.sh migrate-reports.sh
 ├── tests/
 │   ├── 001_smoke.sh
 │   └── custom/     001_print-dmesg + 010_ … 280_ (29 scripts)
-├── configs/        *.config fragments applied post-config; archive_passed/ + archive_failed/ (committed config archive)
+├── configs/        *.config fragments applied post-config; <profile>-<arch>.config overlays; archive_passed/ + archive_failed/ (committed config archive)
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context
 ├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
