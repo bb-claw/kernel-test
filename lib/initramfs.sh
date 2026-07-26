@@ -34,10 +34,19 @@ cp "$TOYBOX" "$STAGE/bin/toybox"
 chmod +x "$STAGE/bin/toybox"
 
 # Symlinks for all Toybox applets.
+# Cross-arch binaries (arm64, riscv) cannot execute on the x86_64 build host;
+# fall back to the native x86_64 binary for the applet list — the set is
+# identical across arches for the same Toybox version.
 # --list may emit space-separated or newline-separated output depending on version;
 # tr normalises to one-per-line; grep strips blanks and the "toybox" entry so the
 # loop body is a plain ln — avoids [[ ]] && continue triggering set -e on mismatch.
-"$STAGE/bin/toybox" 2>/dev/null \
+TOYBOX_LIST_BIN="$STAGE/bin/toybox"
+if ! "$TOYBOX_LIST_BIN" &>/dev/null; then
+    TOYBOX_LIST_BIN="$CACHE_DIR/toybox-x86_64"
+    [[ -x $TOYBOX_LIST_BIN ]] || \
+        die "Toybox applet list unavailable: $ARCH binary is not natively executable and toybox-x86_64 not found in $CACHE_DIR"
+fi
+"$TOYBOX_LIST_BIN" 2>/dev/null \
     | tr ' ' '\n' | grep -v '^$' | grep -vxF 'toybox' \
     | while read -r applet; do
         ln -sf toybox "$STAGE/bin/$applet"
