@@ -1200,11 +1200,124 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
+## 2026-07-28 — RISC-V VDSO CFI: Linker Warnings in Bootable Configs
+
+### Low — Compiler / Toolchain Warning (warning-only manifestation of known root cause)
+
+- [ ] **`CONFIG_RISCV_USER_CFI=y` generates GNU ELF properties that Binutils 2.44 doesn't understand — linker warns but build succeeds**
+  Kernel: v7.2-rc4. Arch: riscv. Found by `lib/warnings.sh` (new warning analysis feature) during `make full`.
+  Related to the allmodconfig build *failure* recorded 2026-07-25 — that entry covers the fatal case;
+  this entry covers the warning-only case in bootable configs (defconfig, randdefconfig, etc.).
+
+  **Warning output (randdefconfig-riscv):**
+  ```
+  riscv64-linux-gnu-ld: warning: arch/riscv/kernel/vdso_cfi/flush_icache.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  riscv64-linux-gnu-ld: warning: arch/riscv/kernel/vdso_cfi/getcpu.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  riscv64-linux-gnu-ld: warning: arch/riscv/kernel/vdso_cfi/getrandom.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  [... 9 more — one per vdso_cfi object ...]
+  riscv64-linux-gnu-nm: warning: arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  riscv64-linux-gnu-objcopy: warning: arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+  ```
+
+  **Root cause:** `CONFIG_RISCV_USER_CFI` (`def_bool y`, gates `arch/riscv/kernel/vdso_cfi/`) has a
+  `depends on` clause that checks only the *compiler* capability:
+  ```
+  depends on $(cc-option,-mabi=lp64 -march=rv64ima_zicfiss_zicfilp -fcf-protection=full)
+  ```
+  When `riscv64-linux-gnu-gcc` (GCC 15) supports Zicfiss/Zicfilp, `RISCV_USER_CFI` auto-enables and
+  the vDSO CFI objects are compiled with RISC-V CFI ELF property notes (`GNU_PROPERTY_RISCV_FEATURE_1_AND`,
+  type `0xc0000000`). The *linker* (`riscv64-linux-gnu-ld`, Binutils 2.44 — the latest released version)
+  does not yet understand these notes and warns for each object, but exits 0 so the build succeeds.
+
+  **Why warnings but not failure (unlike allmodconfig):** In allmodconfig, `ld` produces the warnings
+  AND the `vdso-cfi.so.dbg` output file is not created (the linker exits non-zero or the file is
+  truncated), causing the downstream `nm`/`VDSOSYM` step to fail with "No such file" and leaving
+  `include/generated/vdso-cfi-offsets.h` incomplete → `signal.c` compile error. In bootable configs
+  (defconfig, randdefconfig), `ld` exits 0 and produces a complete `.so.dbg` despite the warnings,
+  so all downstream steps succeed. The difference may be config-dependent (allmodconfig enables more
+  options that alter the linker invocation or object set).
+
+  **Why only randdefconfig, not defconfig (incremental build limitation):**
+  Both `defconfig-riscv` and `randdefconfig-riscv` have `CONFIG_RISCV_USER_CFI=y`. However,
+  `defconfig-riscv` was built in a previous incremental run — the `vdso_cfi/` objects already existed
+  on disk, so the current `make full` did not recompile or relink them. No linker invocation →
+  no warnings in this run's `build.log`. `randdefconfig-riscv` always does a full rebuild (its config
+  changes each run), so the linker runs fresh and the warnings are captured.
+  Confirmed: `grep -c "vdso_cfi" build/defconfig-riscv/build.log` → `0` (stale log).
+
+  **Proposed fix:** Add a linker capability check to `arch/riscv/Kconfig`:
+  ```diff
+   config RISCV_USER_CFI
+           def_bool y
+           depends on 64BIT && MMU && \
+                   $(cc-option,-mabi=lp64 -march=rv64ima_zicfiss_zicfilp -fcf-protection=full)
+  +        depends on $(ld-option,--march=rv64ima_zicfiss_zicfilp)
+           depends on RISCV_ALTERNATIVE
+  ```
+  Or alternatively, document the minimum Binutils version (> 2.44) required when
+  `CONFIG_RISCV_USER_CFI=y` is to build warning-free.
+
+  **Reproduce:**
+  ```sh
+  # Force a full rebuild of defconfig-riscv to see the warnings directly:
+  rm -rf build/defconfig-riscv
+  make all NO_FETCH=1 CONFIGS=defconfig ARCHS=riscv
+  grep "vdso_cfi" build/defconfig-riscv/build.log | head -5
+  # Or: run any randconfig variant and check warnings-summary.txt:
+  make all NO_FETCH=1 CONFIGS=randdefconfig ARCHS=riscv
+  cat reports/$(ls -t reports/ | grep -v baseline | head -1)/warnings-summary.txt
+  ```
+
+  **Subsystem:** `arch/riscv/` — RISC-V architecture Kconfig / vDSO CFI.
+  Maintainers: `Paul Walmsley <pjw@kernel.org>`, `Palmer Dabbelt <palmer@dabbelt.com>`,
+  `Albert Ou <aou@eecs.berkeley.edu>`.
+  Mailing list: `linux-riscv@lists.infradead.org`, `linux-kernel@vger.kernel.org`.
+
+---
+
+## lib/warnings.sh — Known Limitation
+
+### Warning counts are unreliable for deterministic configs on incremental builds
+
+`lib/warnings.sh` extracts warnings from `build/<config>-<arch>/build.log`. The build log only
+records what was *compiled in that run*. On an incremental build (config unchanged, kernel source
+unchanged since last build), unchanged objects are not recompiled — no compiler/linker invocation →
+no warnings for those objects in the log.
+
+**Affected configs:** `defconfig`, `tinyconfig`, `allnoconfig`, `kunitconfig`, `allmodconfig` —
+any config that is deterministic and was previously built. The warning count will be 0 or lower
+than the true value after the first build.
+
+**Unaffected configs:** `randdefconfig`, `rand500config`, `kunitrandconfig`, `randconfig` —
+these always do a full rebuild (config changes each run), so the build log is always complete.
+
+**Practical impact:** The CROSS-ARCH DIVERGENCE and NEW SINCE sections in `warnings-summary.txt`
+are reliable for random configs (which are the primary signal source). For stable configs, warning
+counts and diffs are only accurate after `make clean` or a kernel version bump (which forces many
+recompiles via ccache misses on new object paths).
+
+**Discovery:** `defconfig-riscv` had `CONFIG_RISCV_USER_CFI=y` and the `vdso_cfi/` objects existed
+in `build/defconfig-riscv/` from a prior run, but showed 0 `vdso_cfi` occurrences in the current
+`build.log` — the incremental build skipped them. The same warnings appeared in `randdefconfig-riscv`
+because that config fully rebuilds every run.
+
+**Workaround:** Force a full rebuild of a specific combo when accurate warning counts are needed:
+```sh
+rm -rf build/<config>-<arch>
+make all NO_FETCH=1 CONFIGS=<config> ARCHS=<arch>
+```
+
+**Recommendation:** No code change. Rely on `randdefconfig`, `rand500config`, and `kunitrandconfig`
+as the primary warning signal sources — they are always accurate. Stable config warning counts are
+a lower bound only.
+
+---
+
 ## Finding Status Summary
 
 | Status | Count |
 |--------|-------|
-| Open   | 9     |
+| Open   | 10    |
 | Resolved | 18  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
