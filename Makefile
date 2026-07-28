@@ -97,7 +97,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -315,6 +315,21 @@ baseline:
 	ln -sfn "$$(basename $$latest)" "$(REPORT_DIR)/baseline"; \
 	echo "[baseline] Pinned: $$latest → $(REPORT_DIR)/baseline"
 
+# Analyse compiler warnings from existing build logs (re-runs without rebuilding).
+# Writes warnings-summary.txt + per-combo warnings-<config>-<arch>.txt to the
+# latest report dir. Also runs automatically at the end of every 'make all'.
+warnings:
+	$(Q)lib/warnings.sh
+
+# Pin the latest report dir as the warning regression baseline.
+# Subsequent runs will also diff warnings against this pinned baseline.
+warnings-baseline:
+	$(Q)latest=$$(find "$(REPORT_DIR)" -maxdepth 1 -mindepth 1 -type d \
+	    ! -name baseline ! -name warnings-baseline | sort | tail -1); \
+	[[ -n $$latest ]] || { echo "ERROR: no runs found in $(REPORT_DIR)/ — run make all first" >&2; exit 1; }; \
+	ln -sfn "$$(basename $$latest)" "$(REPORT_DIR)/warnings-baseline"; \
+	echo "[warnings-baseline] Pinned: $$latest → $(REPORT_DIR)/warnings-baseline"
+
 # Capture dmesg from the running host kernel, run analysis, and diff vs previous.
 # Usage: make dmesg [DMESG_LABEL=mainline|stable|longterm|linux-next]
 dmesg:
@@ -451,6 +466,8 @@ Targets:
   report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
   diff             Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
   baseline         Pin the latest report dir as the regression baseline; auto-diff will compare against it
+  warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
+  warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
