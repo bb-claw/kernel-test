@@ -15,7 +15,8 @@ make all
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
-  └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline
+  └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline; calls warnings.sh
+  └─ lib/warnings.sh     extract ': warning:' lines from build logs (PASS builds only); per-combo files + summary (counts, NEW/FIXED since prev, cross-arch divergence vs x86_64); make warnings standalone
   └─ lib/diff.sh         compare two report dirs for per-test regressions/fixes; invoked by report.sh + make diff
   └─ lib/dmesg.sh        host-side only: capture + analyse running kernel dmesg; make dmesg [DMESG_LABEL=]
 ```
