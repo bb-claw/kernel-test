@@ -440,4 +440,11 @@ if [[ -L "$REPORT_DIR/baseline" ]]; then
     fi
 fi
 
+# ── Warning analysis ──────────────────────────────────────────────────────────
+
+_WARNINGS="$(dirname "$0")/warnings.sh"
+printf '\n'
+info "Running warning analysis ..."
+"$_WARNINGS" "$RUN_DIR" || warn "warnings.sh exited non-zero (analysis incomplete)"
+
 [[ $OVERALL == PASS ]] || exit 1

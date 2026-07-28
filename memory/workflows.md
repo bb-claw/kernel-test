@@ -61,6 +61,16 @@ make baseline                                         # pin latest run; future r
 
 `lib/diff.sh` compares per-test: `PASS→FAIL` = regression, `FAIL→PASS` = fix.
 
+### Warning analysis
+
+```sh
+make warnings                                         # (re-)analyse warnings from existing build/ logs; writes to latest report dir
+make warnings-baseline                                # pin latest run as warning baseline; future runs auto-diff against it
+```
+
+`lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`.
+Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts table + cross-arch divergence vs x86_64 + new/fixed since prev run), `warnings-diff-prev.txt`. Informational only — no OVERALL impact.
+
 ### Config archive
 
 ```sh
