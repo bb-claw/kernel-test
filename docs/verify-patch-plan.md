@@ -47,14 +47,14 @@ make verify-patch FILES=security/landlock/fs.o V=1
 | `FILES`         | *(required)*         | Space-separated `.o` files, dirs, or subtrees    |
 | `BASE`          | *(none)*             | Git ref for "before" state; enables before/after |
 | `COMPILER`      | `both`               | `gcc`, `clang`, or `both`                        |
-| `VERIFY_ARCHS`  | `arm64 x86_64 riscv i386` | Architectures to test (separate from `ARCHS`) |
+| `VERIFY_ARCHS`  | `$(ARCHS)` (all four by default) | Architectures to test; defaults to `ARCHS` so `ARCHS=x86_64` works |
 | `CONFIG`        | `allmodconfig`       | Kernel config target                             |
 | `CLEAN`         | `0`                  | Set to `1` to force clean rebuild per combo      |
 | `V`             | `0`                  | Set to `1` for verbose compiler output           |
 
-`VERIFY_ARCHS` is independent of the main pipeline's `ARCHS` so that
-`make verify-patch` always tests all four arches by default without
-affecting `make all` invocations.
+`VERIFY_ARCHS` defaults to `$(ARCHS)`, so `make verify-patch ARCHS=x86_64`
+restricts the run to x86_64 intuitively. Set `VERIFY_ARCHS=` to override
+independently of the main pipeline's `ARCHS`.
 
 ---
 

@@ -21,7 +21,11 @@ BASE="${BASE:-}"
 CLEAN="${CLEAN:-0}"
 V="${V:-0}"
 
-VERIFY_DIR="${BUILD_DIR:-${REPO_ROOT}/build}/verify-patch"
+# Resolve BUILD_DIR to an absolute path — git worktree add resolves relative
+# paths relative to KERNEL_TREE (via -C), not the kernel-test CWD.
+_build="${BUILD_DIR:-build}"
+[[ "${_build}" = /* ]] || _build="${REPO_ROOT}/${_build}"
+VERIFY_DIR="${_build}/verify-patch"
 TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
 LOG_DIR="${VERIFY_DIR}/logs-${TIMESTAMP}"
 

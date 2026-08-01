@@ -52,7 +52,7 @@ CANARY         ?= 0
 FILES          ?=
 BASE           ?=
 COMPILER       ?= both
-VERIFY_ARCHS   ?= arm64 x86_64 riscv i386
+VERIFY_ARCHS   ?= $(ARCHS)
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -542,7 +542,7 @@ Variables (current values):
   FILES               = $(if $(FILES),$(FILES),(not set — required by: make verify-patch FILES=security/landlock/fs.o))
   BASE                = $(if $(BASE),$(BASE),(not set — git ref for before/after in: make verify-patch BASE=v7.2-rc4))
   COMPILER            = $(COMPILER)  (gcc|clang|both — compiler selection for make verify-patch; default: both)
-  VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; independent of ARCHS; default: all four)
+  VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; defaults to ARCHS so ARCHS=x86_64 works as expected)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report

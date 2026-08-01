@@ -28,7 +28,7 @@
 | `FILES` | _(none)_ | `FILES=security/landlock/fs.o` — required by `make verify-patch`; space-separated `.o` files or dirs |
 | `BASE` | _(none)_ | `BASE=v7.2-rc4` — git ref for "before" state in `make verify-patch` before/after mode |
 | `COMPILER` | `both` | `COMPILER=gcc\|clang\|both` — compiler selection for `make verify-patch` |
-| `VERIFY_ARCHS` | `arm64 x86_64 riscv i386` | Architectures for `make verify-patch` (independent of main `ARCHS`) |
+| `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
