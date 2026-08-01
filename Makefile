@@ -49,6 +49,10 @@ PASS2          ?= 0
 SKIP_CFGS      ?=
 GATE_CFGS      ?=
 CANARY         ?= 0
+FILES          ?=
+BASE           ?=
+COMPILER       ?= both
+VERIFY_ARCHS   ?= arm64 x86_64 riscv i386
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -85,6 +89,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
+export FILES BASE COMPILER VERIFY_ARCHS
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -97,7 +102,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch verify-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -431,6 +436,15 @@ bisect:
 # Usage: make canary-patch [KERNEL_TREE=~/git/linux]
 canary-patch:
 	$(Q)scripts/canary-patch.sh
+
+# ── Patch verification ────────────────────────────────────────────────────────
+
+# Build FILES with GCC and/or Clang across VERIFY_ARCHS.
+# Optionally compare before/after a base git commit (BASE=<ref>).
+# Usage: make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=gcc|clang|both] [ARCHS="arm64 x86_64"] [CLEAN=1]
+verify-patch:
+	@test -n "$(FILES)" || { echo "ERROR: FILES= is required — e.g. FILES=security/landlock/fs.o"; exit 1; }
+	$(Q)ARCHS="$(VERIFY_ARCHS)" CONFIG="$(CONFIG)" scripts/verify-patch.sh
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
