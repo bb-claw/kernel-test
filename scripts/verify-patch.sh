@@ -56,10 +56,12 @@ if [[ -n "${BASE}" ]]; then
     base_tree="${VERIFY_DIR}/worktree-base"
     if [[ -d "${base_tree}" ]]; then
         git -C "${KERNEL_TREE}" worktree remove --force "${base_tree}" 2>/dev/null || true
+        rm -rf "${base_tree}"
     fi
+    git -C "${KERNEL_TREE}" worktree prune 2>/dev/null || true
     git -C "${KERNEL_TREE}" worktree add "${base_tree}" "${BASE}"
     # shellcheck disable=SC2064
-    trap "git -C '${KERNEL_TREE}' worktree remove --force '${base_tree}' 2>/dev/null || true" EXIT
+    trap "git -C '${KERNEL_TREE}' worktree remove --force '${base_tree}' 2>/dev/null || true; rm -rf '${base_tree}'; git -C '${KERNEL_TREE}' worktree prune 2>/dev/null || true" EXIT
 fi
 
 mkdir -p "${LOG_DIR}"
@@ -89,8 +91,8 @@ build_files() {
     mkdir -p "${build_dir}"
 
     if [[ ! -f "${build_dir}/.config" ]]; then
-        make "${flags[@]}" "${CONFIG}"   > "${setup_log}" 2>&1
-        make "${flags[@]}" olddefconfig >> "${setup_log}" 2>&1
+        MAKEFLAGS='' MAKELEVEL='' make "${flags[@]}" "${CONFIG}"   > "${setup_log}" 2>&1
+        MAKEFLAGS='' MAKELEVEL='' make "${flags[@]}" olddefconfig >> "${setup_log}" 2>&1
     fi
 
     # Remove stale objects to force recompile of changed files
@@ -99,7 +101,7 @@ build_files() {
     done
 
     # shellcheck disable=SC2086
-    make "${flags[@]}" ${FILES} > "${build_log}" 2>&1
+    MAKEFLAGS='' MAKELEVEL='' make "${flags[@]}" ${FILES} > "${build_log}" 2>&1
 }
 
 # ── Count errors in a log file ────────────────────────────────────────────────
