@@ -1,4 +1,4 @@
-Passed configs archive — 416 entries, 1275 rows — generated 2026-08-02T10:34:00Z
+Passed configs archive — 418 entries, 1277 rows — generated 2026-08-02T10:35:16Z
 
 CONFIG           ARCH    VERSION     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -484,6 +484,7 @@ localconfig      x86_64  v7.1.4-rc1  4     stable-rc  2026-07-16_23-02-14  stabl
 localconfig      x86_64  v7.1.4-rc1  4     stable-rc  2026-07-18_09-57-06  stable-rc-7.1-2026-07-18_09-57-06-v7.1.4-rc1          34f9fc0e473009e9382fbb5f8fb787c7f0a3d64496ef23519e1181f88fe2d63c
 localconfig      x86_64  v7.1.4-rc2  2     stable-rc  2026-07-18_10-35-16  stable-rc-7.1-2026-07-18_10-35-16-v7.1-rc7            bbf2ad1e14596d9ebc7cfaa843f5761a143ee42f39862a0e636bd36958d44f7f
 localconfig      x86_64  v7.1.4-rc2  2     stable-rc  2026-07-18_11-11-09  stable-rc-7.1-2026-07-18_11-11-09-v7.1.4-rc2          bbf2ad1e14596d9ebc7cfaa843f5761a143ee42f39862a0e636bd36958d44f7f
+localconfig      x86_64  v7.1.5      1     stable     2026-07-26_01-36-40  stable-7.1-2026-07-26_01-36-40-v7.1.5                 49f42e4dcb7573288d3d9c4d2f50e66a1ca6e0d2ee7a3db759a5c3f9bc571ad0
 localconfig      x86_64  v7.1.5-rc2  1     stable-rc  2026-07-23_13-12-17  stable-rc-7.1-2026-07-23_13-12-17-v7.1.5-rc2          02e8b5788f2480bf1832a5bcac5e84231701ed0d6e1f523bdd7d238dcac903b4
 localconfig      x86_64  v7.2-rc2    17    mainline   2026-07-12_00-30-05  mainline-7.2-2026-07-12_00-30-05-v7.2-rc2             0f433a1b4e4d81ec302bac5af29a3b5a8a3e0adab55821790410f72cf22bf6fe
 localconfig      x86_64  v7.2-rc2    17    mainline   2026-07-12_00-53-01  mainline-7.2-2026-07-12_00-53-01-v7.2-rc2             0f433a1b4e4d81ec302bac5af29a3b5a8a3e0adab55821790410f72cf22bf6fe
@@ -590,6 +591,7 @@ rand500config    i386    v7.1.3      3     stable     2026-07-15_10-00-44  stabl
 rand500config    i386    v7.1.3      3     stable     2026-07-15_10-03-30  stable-7.1-2026-07-15_10-03-30-v7.1.3                 5694c61df46c61ebad589d940b592f4d272027adaf33bd134cbc88bb968b7f56
 rand500config    i386    v7.1.3      1     stable     2026-07-11_23-39-20  stable-7.1-2026-07-11_23-39-20-v7.1.3                 99e21d128ceaf0b58bf92894afdd52403fa42ff256b144d9ec10343b2b97c2ba
 rand500config    i386    v7.1.3      1     stable     2026-07-17_00-21-11  stable-7.1-2026-07-17_00-21-11-v7.1.3                 e0ca02bc6a6d798b2bbd5e9be04132eac57168924ab48deabc3f9f9e4d760443
+rand500config    i386    v7.1.4      1     stable     2026-07-21_22-57-45  stable-7.1-2026-07-21_22-57-45-v7.1.4                 0a453ff1d2a69973eb7c20d0e40b9452eb13326afbd20072500d6cd6e920653f
 rand500config    i386    v7.1.4-rc1  1     stable-rc  2026-07-17_07-37-37  stable-rc-7.1-2026-07-17_07-37-37-v7.1.4-rc1          1bc84835abd7245fb9c11d527b6195e704610755346bb56614289260e182bbae
 rand500config    i386    v7.1.4-rc2  1     stable-rc  2026-07-18_12-05-53  stable-rc-7.1-2026-07-18_12-05-53-v7.1.4-rc2          943846b4ff9e394fc453a4948ed7d9582d7ebeb101f616742763672947fff17e
 rand500config    i386    v7.1.5-rc2  1     stable-rc  2026-07-23_15-15-30  stable-rc-7.1-2026-07-23_15-15-30-v7.1.5-rc2          77a9d2e043cd42c9de3808e300fda512351603b1b39f36e69c68cfdb271fabda
