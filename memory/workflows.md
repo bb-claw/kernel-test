@@ -29,6 +29,7 @@
 | `BASE` | _(none)_ | `BASE=v7.2-rc4` — git ref for "before" state in `make verify-patch` before/after mode |
 | `COMPILER` | `both` | `COMPILER=gcc\|clang\|both` — compiler selection for `make verify-patch` |
 | `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
+| `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.

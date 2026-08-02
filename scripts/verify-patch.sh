@@ -46,6 +46,7 @@ echo "  Compiler: ${COMPILER}"
 echo "  Archs:    ${ARCHS}"
 if [[ -n "${BASE}" ]]; then
     current_ref="$(git -C "${KERNEL_TREE}" rev-parse --abbrev-ref HEAD)"
+    [[ "${current_ref}" == "HEAD" ]] && current_ref="$(git -C "${KERNEL_TREE}" rev-parse --short HEAD)"
     echo "  Base:     ${BASE}  →  ${current_ref}"
 fi
 echo
@@ -74,6 +75,8 @@ build_files() {
     local setup_log="${log_prefix}.setup.log"
     local build_log="${log_prefix}.log"
 
+    [[ -n "${build_dir}" && "${build_dir}" = /* ]] || die "build_dir is empty or not absolute: '${build_dir}'"
+
     local cross
     cross="$(arch_cross_compile "${arch}")"
 
@@ -95,9 +98,15 @@ build_files() {
         MAKEFLAGS='' MAKELEVEL='' make "${flags[@]}" olddefconfig >> "${setup_log}" 2>&1
     fi
 
-    # Remove stale objects to force recompile of changed files
+    # Remove stale objects to force recompile of changed files.
+    # For directory targets (FILES=security/landlock/) remove all .o files inside;
+    # rm -f on a directory silently fails and would leave cached objects in place.
     for f in ${FILES}; do
-        rm -f "${build_dir}/${f}"
+        if [[ -d "${build_dir}/${f}" ]]; then
+            find "${build_dir}/${f}" -name '*.o' -delete 2>/dev/null || true
+        else
+            rm -f "${build_dir}/${f}"
+        fi
     done
 
     # shellcheck disable=SC2086

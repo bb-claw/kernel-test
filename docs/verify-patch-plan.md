@@ -128,9 +128,9 @@ Base:    v7.2-rc4  →  HEAD (fix/landlock-uninit)
  arm64   clang     PASS          PASS          UNCHANGED-PASS
  x86_64  gcc       3 errors      PASS          FIXED
  x86_64  clang     PASS          PASS          UNCHANGED-PASS
- riscv   gcc       0 errors      PASS          UNCHANGED-PASS
+ riscv   gcc       PASS          PASS          UNCHANGED-PASS
  riscv   clang     PASS          PASS          UNCHANGED-PASS
- i386    gcc       0 errors      PASS          UNCHANGED-PASS
+ i386    gcc       PASS          PASS          UNCHANGED-PASS
  i386    clang     PASS          PASS          UNCHANGED-PASS
 
 Overall: FIXED — 2 combos improved, 0 regressions

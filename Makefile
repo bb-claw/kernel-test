@@ -53,6 +53,7 @@ FILES          ?=
 BASE           ?=
 COMPILER       ?= both
 VERIFY_ARCHS   ?= $(ARCHS)
+CLEAN          ?= 0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -89,7 +90,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -543,6 +544,7 @@ Variables (current values):
   BASE                = $(if $(BASE),$(BASE),(not set — git ref for before/after in: make verify-patch BASE=v7.2-rc4))
   COMPILER            = $(COMPILER)  (gcc|clang|both — compiler selection for make verify-patch; default: both)
   VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; defaults to ARCHS so ARCHS=x86_64 works as expected)
+  CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
