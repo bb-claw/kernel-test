@@ -128,6 +128,7 @@ make verify-patch FILES="a.o b.o" ARCHS="arm64 x86_64" CLEAN=1          # custom
 
 Uses `VERIFY_ARCHS` (all 4 by default) and `COMPILER` (both by default). `BASE=` creates a
 git worktree for the "before" build; exits 1 on failures or regressions. Logs: `build/verify-patch/logs-<timestamp>/`.
+Clang builds require `clang` + `lld` + `llvm` (all three; installed by `make bootstrap`).
 
 ### Capture and analyse host kernel dmesg
 

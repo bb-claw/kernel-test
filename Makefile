@@ -463,7 +463,7 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); includes clang+lld+llvm for LLVM=1 (make verify-patch COMPILER=clang|both); activates git hooks
   hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
