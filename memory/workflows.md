@@ -25,6 +25,11 @@
 | `GATE_CFGS` | _(none)_ | `GATE_CFGS=CONFIG_X,CONFIG_Y` — extra gate symbols for drivers inside nested `if` blocks |
 | `PINNED_OPTS` | _(none)_ | `PINNED_OPTS=CONFIG_X,CONFIG_Y` — options injected into every bisect step but not baseline |
 | `CANARY` | `0` | `CANARY=1` — inject `CONFIG_BOOT_CANARY=y`+`CONFIG_DEBUG_42=y`; requires prior `make canary-patch` |
+| `FILES` | _(none)_ | `FILES=security/landlock/fs.o` — required by `make verify-patch`; space-separated `.o` files or dirs |
+| `BASE` | _(none)_ | `BASE=v7.2-rc4` — git ref for "before" state in `make verify-patch` before/after mode |
+| `COMPILER` | `both` | `COMPILER=gcc\|clang\|both` — compiler selection for `make verify-patch` |
+| `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
+| `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
 
 `KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -105,26 +110,25 @@ Multi-pass tip: when `interaction` occurs, use the archived minimum-set config a
 `CONFIG_FILE` and pin the most suspicious option as `PINNED_OPTS`; repeat until single confirmed.
 The archived `-bisect-from-<sha>` suffix is always one level only (chaining is stripped).
 
-### Kconfig subsystem sweep (kconfig-build)
+### Kconfig subsystem sweep / boot canary
 
 ```sh
-make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1              # list options without building
-make kconfig-build SUBSYSTEM=pinctrl DRIVER=pinctrl-bm1880 ARCHS=arm64  # single driver
-make kconfig-build SUBSYSTEM=pinctrl                         # all options × all archs
+make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1     # list options; omit DRY_RUN=1 to build+boot each
+make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagnose silent boots
 ```
-Per option: tinyconfig + `configs/randkconfigconfig.config` + `configs/randkconfigconfig-<arch>.config` (arch overlay) + `CONFIG_<OPT>=y` → build + boot.
 
-### Boot canary (diagnosing silent boots)
+### Patch verification (multi-compiler/arch)
 
 ```sh
-make canary-patch                                              # patch KERNEL_TREE/drivers/misc/ once
-make all NO_FETCH=1 CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64 # rebuild with canary built in
-grep CANARY_EARLY reports/<latest>/vmstatus-tinyconfig-x86_64.txt
+make verify-patch FILES=security/landlock/fs.o                           # GCC+Clang, all 4 arches
+make verify-patch FILES=security/landlock/fs.o BASE=v7.2-rc4             # before/after comparison
+make verify-patch FILES=security/landlock/ COMPILER=clang                # Clang only
+make verify-patch FILES="a.o b.o" ARCHS="arm64 x86_64" CLEAN=1          # custom scope
 ```
 
-`CANARY_EARLY=reached` → kernel ran past early_initcall (earlycon/console is the problem).
-`CANARY_EARLY=missing` → kernel hung before `do_initcalls()`.
-`/proc/debug_42` returning `42` in test `250_debug-42` → procfs + VFS functional.
+Uses `VERIFY_ARCHS` (all 4 by default) and `COMPILER` (both by default). `BASE=` creates a
+git worktree for the "before" build; exits 1 on failures or regressions. Logs: `build/verify-patch/logs-<timestamp>/`.
+Clang builds require `clang` + `lld` + `llvm` (all three; installed by `make bootstrap`).
 
 ### Capture and analyse host kernel dmesg
 
@@ -133,18 +137,5 @@ make dmesg                         # label: mainline (default)
 make dmesg DMESG_LABEL=stable      # or: longterm / linux-next
 ```
 
----
-
-## Rule: Always Use `make all`, Not Chained Targets
-
-**Wrong:** `make build initramfs test report` — stops at first failure, report never written.
-
-**Correct:** `make all NO_FETCH=1 ...` — always writes report even when build or test fails.
-
----
-
-## Fetch Strategy
-
-Tag-based: `git ls-remote` discovers tag (no objects), then `git fetch --depth=1 <tag>`.
-If tag already local, fetch is skipped. `BUILD_TIMEOUT` (default 1800 s) wraps only the
-`bzImage` step; exit 124 → `STATUS=TIMEOUT`. defconfig/kunitconfig x86_64 needs ~10–12 min.
+**Rule:** Always use `make all NO_FETCH=1 ...` not chained targets — `all` always writes the
+report even when build or test fails; chained targets stop at the first failure.

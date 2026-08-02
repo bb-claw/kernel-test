@@ -49,6 +49,11 @@ PASS2          ?= 0
 SKIP_CFGS      ?=
 GATE_CFGS      ?=
 CANARY         ?= 0
+FILES          ?=
+BASE           ?=
+COMPILER       ?= both
+VERIFY_ARCHS   ?= $(ARCHS)
+CLEAN          ?= 0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -85,6 +90,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -97,7 +103,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch verify-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -432,6 +438,15 @@ bisect:
 canary-patch:
 	$(Q)scripts/canary-patch.sh
 
+# ── Patch verification ────────────────────────────────────────────────────────
+
+# Build FILES with GCC and/or Clang across VERIFY_ARCHS.
+# Optionally compare before/after a base git commit (BASE=<ref>).
+# Usage: make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=gcc|clang|both] [ARCHS="arm64 x86_64"] [CLEAN=1]
+verify-patch:
+	@test -n "$(FILES)" || { echo "ERROR: FILES= is required — e.g. FILES=security/landlock/fs.o"; exit 1; }
+	$(Q)ARCHS="$(VERIFY_ARCHS)" CONFIG="$(CONFIG)" scripts/verify-patch.sh
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
@@ -448,7 +463,7 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); activates git hooks
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); includes clang+lld+llvm for LLVM=1 (make verify-patch COMPILER=clang|both); activates git hooks
   hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
@@ -476,6 +491,7 @@ Targets:
   canary-patch     Patch KERNEL_TREE/drivers/misc/ with boot diagnostic modules; run once before 'make all CANARY=1'
   kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_X GATE_CFGS=CONFIG_X)
   kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
+  verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
   clean            Remove build/ and cache/
   distclean        Remove build/, cache/, and reports/
   help             Show this message
@@ -524,6 +540,11 @@ Variables (current values):
   SKIP_CFGS           = $(if $(SKIP_CFGS),$(SKIP_CFGS),(not set — skip symbols as candidates: SKIP_CFGS=CONFIG_DEBUG_FS,CONFIG_PM))
   GATE_CFGS           = $(if $(GATE_CFGS),$(GATE_CFGS),(not set — comma-separated extra symbols to enable for drivers inside nested if blocks))
   CANARY              = $(CANARY)  (set to 1 to inject CONFIG_BOOT_CANARY=y + CONFIG_DEBUG_42=y; requires prior 'make canary-patch')
+  FILES               = $(if $(FILES),$(FILES),(not set — required by: make verify-patch FILES=security/landlock/fs.o))
+  BASE                = $(if $(BASE),$(BASE),(not set — git ref for before/after in: make verify-patch BASE=v7.2-rc4))
+  COMPILER            = $(COMPILER)  (gcc|clang|both — compiler selection for make verify-patch; default: both)
+  VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; defaults to ARCHS so ARCHS=x86_64 works as expected)
+  CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
@@ -602,6 +623,22 @@ Note: run 'make clean' when switching between kernel trees (e.g. mainline → st
   #   CANARY_EARLY=reached + timeout/no-console → earlycon/console broken; kernel alive
   #   CANARY_EARLY=missing                      → kernel hung before early_initcall
   #   /proc/debug_42 returns 42                 → procfs + VFS + module_init all functional
+
+── Patch verification ───────────────────────────────────────────────────────────
+
+  # Build with GCC + Clang across all 4 arches (default)
+  make verify-patch FILES=security/landlock/fs.o
+
+  # Before/after comparison — strongest evidence for LKML patch emails
+  make verify-patch FILES=security/landlock/fs.o BASE=v7.2-rc4
+
+  # Single compiler or restricted arch set
+  make verify-patch FILES=security/landlock/fs.o COMPILER=clang
+  make verify-patch FILES=security/landlock/ ARCHS="arm64 x86_64" CLEAN=1
+
+  # Multiple files or a whole directory
+  make verify-patch FILES="security/landlock/fs.o security/landlock/net.o"
+  make verify-patch FILES=security/landlock/ BASE=v7.2-rc4
 
 ── Kconfig tools ───────────────────────────────────────────────────────────────
 

@@ -45,6 +45,7 @@ install_packages() {
             fi
             $SUDO pacman -S --needed --noconfirm \
                 gcc-multilib aarch64-linux-gnu-gcc riscv64-linux-gnu-gcc make ccache \
+                clang lld llvm \
                 qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
                 bc flex bison libelf pahole
@@ -76,6 +77,7 @@ install_packages() {
             # Base packages from main; qemu-system-misc provides qemu-system-riscv64
             $SUDO apt-get install -y \
                 gcc gcc-multilib make ccache \
+                clang lld llvm \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev
@@ -104,6 +106,7 @@ install_packages() {
         dnf)
             $SUDO dnf install -y \
                 gcc gcc-multilib gcc-aarch64-linux-gnu make ccache \
+                clang lld llvm \
                 qemu-system-x86 qemu-system-aarch64 \
                 cpio git lzop \
                 bc flex bison elfutils-libelf-devel dwarves
@@ -112,6 +115,7 @@ install_packages() {
         zypper)
             $SUDO zypper install -y \
                 gcc gcc-multilib cross-aarch64-linux-gnu-gcc make ccache \
+                clang lld llvm \
                 qemu-x86 qemu-arm \
                 cpio git lzop \
                 bc flex bison libelf-devel dwarves
@@ -197,6 +201,26 @@ else
     warn "riscv is in the default ARCHS — exclude it with ARCHS=\"x86_64 i386 arm64\" or install riscv64-linux-gnu-gcc"
 fi
 
+# ── clang/LLVM sanity check (make verify-patch COMPILER=clang|both) ──────────
+# clang=compiler, ld.lld=linker (lld pkg), llvm-ar/llvm-nm/...=tools (llvm pkg).
+# All three packages are needed; clang does not pull in llvm-ar on any distro.
+
+if command -v clang &>/dev/null; then
+    info "clang: OK ($(clang --version 2>&1 | head -1))"
+else
+    warn "clang not found — make verify-patch COMPILER=clang will not work"
+    warn "On Arch:   sudo pacman -S clang lld llvm"
+    warn "On Debian: sudo apt-get install clang lld llvm"
+fi
+
+if command -v llvm-ar &>/dev/null; then
+    info "llvm-ar: OK (kernel LLVM=1 toolchain complete)"
+else
+    warn "llvm-ar not found — kernel LLVM=1 builds will fail even if clang is present"
+    warn "On Arch:   sudo pacman -S llvm"
+    warn "On Debian: sudo apt-get install llvm"
+fi
+
 # ── pahole version check (BTF/debug info for kernels ≥6.0) ───────────────────
 
 check_pahole_version() {
@@ -222,7 +246,7 @@ check_pahole_version
 # Core tools always checked; arch-specific QEMU binaries and cross-compilers
 # gated on the ARCHS passed to bootstrap so a partial-arch setup is valid.
 
-REQUIRED=(gcc make ccache cpio git bc flex bison lzop)
+REQUIRED=(gcc make ccache cpio git bc flex bison lzop clang llvm-ar)
 for a in ${ARCH}; do
     case "$a" in
         x86_64) REQUIRED+=(qemu-system-x86_64) ;;
