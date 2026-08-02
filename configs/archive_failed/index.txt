@@ -1,4 +1,4 @@
-Failed configs archive — 51 entries, 81 rows — generated 2026-08-02T10:27:37Z
+Failed configs archive — 53 entries, 84 rows — generated 2026-08-02T10:34:00Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON                                                                                     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -67,12 +67,18 @@ rand500config    arm64   v7.2-rc2    BUILD_FAIL                                 
     -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
 rand500config    arm64   v7.2-rc2    BUILD_FAIL                                                                                         6     mainline   2026-07-18_19-33-53  mainline-7.2-2026-07-18_19-33-53-v7.2-rc2             edfe557442df5e93de92b3b3cca7c8a36183e28da1169bd8c7112e462b33b42a
     -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
+rand500config    arm64   v7.2-rc3    BOOT_FAIL-kernel-panic                                                                             1     next       2026-07-19_01-00-44  next-7.2-2026-07-19_01-00-44-v7.2-rc3                 f88ac11e6953bb81c0b21969e8173b5697e5ec5c91680a8c779da1510477d44d
+    -> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 rand500config    arm64   v7.2-rc3    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-19_23-57-23  mainline-7.2-2026-07-19_23-57-23-v7.2-rc3             7d9b39f86d0e9106b0750c12b024216a1ba1a3297adc7c1dd957daf0525f5485
 rand500config    arm64   v7.2-rc3    BOOT_FAIL-timeout-bisect-from-7d9b39f86d0e9106b0750c12b024216a1ba1a3297adc7c1dd957daf0525f5485     0                                                                                           207fc28107009142b5b2c6fba12e910d0b4e42462897d911c2f2ffe22332b1a1
 rand500config    arm64   v7.2-rc3    BUILD_FAIL                                                                                         1     next       2026-07-18_21-09-11  next-7.2-2026-07-18_21-09-11-v7.2-rc3                 53e198623077e919370cf15a40779ce389d98888df43fb5cfc7070c59b0a646c
     -> /home/benni/git/linux-next/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_ini...
 rand500config    arm64   v7.2-rc3    BUILD_FAIL                                                                                         1     mainline   2026-07-18_21-13-55  mainline-7.2-2026-07-18_21-13-55-v7.2-rc3             ad50220bf37b17e766d9deb36a54accb0075ecee52bb5f2f1eaab2703cdba50c
     -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
+rand500config    arm64   v7.2-rc3    BUILD_FAIL                                                                                         2     next       2026-07-20_17-30-54  next-7.2-2026-07-20_17-30-54-v7.2-rc3                 ffcfc34878b87a635dad87c037d9b08361fe1d8a48881b05d0f1646a48a910c7
+    -> /home/benni/git/linux-next/drivers/pinctrl/pinctrl-bm1880.c:1288:10: error: 'const struct pinconf_ops' has no member ...
+rand500config    arm64   v7.2-rc3    BUILD_FAIL                                                                                         2     next       2026-07-20_17-32-34  next-7.2-2026-07-20_17-32-34-v7.2-rc3                 ffcfc34878b87a635dad87c037d9b08361fe1d8a48881b05d0f1646a48a910c7
+    -> /home/benni/git/linux-next/drivers/pinctrl/pinctrl-bm1880.c:1288:10: error: 'const struct pinconf_ops' has no member ...
 rand500config    arm64   v7.2-rc4    BOOT_FAIL-kernel-panic                                                                             1     mainline   2026-07-21_00-50-01  mainline-7.2-2026-07-21_00-50-01-v7.2-rc4             d2d7a42d5a261ceb37b934aef3b2f4e98d3a033c0b9d0146ab64d5e5383902fe
     -> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 rand500config    arm64   v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_00-31-45  mainline-7.2-2026-07-21_00-31-45-v7.2-rc4             34db892671b98d4a81f229b40b0f8aae06ad2a769cbbde23d5cd0f435f3fd274
