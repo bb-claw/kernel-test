@@ -5,3 +5,4 @@
 - [test-inventory.md](test-inventory.md) — all 21 tests, what each exercises, skip logic, how to add
 - [workflows.md](workflows.md) — common make commands, variables, patterns
 - [code-quality.md](code-quality.md) — commit format, pre-push checklist, shell style rules
+- [patch-workflow.md](patch-workflow.md) — pre-send quality gate (own patches) + maintainer reviewer workflow; verification questions checklist
