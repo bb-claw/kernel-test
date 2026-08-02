@@ -1,4 +1,4 @@
-Failed configs archive — 57 entries, 88 rows — generated 2026-08-02T10:35:16Z
+Failed configs archive — 58 entries, 89 rows — generated 2026-08-02T10:36:22Z
 
 CONFIG           ARCH    VERSION     FAILURE REASON                                                                                     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -144,5 +144,6 @@ rand500config    x86_64  v7.2-rc4    BOOT_FAIL-timeout                          
 rand500config    x86_64  v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_00-20-50  mainline-7.2-2026-07-21_00-20-50-v7.2-rc4             4b30864406185ce4ee9eb9906b471888a272c3ca893238fb5db4894f8e98d68d
 rand500config    x86_64  v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_00-06-32  mainline-7.2-2026-07-21_00-06-32-v7.2-rc4             7829a0549ae7c8bcf26e2bc17c9bb3469e2652aa77e6b3afff6177efc3ef399b
 rand500config    x86_64  v7.2-rc4    BOOT_FAIL-timeout                                                                                  1     mainline   2026-07-21_00-55-18  mainline-7.2-2026-07-21_00-55-18-v7.2-rc4             c37f534ed8b99f4b4c776ac20bf0ba88883ac75aa84c65f42026d474c3ba0662
+randdefconfig    arm64   v7.1.6-rc1  BOOT_FAIL-timeout                                                                                  1     stable-rc  2026-07-29_21-54-47  stable-rc-7.1-2026-07-29_21-54-47-v7.1.6-rc1          619f754c6e4aa8b1820211c3556343abb343f670a1b437c3edd43089b7a8d988
 tinyconfig       arm64   v7.2-rc3    BUILD_FAIL                                                                                         1     mainline   2026-07-18_23-51-22  mainline-7.2-2026-07-18_23-51-22-v7.2-rc3             5b67ead92304195446e02168a7d5e529592d8f8e7b4fb17563d208f0b533490c
     -> /home/benni/git/linux/include/linux/mfd/ocelot.h:34:24: error: implicit declaration of function 'devm_regmap_init_mmi...
