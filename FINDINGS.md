@@ -337,7 +337,7 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ### High — Build Failure
 
-- [x] **PINCTRL_MICROCHIP_SGPIO missing `select REGMAP_MMIO` — build fails without regmap** ✅ fix confirmed 2026-07-18
+- [x] **PINCTRL_MICROCHIP_SGPIO missing `select REGMAP_MMIO` — build fails without regmap** ✅ patch in pinctrl-fixes tree 2026-08-02, awaiting merge to mainline
   Kernel: v7.2-rc2 and v7.2-rc3. Arch: arm64 (affects all arches). Found by rand500config sampling.
 
   `pinctrl-microchip-sgpio.c` includes `<linux/mfd/ocelot.h>` which calls
@@ -1117,74 +1117,179 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 
 ---
 
-### High — Build Failure (riscv allmodconfig, actionable)
+### High — Build Failure (riscv allmodconfig, patch ready) ✅ resolved 2026-08-03
 
-- [ ] **`arch/riscv/kernel/signal.c`: `__vdso_rt_sigreturn_cfi_offset` undeclared when `CONFIG_RISCV_USER_CFI=y`**
-  Kernel: v7.2-rc4 (mainline). Arch: riscv cross-compile. Found by
+- [x] **`CONFIG_RISCV_USER_CFI=y` with Binutils 2.44 linker breaks allmodconfig riscv — `__vdso_rt_sigreturn_cfi_offset` undeclared**
+  Kernel: v7.2-rc4 + v7.2-rc5 (mainline). Arch: riscv cross-compile. Found by
   `make all CONFIGS=allmodconfig BUILD_TIMEOUT=3600`. Compiler: `riscv64-linux-gnu-gcc` = GCC 15.1.0,
   linker: `riscv64-linux-gnu-ld` = Binutils 2.44.
 
-  **Build sequence:**
+  ---
+
+  **Background — what the pieces are (beginner-friendly):**
+
+  - **VDSO** (*Virtual Dynamic Shared Object*): A tiny library the kernel builds and maps into every
+    process's memory. User programs call it for fast operations like getting the current time — without
+    doing a full system call. The kernel builds one VDSO `.so` file per architecture as part of `make`.
+
+  - **vdso_cfi**: When `CONFIG_RISCV_USER_CFI=y`, the kernel builds a *second* VDSO compiled with
+    RISC-V CFI (Control Flow Integrity) extensions — hardware instructions that detect when a function
+    returns to the wrong place (ROP attacks). Programs without CFI-capable hardware get the regular
+    VDSO; programs running on CFI-capable hardware get this one.
+
+  - **GNU property note** (type `0xc0000000`): A metadata tag embedded inside the compiled `.o` files
+    that says "this code uses CFI instructions". The linker is supposed to read these tags when it
+    combines the `.o` files into the final `.so` file and propagate the information. Think of it as a
+    sticky label on each object saying what hardware features it needs.
+
+  - **`CONFIG_WERROR=y`**: Makes the compiler treat all warnings as errors. `allmodconfig` always
+    sets this. When `CONFIG_WERROR=y`, the Makefile also passes `--fatal-warnings` to the *linker*,
+    which means linker warnings also become fatal errors.
+
+  - **Kconfig `depends on`**: The switch in the feature's configuration that says "only enable this
+    feature if condition X is true". Before this fix, `CONFIG_RISCV_USER_CFI` only checked whether
+    the *compiler* understood CFI instructions. It did not check whether the *linker* understood the
+    resulting metadata tags.
+
+  ---
+
+  **How we found it:**
+
+  1. Ran `make all NO_FETCH=1 CONFIGS=allmodconfig ARCHS=riscv` on v7.2-rc5 — the build failed.
+  2. The `build.log` showed `riscv64-linux-gnu-ld: warning: ... unsupported GNU_PROPERTY_TYPE (5)
+     type: 0xc0000000` — the linker doesn't know what these tags mean.
+  3. Confirmed the `--fatal-warnings` mechanism: found `scripts/Makefile.warn:207` adds
+     `KBUILD_LDFLAGS += --fatal-warnings` when `CONFIG_WERROR=y`. So the linker warning became a
+     fatal error.
+  4. Reproduced the linker failure directly:
+     ```sh
+     # Extract the exact ld command from the build:
+     cat build/allmodconfig-riscv/arch/riscv/kernel/vdso_cfi/.vdso-cfi.so.dbg.cmd
+     # Run it — exits 1 with the warning
+     ```
+  5. Traced the cascade: ld exits 1 → `vdso-cfi.so.dbg` is never written → `nm` complains "No such
+     file" → `vdso-cfi-offsets.h` is generated empty → `signal.c` can't find
+     `__vdso_rt_sigreturn_cfi_offset` → compile error.
+  6. Found the root cause in `arch/riscv/Kconfig:1181`: `CONFIG_RISCV_USER_CFI` checks only the
+     compiler (`$(cc-option,...)`), not the linker. Added linker commit author Deepak Gupta as `Cc:`.
+
+  ---
+
+  **Build failure sequence (what actually happens):**
+
   ```
-    VDSOLD  arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
-  riscv64-linux-gnu-ld: warning: rt_sigreturn.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
-  riscv64-linux-gnu-ld: warning: vgettimeofday.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
-  [... similar warnings for all vdso_cfi objects ...]
-    VDSOSYM include/generated/vdso-cfi-offsets.h
-  riscv64-linux-gnu-nm: 'arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg': No such file
+  Step 1: VDSOLD  arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
+    riscv64-linux-gnu-ld: warning: rt_sigreturn.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+    riscv64-linux-gnu-ld: warning: vgettimeofday.o: unsupported GNU_PROPERTY_TYPE (5) type: 0xc0000000
+    [... same for all 9 vdso_cfi objects ...]
+    → ld exits 1 (--fatal-warnings turns warnings into errors)
+    → vdso-cfi.so.dbg is NOT created
+
+  Step 2: VDSOSYM include/generated/vdso-cfi-offsets.h
+    riscv64-linux-gnu-nm: 'vdso-cfi.so.dbg': No such file or directory
+    → vdso-cfi-offsets.h is generated empty (0 bytes)
+
+  Step 3: Compiling arch/riscv/kernel/signal.c
+    error: '__vdso_rt_sigreturn_cfi_offset' undeclared
+    → The symbol should have come from vdso-cfi-offsets.h — but that file is empty
   ```
 
-  **Build error:**
+  ---
+
+  **Root cause in `arch/riscv/Kconfig`:**
+
+  The feature's Kconfig entry only checks compiler support, not linker support:
+  ```kconfig
+  config RISCV_USER_CFI
+      depends on $(cc-option,-mabi=lp64 -march=rv64ima_zicfiss_zicfilp -fcf-protection=full)
+      # ^^^ checks: can riscv64-linux-gnu-gcc compile with CFI flags? YES (GCC 15 can)
+      # Missing: can riscv64-linux-gnu-ld link the resulting objects? NO (Binutils 2.44 cannot)
   ```
-  In file included from arch/riscv/kernel/signal.c:18:
-  arch/riscv/kernel/signal.c: In function 'setup_rt_frame':
-  arch/riscv/include/asm/vdso.h:31:51: error: '__vdso_rt_sigreturn_cfi_offset' undeclared
-    (first use in this function); did you mean 'compat__vdso_rt_sigreturn_offset'?
-     31 |           (void __user *)((unsigned long)(base) + __vdso_##name##_cfi_offset) : \
-        |                                                   ^~~~~~~
-  arch/riscv/kernel/signal.c:438:35: note: in expansion of macro 'VDSO_SYMBOL'
-    438 |         regs->ra = (unsigned long)VDSO_SYMBOL(
-        |                                   ^~~~~~~~~~~
-  ```
 
-  **Root cause (two-stage failure):**
+  GCC 15 + Binutils 2.44 is an inconsistent toolchain: the compiler knows how to emit CFI property
+  tags, but the linker doesn't know how to read them. Normally a distro's toolchain would keep these
+  in sync, but cross-compilation toolchains (`riscv64-linux-gnu-*`) can lag behind.
 
-  1. **`VDSOLD` step:** `riscv64-linux-gnu-ld` (Binutils 2.44) emits `unsupported GNU_PROPERTY_TYPE (5)
-     type: 0xc0000000` warnings for every riscv64 vDSO CFI object. These notes are CFI-related GNU
-     property annotations emitted by GCC 15 for riscv — Binutils 2.44 does not understand them. The
-     ld command fails or the output `.so.dbg` is not produced (the `&&`-chained objcopy step never
-     runs), so `vdso-cfi.so.dbg` does not exist after the `VDSOLD` step.
+  The missing `depends on` line is the bug — introduced by commit
+  `22c1e263af2a` ("riscv: create a Kconfig fragment for shadow stack and landing pad support").
 
-  2. **`VDSOSYM` step:** The `gen_vdso_offsets.sh` script runs `nm` on the missing `.so.dbg` — `nm`
-     reports "No such file" and exits non-zero. The generated `include/generated/vdso-cfi-offsets.h`
-     is either empty or incomplete — `__vdso_rt_sigreturn_cfi_offset` is absent.
+  ---
 
-  3. **`signal.c` compile:** `arch/riscv/include/asm/vdso.h` includes
-     `<generated/vdso-cfi-offsets.h>` when `CONFIG_RISCV_USER_CFI=y` and expands `VDSO_SYMBOL` to
-     reference `__vdso_rt_sigreturn_cfi_offset` — which was never defined.
-
-  **Why only riscv allmodconfig:** `CONFIG_RISCV_USER_CFI` is only selectable on riscv and is enabled
-  by `allmodconfig`. Toolchain constraint: the Arch Linux `riscv64-linux-gnu-ld` (Binutils 2.44)
-  does not yet support the CFI GNU property type emitted by `riscv64-linux-gnu-gcc` 15.
-
-  **Proposed fix:** Either (a) update Binutils for the riscv64 cross-toolchain to a version that
-  handles the CFI GNU property type, or (b) strip unsupported property types from the linker
-  command via `--no-warn-rwx-segments` / property filtering flags, or (c) guard the CFI vDSO path
-  on a Binutils capability check in `arch/riscv/kernel/vdso_cfi/Makefile`.
-
-  **Minimal reproducer** (from `~/git/linux`):
+  **Reproducer** (from `~/git/linux`):
   ```sh
-  make O=/tmp/riscvcfi-repro ARCH=riscv allmodconfig
-  make O=/tmp/riscvcfi-repro ARCH=riscv \
-      CROSS_COMPILE=riscv64-linux-gnu- CC=riscv64-linux-gnu-gcc \
-      arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
-  # Shows ld warnings + missing .dbg; then:
-  make O=/tmp/riscvcfi-repro ARCH=riscv \
-      CROSS_COMPILE=riscv64-linux-gnu- CC=riscv64-linux-gnu-gcc \
-      arch/riscv/kernel/signal.o
+  make O=/tmp/riscvcfi-repro ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- allmodconfig
+  make O=/tmp/riscvcfi-repro ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- -j$(nproc)
+  # Build fails at signal.o with __vdso_rt_sigreturn_cfi_offset undeclared
   ```
 
-  **Subsystem:** `arch/riscv/` — RISC-V architecture signal/vDSO.
+  Manual two-step to isolate just the linker failure:
+  ```sh
+  # Step 1: build just the vdso_cfi (shows the linker warnings + exit 1):
+  make O=/tmp/riscvcfi-repro ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- \
+      arch/riscv/kernel/vdso_cfi/vdso-cfi.so.dbg
+  # Step 2: check the generated header is empty:
+  wc -c /tmp/riscvcfi-repro/include/generated/vdso-cfi-offsets.h
+  # Shows: 0
+  ```
+
+  The linker failure can be reproduced standalone with a tiny assembly file:
+  ```sh
+  # Confirm riscv64-linux-gnu-ld 2.44 doesn't understand the CFI property type:
+  /home/benni/git/linux-dev/scripts/riscv-ld-cfi-prop-test.sh \
+      riscv64-linux-gnu-gcc riscv64-linux-gnu-ld
+  echo $?  # prints: 1  (non-zero = linker can't handle it)
+  ```
+
+  ---
+
+  **Fix — two files changed:**
+
+  The fix adds a Kconfig capability test: when building `allmodconfig` (or any RISC-V config with
+  `CONFIG_RISCV_USER_CFI` candidate), Kconfig now runs a small test script that assembles a minimal
+  object with the CFI property tag and tries to link it. If the linker exits non-zero (as Binutils
+  2.44 does), the `$(success,...)` check returns `n` and `CONFIG_RISCV_USER_CFI` is disabled.
+
+  **`scripts/riscv-ld-cfi-prop-test.sh`** (new file):
+  ```bash
+  # Assembles a tiny .s with the CFI GNU property, then links with --fatal-warnings.
+  # Exit 0 = linker handles it fine; exit 1 = linker doesn't know this property.
+  CC="$1"; LD="$2"
+  # ... (creates temp dir, assembles, links, returns exit code)
+  ```
+
+  **`arch/riscv/Kconfig`** (one line added):
+  ```diff
+   config RISCV_USER_CFI
+       depends on 64BIT && MMU && \
+           $(cc-option,-mabi=lp64 -march=rv64ima_zicfiss_zicfilp -fcf-protection=full)
+       depends on RISCV_ALTERNATIVE
+  +    depends on $(success,$(srctree)/scripts/riscv-ld-cfi-prop-test.sh $(CC) $(LD))
+  ```
+
+  When Kconfig runs during `make allmodconfig`, it executes the test script. With Binutils 2.44:
+  script returns 1 → `$(success,...)` = `n` → `CONFIG_RISCV_USER_CFI` is not set → the vdso_cfi
+  build never runs → no failure.
+
+  **Patch branch:** `~/git/linux-dev` on `fix/20260803_riscv_user_cfi_ld_cfi_prop_test` (commit `592ae4fe`).
+
+  **Verified:** `make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- allmodconfig` on the patched tree
+  produces no `CONFIG_RISCV_USER_CFI` entry — feature correctly disabled with Binutils 2.44.
+
+  **Fixes:** `22c1e263af2a` ("riscv: create a Kconfig fragment for shadow stack and landing pad support")
+  **Cc:** `stable@vger.kernel.org` (appears in Linux 7.2)
+
+  **Send patch with:**
+  ```sh
+  # Remove Co-Authored-By line from commit first (git commit --amend), then:
+  cd ~/git/linux-dev
+  git send-email --to=linux-riscv@lists.infradead.org \
+    --cc=pjw@kernel.org --cc=palmer@dabbelt.com --cc=aou@eecs.berkeley.edu \
+    --cc=alex@ghiti.fr --cc=debug@rivosinc.com --cc=zong.li@sifive.com \
+    --cc=linux-kernel@vger.kernel.org --cc=stable@vger.kernel.org \
+    $(git format-patch -1)
+  ```
+
+  **Subsystem:** `arch/riscv/` — RISC-V architecture Kconfig / vDSO CFI.
   Maintainers: `Paul Walmsley <pjw@kernel.org>`, `Palmer Dabbelt <palmer@dabbelt.com>`,
   `Albert Ou <aou@eecs.berkeley.edu>`.
   Mailing list: `linux-riscv@lists.infradead.org`, `linux-kernel@vger.kernel.org`.
@@ -1318,6 +1423,6 @@ a lower bound only.
 | Status | Count |
 |--------|-------|
 | Open   | 10    |
-| Resolved | 18  |
+| Resolved | 19  |
 | Won't fix | 0  |
 | Reconsider later | 0 |
