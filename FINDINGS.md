@@ -1289,6 +1289,19 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
     $(git format-patch -1)
   ```
 
+  **Report artifacts** (`reports/mainline-7.2-2026-08-02_21-33-27-v7.2-rc5/`):
+
+  | File | Present | Notes |
+  |------|---------|-------|
+  | `build-allmodconfig-riscv.log` | ✅ | Primary evidence — linker warnings + `signal.c` error |
+  | `kconfig-allmodconfig-riscv.config` | ✅ | The triggering config — shows `CONFIG_RISCV_USER_CFI=y` |
+  | `dmesg-allmodconfig-riscv.txt` | ❌ absent | Build failed; QEMU never ran |
+  | `qemu-allmodconfig-riscv.log` | ❌ absent | Build failed; QEMU never ran |
+  | `vmstatus-allmodconfig-riscv.txt` | ❌ absent | Build failed; QEMU never ran |
+
+  The absence of the three QEMU/boot files is itself a diagnostic signal: any combo missing
+  all three while a `build-*.log` exists means the build failed before QEMU was launched.
+
   **Subsystem:** `arch/riscv/` — RISC-V architecture Kconfig / vDSO CFI.
   Maintainers: `Paul Walmsley <pjw@kernel.org>`, `Palmer Dabbelt <palmer@dabbelt.com>`,
   `Albert Ou <aou@eecs.berkeley.edu>`.
