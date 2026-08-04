@@ -10,6 +10,9 @@ reports/
 # Config bisect runs — build artifacts per step; kept locally for analysis
 bisect/
 
+# Consolidated cross-source failure index — populated locally from each clone/machine
+consolidation/
+
 # Host dmesg captures and analysis files (make dmesg)
 dmesg/
 

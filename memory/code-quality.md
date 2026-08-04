@@ -52,6 +52,7 @@ Examples:
 
 ## Bash Lib Script Pitfalls
 
+- **`${arr[-1]:-}` on empty array with `set -euo pipefail`** → bash evaluates the subscript before applying `:-`; prints `arr: bad array subscript` and `set -e` aborts the script. Triggered when `mapfile -t arr < <(...)` receives no output (e.g. `ls-remote` fails on transient TLS error). Fix: `[[ ${#arr[@]} -gt 0 ]] && VAR=${arr[-1]} || VAR=""`.
 - **`printf` with format string starting with `-`** → bash's `printf` builtin tries to parse it as an option; produces `printf: - : invalid option`. Fix: `printf -- '- [ ] ...' args`. Affects any shell lib script (`lib/`, `scripts/`) where the format string is a literal dash-prefixed string (e.g., Markdown list items).
 
 ---

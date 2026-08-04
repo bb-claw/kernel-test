@@ -103,7 +103,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive replay kconfig-check kconfig-build bisect canary-patch verify-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index replay kconfig-check kconfig-build bisect canary-patch verify-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -202,6 +202,7 @@ all:
 #   STABLE_RELEASE set   → stable tag fetch             (lib/fetch.sh)
 #   neither set          → mainline rc tag fetch        (lib/fetch.sh)
 # Presets set these automatically based on the clone directory name.
+# lib/fetch.sh falls back to local tags when ls-remote fails (e.g. transient TLS error).
 fetch:
 ifeq ($(NO_FETCH),1)
 	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local state"
@@ -364,6 +365,12 @@ install:
 config-archive:
 	$(Q)scripts/config-archive.sh
 
+# Merge all per-source failure indexes into consolidation/index.{txt,html}.
+# Sources: consolidation/<source>/archive_failed/index.txt (populated manually).
+# consolidation/ is gitignored — output stays local.
+consolidate-index:
+	$(Q)scripts/consolidate-index.sh
+
 # ── Kconfig static analysis ───────────────────────────────────────────────────
 
 # Scan a kernel subsystem for missing 'select' dependencies.
@@ -486,6 +493,7 @@ Targets:
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
   config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
+  consolidate-index  Merge consolidation/<source>/archive_failed/index.txt files into consolidation/index.{txt,html}
   replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
   bisect           Binary-search a failing config to find the responsible option(s)  (requires CONFIG_FILE=; opt: DRY_RUN=1 PINNED_OPTS=CONFIG_X,CONFIG_Y)
   canary-patch     Patch KERNEL_TREE/drivers/misc/ with boot diagnostic modules; run once before 'make all CANARY=1'
