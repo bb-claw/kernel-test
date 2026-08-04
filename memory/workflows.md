@@ -54,6 +54,7 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuil
 
 `make fetch` dispatches: `LINUX_NEXT=1` → error (use `make fetch-next`); `STABLE_RC_BRANCH` set →
 branch fetch+reset; `STABLE_RELEASE` set → stable tag; neither → mainline rc tag.
+`lib/fetch.sh` falls back to local tags when `ls-remote` fails (e.g. transient TLS error).
 Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
 
 ### Regression diff / baseline
@@ -81,6 +82,14 @@ Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts 
 ```sh
 make config-archive   # scan all reports/, populate configs/archive_passed/ + configs/archive_failed/
 ```
+
+### Consolidated cross-source index
+
+```sh
+make consolidate-index   # merge consolidation/<source>/archive_failed/index.txt → consolidation/index.{txt,html}
+```
+
+Populate: copy `archive_failed/index.txt` into `consolidation/<source>/archive_failed/index.txt` per machine/clone. Labels: `local-mainline`, `local-stable`, `hetzner-mainline`, etc. `consolidation/` is gitignored.
 
 ### Replay an archived config
 
