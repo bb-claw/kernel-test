@@ -24,7 +24,7 @@ FAILED_DIR="$DATA_REPO/configs/archive_failed"
 info() { printf '[config-archive] %s\n' "$*"; }
 warn() { printf '[config-archive] WARN: %s\n' "$*" >&2; }
 
-git -C "$DATA_REPO" pull --rebase
+git -C "$DATA_REPO" pull --rebase --autostash
 mkdir -p "$PASSED_DIR" "$FAILED_DIR"
 
 # Associative arrays keyed by sha256.

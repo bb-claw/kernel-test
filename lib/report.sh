@@ -451,7 +451,7 @@ info "Running warning analysis ..."
 # ── Commit report to data repo ────────────────────────────────────────────────
 
 run_name=$(basename "$RUN_DIR")
-git -C "$DATA_REPO" pull --rebase
+git -C "$DATA_REPO" pull --rebase --autostash
 git -C "$DATA_REPO" add "reports/$run_name"
 if git -C "$DATA_REPO" diff --cached --quiet; then
     info "data repo: nothing new to commit"
