@@ -126,25 +126,23 @@ make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1     # list options; omit DRY_RUN=
 make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagnose silent boots
 ```
 
-### Patch verification (multi-compiler/arch)
+### Patch verification / dmesg
 
 ```sh
-make verify-patch FILES=security/landlock/fs.o                           # GCC+Clang, all 4 arches
-make verify-patch FILES=security/landlock/fs.o BASE=v7.2-rc4             # before/after comparison
-make verify-patch FILES=security/landlock/ COMPILER=clang                # Clang only
-make verify-patch FILES="a.o b.o" ARCHS="arm64 x86_64" CLEAN=1          # custom scope
+make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=clang] [CLEAN=1]
+make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 ```
 
-Uses `VERIFY_ARCHS` (all 4 by default) and `COMPILER` (both by default). `BASE=` creates a
-git worktree for the "before" build; exits 1 on failures or regressions. Logs: `build/verify-patch/logs-<timestamp>/`.
-Clang builds require `clang` + `lld` + `llvm` (all three; installed by `make bootstrap`).
+`BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.
 
-### Capture and analyse host kernel dmesg
+**Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
+
+### CI / linting
 
 ```sh
-make dmesg                         # label: mainline (default); writes DATA_REPO/dmesg/
-make dmesg DMESG_LABEL=stable      # or: longterm / linux-next
+make lint       # Tier 1: bash -n, shellcheck (bash+sh modes), memory sizes, test-inventory, design doc
+make ci-test    # Tier 2: run tests/ci/test-*.sh (no kernel/QEMU needed; uses temp dirs + fixtures)
 ```
 
-**Rule:** Always use `make all NO_FETCH=1 ...` not chained targets — `all` always writes the
-report even when build or test fails; chained targets stop at the first failure.
+PR-title check skipped locally (CI-only via `$GITHUB_EVENT_PATH`).
+GitHub Actions: lint on every push; ci-test only when `lib/**`, `scripts/**`, `tests/ci/**`, or `Makefile` changed.
