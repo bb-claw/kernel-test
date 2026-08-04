@@ -117,12 +117,14 @@ setup_git_stub() {
     tmpdir
     local bindir="$_LAST_TMPDIR/bin"
     mkdir "$bindir"
-    cat > "$bindir/git" <<'STUB'
+    local real_git
+    real_git=$(command -v git)
+    cat > "$bindir/git" <<STUB
 #!/bin/bash
 for arg; do
-    case "$arg" in pull|push) exit 0 ;; esac
+    case "\$arg" in pull|push) exit 0 ;; esac
 done
-exec /usr/bin/git "$@"
+exec "$real_git" "\$@"
 STUB
     chmod +x "$bindir/git"
     PATH="$bindir:$PATH"

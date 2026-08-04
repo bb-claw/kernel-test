@@ -37,8 +37,12 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE="origin/${{ github.base_ref }}"
+          elif [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+            # New branch — compare all commits against main
+            BASE="origin/main"
           else
-            BASE="HEAD^"
+            # Push to existing branch — diff all commits in the push
+            BASE="${{ github.event.before }}"
           fi
           changed=$(git diff --name-only "${BASE}..HEAD" 2>/dev/null || echo "")
           tier2=$(echo "$changed" | grep -E \
