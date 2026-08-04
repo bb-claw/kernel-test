@@ -6,6 +6,8 @@ cache/
 
 # Test reports — stored in kernel-test-data/ (DATA_REPO), not the harness repo
 reports/
+# Exception: CI test fixtures live in the harness repo
+!tests/ci/fixtures/reports/
 
 # Config bisect runs — build artifacts per step; kept locally for analysis
 bisect/
@@ -16,6 +18,8 @@ configs/archive_failed/
 
 # Consolidated cross-source failure index — stored locally in DATA_REPO/consolidation/
 consolidation/
+# Exception: CI test fixtures live in the harness repo
+!tests/ci/fixtures/consolidation/
 
 # Host dmesg captures and analysis files — stored in DATA_REPO/dmesg/
 dmesg/

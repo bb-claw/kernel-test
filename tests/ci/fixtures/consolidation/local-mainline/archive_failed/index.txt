@@ -1,0 +1,6 @@
+Failed configs archive — 2 entries, 2 rows — generated 2026-01-01T10:00:00Z
+
+CONFIG           ARCH    VERSION     FAILURE REASON                                                                                     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+tinyconfig       x86_64  v7.2-rc1    BOOT_FAIL-timeout                                                                                  1     mainline   2026-01-01_10-00-00  mainline-7.2-2026-01-01_10-00-00-v7.2-rc1             aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111
+defconfig        x86_64  v7.2-rc1    BUILD_FAIL                                                                                         1     mainline   2026-01-01_10-00-00  mainline-7.2-2026-01-01_10-00-00-v7.2-rc1             cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333
