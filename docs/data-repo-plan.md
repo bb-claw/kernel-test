@@ -40,12 +40,22 @@ build or test.
 ## New variable: DATA_REPO
 
 ```makefile
-DATA_REPO ?= ~/git/kernel-test-data
+DATA_REPO ?= $(HOME)/git/kernel-test-data   # Makefile default (mainline clone)
 ```
 
-Tilde-expanded and absolutified at Makefile parse time (same as `KERNEL_TREE`).
-All scripts that read or write reports, archives, or the consolidation index use
-`DATA_REPO` as their root instead of `REPO_ROOT`.
+Set identically in every preset file so all four clone types point to the same
+data repo by default and the value is visible per-clone:
+
+| Preset | Sets |
+|--------|------|
+| `presets/kernel-test-stable.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| `presets/kernel-test-stable-rc.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| `presets/kernel-test-next.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| _(mainline — no preset)_ | falls back to Makefile default |
+
+Override per-machine via `local.mk` (gitignored) if a different path is needed
+(e.g. a different disk on Hetzner).  Tilde-expanded and absolutified at parse
+time (same pattern as `KERNEL_TREE`).
 
 If `DATA_REPO` is unset or the directory does not exist, scripts that need it
 print an error and exit 1.  No silent fallback to the harness directory.
@@ -151,6 +161,9 @@ Split:
 | File | Change |
 |------|--------|
 | `Makefile` | Add `DATA_REPO` variable + tilde-expand; add `init-data-repo` target |
+| `presets/kernel-test-stable.mk` | Add `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| `presets/kernel-test-stable-rc.mk` | Add `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| `presets/kernel-test-next.mk` | Add `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
 | `lib/report.sh` | Write to `$DATA_REPO/reports/`; auto-commit after |
 | `lib/diff.sh` | Read from `$DATA_REPO/reports/` |
 | `lib/bootstrap.sh` | Clone or pull `kernel-test-data` |
