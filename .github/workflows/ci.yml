@@ -74,5 +74,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure git identity for test commits
+        run: |
+          git config --global user.name  "CI"
+          git config --global user.email "ci@kernel-test.local"
+
       - name: Run make ci-test
         run: make ci-test
