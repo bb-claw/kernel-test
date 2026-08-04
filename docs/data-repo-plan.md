@@ -46,12 +46,13 @@ DATA_REPO ?= $(HOME)/git/kernel-test-data   # Makefile default (mainline clone)
 Set identically in every preset file so all four clone types point to the same
 data repo by default and the value is visible per-clone:
 
-| Preset | Sets |
-|--------|------|
-| `presets/kernel-test-stable.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
-| `presets/kernel-test-stable-rc.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
-| `presets/kernel-test-next.mk` | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
-| _(mainline — no preset)_ | falls back to Makefile default |
+| Preset | Clone name | Sets |
+|--------|------------|------|
+| `presets/kernel-test.mk` | `kernel-test` (local) | `DATA_REPO ?= $(HOME)/git/kernel-test-data` |
+| `presets/kernel-test-mainline.mk` | `kernel-test-mainline` (Hetzner) | `KERNEL_TREE`, `LABEL`, `DATA_REPO` |
+| `presets/kernel-test-stable.mk` | `kernel-test-stable` | `STABLE_RELEASE`, `DATA_REPO` |
+| `presets/kernel-test-stable-rc.mk` | `kernel-test-stable-rc` | `KERNEL_TREE`, `LABEL`, `GCC`, `BUILD_TIMEOUT`, `STABLE_RC_BRANCH`, `DATA_REPO` |
+| `presets/kernel-test-next.mk` | `kernel-test-next` | `KERNEL_TREE`, `LABEL`, `LINUX_NEXT`, `DATA_REPO` |
 
 Override per-machine via `local.mk` (gitignored) if a different path is needed
 (e.g. a different disk on Hetzner).  Tilde-expanded and absolutified at parse
