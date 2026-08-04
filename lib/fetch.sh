@@ -42,7 +42,7 @@ if [[ -n ${STABLE_RELEASE:-} ]]; then
         | awk '{print $2}' | grep -v '\^{}' | sed 's|refs/tags/||' \
         | grep -v -- '-rc' | sort -V
     )
-    LATEST_TAG=${_tags[-1]:-}
+    [[ ${#_tags[@]} -gt 0 ]] && LATEST_TAG=${_tags[-1]} || LATEST_TAG=""
 
     if [[ -z $LATEST_TAG ]]; then
         warn "Remote tag discovery failed — checking local tags ..."
@@ -50,7 +50,7 @@ if [[ -n ${STABLE_RELEASE:-} ]]; then
             git -C "$KERNEL_TREE" tag -l "v${STABLE_RELEASE}.*" \
             --sort=version:refname | grep -v -- '-rc'
         )
-        LATEST_TAG=${_local[-1]:-}
+        [[ ${#_local[@]} -gt 0 ]] && LATEST_TAG=${_local[-1]} || LATEST_TAG=""
         [[ -n $LATEST_TAG ]] \
             || die "No stable tags found for series ${STABLE_RELEASE} locally or remotely."
         warn "Using best available local tag: $LATEST_TAG"
@@ -68,14 +68,14 @@ else
         | awk '{print $2}' | grep -v '\^{}' | sed 's|refs/tags/||' \
         | sort -V
     )
-    LATEST_TAG=${_tags[-1]:-}
+    [[ ${#_tags[@]} -gt 0 ]] && LATEST_TAG=${_tags[-1]} || LATEST_TAG=""
 
     if [[ -z $LATEST_TAG ]]; then
         warn "Remote tag discovery failed — checking local tags ..."
         mapfile -t _local < <(
             git -C "$KERNEL_TREE" tag -l 'v*-rc*' --sort=version:refname
         )
-        LATEST_TAG=${_local[-1]:-}
+        [[ ${#_local[@]} -gt 0 ]] && LATEST_TAG=${_local[-1]} || LATEST_TAG=""
         [[ -n $LATEST_TAG ]] \
             || die "No -rc tags found locally or remotely." \
                    "Ensure the kernel tree was cloned from Linus's tree and has network access."
