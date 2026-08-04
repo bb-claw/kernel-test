@@ -24,7 +24,8 @@ git init "$DATA_REPO"
 mkdir -p "$DATA_REPO/reports" \
          "$DATA_REPO/configs/archive_passed" \
          "$DATA_REPO/configs/archive_failed" \
-         "$DATA_REPO/consolidation"
+         "$DATA_REPO/consolidation" \
+         "$DATA_REPO/dmesg"
 printf 'consolidation/\n' > "$DATA_REPO/.gitignore"
 git -C "$DATA_REPO" add .gitignore
 git -C "$DATA_REPO" commit -m "chore: initial data repo structure"
