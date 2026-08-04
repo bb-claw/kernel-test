@@ -4,7 +4,8 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-require_env BUILD_DIR CONFIGS ARCHS BUILD_ONLY_CONFIGS REPORT_DIR RUN_STAMP KERNEL_TREE
+require_env BUILD_DIR CONFIGS ARCHS BUILD_ONLY_CONFIGS REPORT_DIR DATA_REPO RUN_STAMP KERNEL_TREE
+[[ -d $DATA_REPO ]] || die "DATA_REPO directory does not exist: $DATA_REPO — run: make bootstrap"
 
 REPORT_GEN_EPOCH=$(date -u +%s)
 
@@ -446,5 +447,16 @@ _WARNINGS="$(dirname "$0")/warnings.sh"
 printf '\n'
 info "Running warning analysis ..."
 "$_WARNINGS" "$RUN_DIR" || warn "warnings.sh exited non-zero (analysis incomplete)"
+
+# ── Commit report to data repo ────────────────────────────────────────────────
+
+run_name=$(basename "$RUN_DIR")
+git -C "$DATA_REPO" pull --rebase
+git -C "$DATA_REPO" add "reports/$run_name"
+if git -C "$DATA_REPO" diff --cached --quiet; then
+    info "data repo: nothing new to commit"
+else
+    git -C "$DATA_REPO" commit -m "chore(report): add ${LABEL} ${KERNEL_VERSION} ${run_name##*-} results"
+fi
 
 [[ $OVERALL == PASS ]] || exit 1

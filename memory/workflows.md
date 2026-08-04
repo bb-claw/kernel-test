@@ -5,6 +5,7 @@
 | Variable | Default | Override example |
 |---|---|---|
 | `KERNEL_TREE` | `../linux` | `KERNEL_TREE=~/git/linux-stable` |
+| `DATA_REPO` | `~/git/kernel-test-data` | `DATA_REPO=~/git/other-data` (or override in `local.mk`) |
 | `STABLE_KERNEL_TREE` | `~/git/linux-stable` | — |
 | `STABLE_RELEASE` | _(none)_ | `STABLE_RELEASE=7.1` |
 | `TAG` | _(none)_ | `TAG=v7.2-rc2` (used by `make checkout` only) |
@@ -31,7 +32,7 @@
 | `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
 | `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
 
-`KERNEL_TREE` is tilde-expanded and absolutified at Makefile parse time.
+`KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
 ---
@@ -74,22 +75,21 @@ make warnings                                         # (re-)analyse warnings fr
 make warnings-baseline                                # pin latest run as warning baseline; future runs auto-diff against it
 ```
 
-`lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`.
-Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts table + cross-arch divergence vs x86_64 + new/fixed since prev run), `warnings-diff-prev.txt`. Informational only — no OVERALL impact.
+`lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`. Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts + cross-arch divergence vs x86_64 + new/fixed since prev run), `warnings-diff-prev.txt`. Informational only.
 
 ### Config archive
 
 ```sh
-make config-archive   # scan all reports/, populate configs/archive_passed/ + configs/archive_failed/
+make config-archive   # scan DATA_REPO/reports/, populate DATA_REPO/configs/archive_{passed,failed}/; auto-commits to data repo
 ```
 
 ### Consolidated cross-source index
 
 ```sh
-make consolidate-index   # merge consolidation/<source>/archive_failed/index.txt → consolidation/index.{txt,html}
+make consolidate-index   # merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}
 ```
 
-Populate: copy `archive_failed/index.txt` into `consolidation/<source>/archive_failed/index.txt` per machine/clone. Labels: `local-mainline`, `local-stable`, `hetzner-mainline`, etc. `consolidation/` is gitignored.
+Populate: copy `archive_failed/index.txt` into `DATA_REPO/consolidation/<source>/archive_failed/index.txt` per machine/clone (labels: `local-mainline`, `hetzner-mainline`, etc.). `consolidation/` gitignored in both repos.
 
 ### Replay an archived config
 

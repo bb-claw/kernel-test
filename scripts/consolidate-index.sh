@@ -15,8 +15,10 @@
 # Run via: make consolidate-index
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONSOL_DIR="$REPO_ROOT/consolidation"
+DATA_REPO="${DATA_REPO:-}"
+[[ -n $DATA_REPO && -d $DATA_REPO ]] || \
+    { printf '[consolidate-index] ERROR: DATA_REPO directory does not exist: %s\nRun: make bootstrap\n' "${DATA_REPO:-<unset>}" >&2; exit 1; }
+CONSOL_DIR="$DATA_REPO/consolidation"
 
 info() { printf '[consolidate-index] %s\n' "$*"; }
 

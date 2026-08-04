@@ -14,9 +14,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPORT_ROOT="$REPO_ROOT/reports"
-PASSED_DIR="$REPO_ROOT/configs/archive_passed"
-FAILED_DIR="$REPO_ROOT/configs/archive_failed"
+DATA_REPO="${DATA_REPO:-}"
+[[ -n $DATA_REPO && -d $DATA_REPO ]] || \
+    { printf '[config-archive] ERROR: DATA_REPO directory does not exist: %s\nRun: make bootstrap\n' "${DATA_REPO:-<unset>}" >&2; exit 1; }
+REPORT_ROOT="$DATA_REPO/reports"
+PASSED_DIR="$DATA_REPO/configs/archive_passed"
+FAILED_DIR="$DATA_REPO/configs/archive_failed"
 
 info() { printf '[config-archive] %s\n' "$*"; }
 warn() { printf '[config-archive] WARN: %s\n' "$*" >&2; }
@@ -629,3 +632,13 @@ generate_index() {
 }
 
 generate_index
+
+# ── Commit to data repo ───────────────────────────────────────────────────────
+
+git -C "$DATA_REPO" pull --rebase
+git -C "$DATA_REPO" add configs/archive_passed configs/archive_failed
+if git -C "$DATA_REPO" diff --cached --quiet; then
+    info "data repo: nothing new to commit"
+else
+    git -C "$DATA_REPO" commit -m "chore(config-archive): update archive indexes and configs"
+fi

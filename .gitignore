@@ -10,7 +10,11 @@ reports/
 # Config bisect runs — build artifacts per step; kept locally for analysis
 bisect/
 
-# Consolidated cross-source failure index — populated locally from each clone/machine
+# Config archives — stored in kernel-test-data/ (DATA_REPO), not the harness repo
+configs/archive_passed/
+configs/archive_failed/
+
+# Consolidated cross-source failure index — stored locally in DATA_REPO/consolidation/
 consolidation/
 
 # Host dmesg captures and analysis files (make dmesg)
