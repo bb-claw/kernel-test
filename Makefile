@@ -25,13 +25,19 @@ endif
 # 'override' is required because command-line variables suppress ordinary :=.
 override KERNEL_TREE := $(abspath $(patsubst ~%,$(HOME)%,$(KERNEL_TREE)))
 
+# Dedicated data repository — stores reports/, configs/archive_*/, consolidation/.
+# Set identically in all presets so every clone writes to the same repo.
+# Override per-machine via local.mk (gitignored).
+DATA_REPO ?= $(HOME)/git/kernel-test-data
+override DATA_REPO := $(abspath $(patsubst ~%,$(HOME)%,$(DATA_REPO)))
+
 ARCHS_ALL     := x86_64 i386 arm64 riscv
 ARCHS         ?= $(ARCHS_ALL)
 CONFIGS       ?= tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig
 TIMEOUT       ?= 360
 BUILD_TIMEOUT ?= 1800
 GCC           ?= gcc
-REPORT_DIR    ?= reports
+REPORT_DIR    ?= $(DATA_REPO)/reports
 V             ?= 0
 NO_FETCH      ?= 0
 NO_BUILD      ?= 0
@@ -85,7 +91,7 @@ endif
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR V RUN_STAMP NO_FETCH NO_BUILD
+export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
@@ -103,7 +109,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index replay kconfig-check kconfig-build bisect canary-patch verify-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -127,7 +133,11 @@ $(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 bootstrap:
-	$(Q)lib/bootstrap.sh "$(ARCHS)"
+	$(Q)lib/bootstrap.sh "$(ARCHS)" "$(DATA_REPO)"
+
+# Initialise kernel-test-data/ from scratch (one-time; prefer bootstrap which also pulls).
+init-data-repo:
+	$(Q)scripts/init-data-repo.sh "$(DATA_REPO)"
 
 hooks:
 	@git config core.hooksPath .githooks
@@ -161,6 +171,8 @@ info:
 	@[[ -f $(BUILD_DIR)/.kernel-version ]] \
 	    && printf 'Version file: %s\n' "$$(cat $(BUILD_DIR)/.kernel-version)" \
 	    || printf 'Version file: (not set — run: make fetch / make fetch-stable / make fetch-stable-rc  or  make checkout TAG=)\n'
+	@printf 'Data repo:    %s%s\n' "$(DATA_REPO)" \
+	    "$$([ -d "$(DATA_REPO)" ] && echo '' || echo '  ← MISSING: run make bootstrap')"
 
 # Fetch and checkout a specific tag or commit. Usage: make checkout TAG=v7.2-rc2
 checkout:
@@ -461,8 +473,8 @@ clean:
 	$(Q)rm -rf $(BUILD_DIR) $(CACHE_DIR)
 
 distclean: clean
-	@echo "[distclean] Removing $(REPORT_DIR)/"
-	$(Q)rm -rf $(REPORT_DIR)
+	@echo "[distclean] Removing build/ and cache/ only."
+	@echo "[distclean] Reports and archives live in DATA_REPO ($(DATA_REPO)) — manage separately."
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -491,9 +503,10 @@ Targets:
   warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
-  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
-  config-archive   Scan all reports/ and populate configs/archive_passed/ + configs/archive_failed/
-  consolidate-index  Merge consolidation/<source>/archive_failed/index.txt files into consolidation/index.{txt,html}
+  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes DATA_REPO/dmesg/)
+  init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)
+  config-archive   Scan DATA_REPO/reports/ and populate DATA_REPO/configs/archive_*/; auto-commits to data repo
+  consolidate-index  Merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}
   replay           Re-test an archived config on the current kernel  (requires CONFIG_FILE=)
   bisect           Binary-search a failing config to find the responsible option(s)  (requires CONFIG_FILE=; opt: DRY_RUN=1 PINNED_OPTS=CONFIG_X,CONFIG_Y)
   canary-patch     Patch KERNEL_TREE/drivers/misc/ with boot diagnostic modules; run once before 'make all CANARY=1'
@@ -501,7 +514,7 @@ Targets:
   kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
   verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
   clean            Remove build/ and cache/
-  distclean        Remove build/, cache/, and reports/
+  distclean        Remove build/ and cache/ (reports/archives in DATA_REPO — manage separately)
   help             Show this message
 
 Config profiles (CONFIGS=):
@@ -529,7 +542,8 @@ Variables (current values):
   TIMEOUT             = $(TIMEOUT)s    (VM boot timeout per config)
   BUILD_TIMEOUT       = $(BUILD_TIMEOUT)s  (per-kernel build timeout; 0 = no limit — use for localconfig; defconfig/kunitconfig x86_64 needs ~10–12 min)
   GCC                 = $(GCC)  (compiler binary; e.g. GCC=gcc-15 for stable kernels that predate GCC 16)
-  REPORT_DIR          = $(REPORT_DIR)
+  DATA_REPO           = $(DATA_REPO)  (sibling data repository: reports/, configs/archive_*/, consolidation/)
+  REPORT_DIR          = $(REPORT_DIR)  (= DATA_REPO/reports; set automatically)
   V                   = $(V)  (set to 1 for verbose output)
   NO_FETCH            = $(NO_FETCH)  (set to 1 to skip git fetch and use local tags)
   NO_BUILD            = $(NO_BUILD)  (set to 1 to skip kernel build and use existing build artifacts)

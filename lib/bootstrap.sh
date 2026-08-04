@@ -7,7 +7,8 @@
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-ARCH="${1:?usage: bootstrap.sh <archs>}"
+ARCH="${1:?usage: bootstrap.sh <archs> <data_repo>}"
+DATA_REPO="${2:?usage: bootstrap.sh <archs> <data_repo>}"
 
 # ── Root vs sudo ──────────────────────────────────────────────────────────────
 # Ansible or other root-context runners have EUID=0; regular users need sudo.
@@ -288,6 +289,21 @@ setup_hooks() {
 
 REPO_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || true)
 if [[ -n $REPO_ROOT ]]; then setup_hooks; else warn "Not inside a git repo — skipping hook setup"; fi
+
+# ── Data repository ───────────────────────────────────────────────────────────
+
+setup_data_repo() {
+    local repo="$1"
+    if [[ ! -d "$repo" ]]; then
+        info "Cloning kernel-test-data → $repo"
+        git clone https://github.com/bb-claw/kernel-test-data.git "$repo"
+    else
+        info "Updating kernel-test-data ($repo)"
+        git -C "$repo" pull --rebase
+    fi
+}
+
+setup_data_repo "$DATA_REPO"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 

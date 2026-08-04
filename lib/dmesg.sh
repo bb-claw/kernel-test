@@ -13,11 +13,16 @@ if [[ $valid -eq 0 ]]; then
     exit 2
 fi
 
+DATA_REPO="${DATA_REPO:-}"
+[[ -n $DATA_REPO && -d $DATA_REPO ]] || \
+    { printf 'error: DATA_REPO directory does not exist: %s\nRun: make bootstrap\n' "${DATA_REPO:-<unset>}" >&2; exit 1; }
+DMESG_DIR="$DATA_REPO/dmesg"
+
 D=$(date +%Y-%m-%d_%H-%M-%S)
 V=$(uname -r | awk -F '.' '{ print $1"."$2 }')
 R=$(uname -r)
-mkdir -p dmesg
-F="dmesg/dmesg-${L}-${V}-${D}-${R}.txt"
+mkdir -p "$DMESG_DIR"
+F="$DMESG_DIR/dmesg-${L}-${V}-${D}-${R}.txt"
 A="${F%.txt}-analysis.txt"
 
 printf 'writing dmesg to %s\n' "$F"
@@ -40,7 +45,7 @@ count_lines() {
 
 # ── Previous capture (same label) for diff ────────────────────────────────────
 
-PREV=$(find dmesg -maxdepth 1 -name "dmesg-${L}-*.txt" \
+PREV=$(find "$DMESG_DIR" -maxdepth 1 -name "dmesg-${L}-*.txt" \
         ! -name "*-analysis.txt" ! -name "${F##*/}" \
         -printf '%T@ %p\n' 2>/dev/null \
     | sort -rn | head -1 | awk '{ sub(/^[^ ]+ /, ""); print }' \
