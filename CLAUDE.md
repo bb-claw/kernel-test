@@ -228,6 +228,7 @@ scripts; the table below covers everything else.
 | Change build, fetch, or test pipeline behaviour | `memory/workflows.md` · `memory/project.md` |
 | Discover a new Toybox sh bug or workaround | `memory/code-quality.md` (Toybox pitfalls list) |
 | Change a git hook or quality gate | `memory/code-quality.md` (hooks table) |
+| Add or remove a `tests/ci/test-*.sh` file | `CLAUDE.md` Key files table (new/remove row) |
 | Change architecture or fundamental design | `memory/project.md` |
 
 The pre-push hook enforces:

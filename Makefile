@@ -137,6 +137,7 @@ bootstrap:
 
 # Initialise kernel-test-data/ from scratch (one-time; prefer bootstrap which also pulls).
 init-data-repo:
+	$(Q)scripts/init-data-repo.sh "$(DATA_REPO)"
 
 # ── CI quality gates ──────────────────────────────────────────────────────────
 
@@ -149,7 +150,6 @@ lint:
 # 'make test' already targets the kernel VM tests — this target is separate.
 ci-test:
 	$(Q)scripts/ci-run-tests.sh
-	$(Q)scripts/init-data-repo.sh "$(DATA_REPO)"
 
 hooks:
 	@git config core.hooksPath .githooks
