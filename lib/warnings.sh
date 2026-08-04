@@ -285,4 +285,4 @@ SUMMARY="$RUN_DIR/warnings-summary.txt"
 } > "$SUMMARY"
 
 info "  warnings-summary.txt written"
-[[ -n $_prev_run ]] && info "  warnings-diff-prev.txt written"
+if [[ -n $_prev_run ]]; then info "  warnings-diff-prev.txt written"; fi
