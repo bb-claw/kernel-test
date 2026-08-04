@@ -503,7 +503,7 @@ Targets:
   warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
-  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes dmesg/)
+  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes DATA_REPO/dmesg/)
   init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)
   config-archive   Scan DATA_REPO/reports/ and populate DATA_REPO/configs/archive_*/; auto-commits to data repo
   consolidate-index  Merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}

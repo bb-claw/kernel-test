@@ -70,6 +70,7 @@ kernel-test-data/
   configs/
     archive_passed/           .config files that produced a PASS result
     archive_failed/           .config files that produced a FAIL result
+  dmesg/                      host kernel dmesg captures and analysis files
   consolidation/              gitignored — local cross-source merge workspace
     <source>/
       archive_failed/
@@ -167,9 +168,10 @@ Split:
 | `lib/report.sh` | Write to `$DATA_REPO/reports/`; auto-commit after |
 | `lib/diff.sh` | Read from `$DATA_REPO/reports/` |
 | `lib/bootstrap.sh` | Clone or pull `kernel-test-data` |
+| `lib/dmesg.sh` | Write to `$DATA_REPO/dmesg/`; read previous captures from there for diff |
 | `scripts/config-archive.sh` | Read from `$DATA_REPO/reports/`; write to `$DATA_REPO/configs/archive_*/`; auto-commit |
 | `scripts/consolidate-index.sh` | Use `$DATA_REPO/consolidation/` as root |
-| `.gitignore` | Add `configs/archive_*/` (data moved out) |
+| `.gitignore` | Add `configs/archive_*/`, `reports/`, `dmesg/` (data moved out) |
 | `FINDINGS.md` | Remove kernel bug entries (moved to data repo) |
 | `CLAUDE.md` | Document `DATA_REPO`, new workflow, data repo structure |
 | `memory/workflows.md` | Add `DATA_REPO` to variables table; update config-archive and consolidate-index sections |
@@ -284,4 +286,4 @@ push will require a pull --rebase before it succeeds.
 - Automated push to remote (user pushes manually; avoids credentials in scripts)
 - Merging `archive_passed/` into a unified index (passed configs are for replay only)
 - Submodule linking between harness and data repo (too much friction on clone)
-- Storing build logs or dmesg in the data repo (too large; already gitignored)
+- Storing build logs in the data repo (too large; already gitignored in both repos)

@@ -142,7 +142,7 @@ Clang builds require `clang` + `lld` + `llvm` (all three; installed by `make boo
 ### Capture and analyse host kernel dmesg
 
 ```sh
-make dmesg                         # label: mainline (default)
+make dmesg                         # label: mainline (default); writes DATA_REPO/dmesg/
 make dmesg DMESG_LABEL=stable      # or: longterm / linux-next
 ```
 
