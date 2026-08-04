@@ -1,4 +1,4 @@
-Passed configs archive — 618 entries, 1510 rows — generated 2026-08-04T10:30:52Z
+Passed configs archive — 618 entries, 1514 rows — generated 2026-08-04T15:07:51Z
 
 CONFIG           ARCH    VERSION     RUNS  LINE       TIMESTAMP            REPORT DIR                                            SHA256
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1228,7 +1228,8 @@ tinyconfig       arm64   v7.2-rc4    11    mainline   2026-07-23_14-33-29  mainl
 tinyconfig       arm64   v7.2-rc4    11    mainline   2026-07-23_14-38-29  mainline-7.2-2026-07-23_14-38-29-v7.2-rc4             f381319b98d58c711fb8564378bea26ad6785595fd25566370b00ad9d524fd60
 tinyconfig       arm64   v7.2-rc4    11    mainline   2026-07-23_14-39-34  mainline-7.2-2026-07-23_14-39-34-v7.2-rc4             f381319b98d58c711fb8564378bea26ad6785595fd25566370b00ad9d524fd60
 tinyconfig       arm64   v7.2-rc4    11    mainline   2026-07-24_19-51-47  mainline-7.2-2026-07-24_19-51-47-v7.2-rc4             f381319b98d58c711fb8564378bea26ad6785595fd25566370b00ad9d524fd60
-tinyconfig       arm64   v7.2-rc5    1     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             d345faaf9507ea6a095d633fdfaaa3399057ca9c81a83f4517db5b1dedd9c0c1
+tinyconfig       arm64   v7.2-rc5    2     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             d345faaf9507ea6a095d633fdfaaa3399057ca9c81a83f4517db5b1dedd9c0c1
+tinyconfig       arm64   v7.2-rc5    2     mainline   2026-08-04_16-55-56  mainline-7.2-2026-08-04_16-55-56-v7.2-rc5             d345faaf9507ea6a095d633fdfaaa3399057ca9c81a83f4517db5b1dedd9c0c1
 tinyconfig       arm64   v7.2-rc5    0                                                                                           d9d8a6380dd6993136d62476338e29c50b1a03af96f5ab4025e4ef37aaa7f1fa
 tinyconfig       i386    v7.1.3      9     stable     2026-07-15_06-31-18  stable-7.1-2026-07-15_06-31-18-v7.1.3                 0ea5015e19d8cdd0c3b74c9ab8c0128ea9204809d411e022d1c556d741b03d6e
 tinyconfig       i386    v7.1.3      9     stable     2026-07-15_09-45-49  stable-7.1-2026-07-15_09-45-49-v7.1.3                 0ea5015e19d8cdd0c3b74c9ab8c0128ea9204809d411e022d1c556d741b03d6e
@@ -1338,8 +1339,9 @@ tinyconfig       i386    v7.2-rc4    21    mainline   2026-07-28_21-43-09  mainl
 tinyconfig       i386    v7.2-rc4    21    mainline   2026-07-28_21-51-47  mainline-7.2-2026-07-28_21-51-47-v7.2-rc4             e564754e89244c1ffa91123c4062f02c9f74316655c6f29372d43889859368dd
 tinyconfig       i386    v7.2-rc4    21    mainline   2026-07-28_23-02-06  mainline-7.2-2026-07-28_23-02-06-v7.2-rc4             e564754e89244c1ffa91123c4062f02c9f74316655c6f29372d43889859368dd
 tinyconfig       i386    v7.2-rc5    0                                                                                           1db8e59ccad42393a54bbf25df171c610dd6d4e98b494c073d50c6271765eb22
-tinyconfig       i386    v7.2-rc5    2     mainline   2026-07-28_23-04-45  mainline-7.2-2026-07-28_23-04-45-v7.2-rc5             7321f4b73f439df9ae91f6ec66a54128b39e0952212211a997313912674c7e22
-tinyconfig       i386    v7.2-rc5    2     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             7321f4b73f439df9ae91f6ec66a54128b39e0952212211a997313912674c7e22
+tinyconfig       i386    v7.2-rc5    3     mainline   2026-07-28_23-04-45  mainline-7.2-2026-07-28_23-04-45-v7.2-rc5             7321f4b73f439df9ae91f6ec66a54128b39e0952212211a997313912674c7e22
+tinyconfig       i386    v7.2-rc5    3     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             7321f4b73f439df9ae91f6ec66a54128b39e0952212211a997313912674c7e22
+tinyconfig       i386    v7.2-rc5    3     mainline   2026-08-04_16-55-56  mainline-7.2-2026-08-04_16-55-56-v7.2-rc5             7321f4b73f439df9ae91f6ec66a54128b39e0952212211a997313912674c7e22
 tinyconfig       riscv   v7.1.5      0                                                                                           0400ed62017622a6f63b29473bda2e8633f50883d07aa75f9403512f5eb31b3d
 tinyconfig       riscv   v7.1.5-rc2  0                                                                                           71322f95a18e61cf306d8c72823b10904e5b0973da0aac8a3b8784e33722b2d9
 tinyconfig       riscv   v7.1.6-rc1  3     stable-rc  2026-07-29_20-23-22  stable-rc-7.1-2026-07-29_20-23-22-v7.1.6-rc1          285a86c0d2659b25c9563c972532d5e099348c56ac2d34fd5fe8c64dd0ee9819
@@ -1358,7 +1360,8 @@ tinyconfig       riscv   v7.2-rc4    9     mainline   2026-07-26_00-47-11  mainl
 tinyconfig       riscv   v7.2-rc4    9     mainline   2026-07-28_21-43-09  mainline-7.2-2026-07-28_21-43-09-v7.2-rc4             e6707dae96b9c66cd26d9d3bd6441eb14921f73d19b5e6680ad067586ef5f0a3
 tinyconfig       riscv   v7.2-rc4    9     mainline   2026-07-28_21-51-47  mainline-7.2-2026-07-28_21-51-47-v7.2-rc4             e6707dae96b9c66cd26d9d3bd6441eb14921f73d19b5e6680ad067586ef5f0a3
 tinyconfig       riscv   v7.2-rc5    0                                                                                           3457b6c454b6ff055ec0a217fa43343f3bde6db0efbf097113dda5dc0a8c2f83
-tinyconfig       riscv   v7.2-rc5    1     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             56c57c6284e9a460bbd87891a467c65e2828252333c3b184ad3deb5c52d6fb5d
+tinyconfig       riscv   v7.2-rc5    2     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             56c57c6284e9a460bbd87891a467c65e2828252333c3b184ad3deb5c52d6fb5d
+tinyconfig       riscv   v7.2-rc5    2     mainline   2026-08-04_16-55-56  mainline-7.2-2026-08-04_16-55-56-v7.2-rc5             56c57c6284e9a460bbd87891a467c65e2828252333c3b184ad3deb5c52d6fb5d
 tinyconfig       x86_64  v7.1.3      48    mainline   2026-07-11_16-51-48  mainline-7.2-2026-07-11_16-51-48-v7.2-rc2             3057809ea9e09fb1c5fa9ed0c6f6d8dd0da772449c3804ee237ca23f2c93c6f3
 tinyconfig       x86_64  v7.1.3      48    mainline   2026-07-12_00-09-21  mainline-7.2-2026-07-12_00-09-21-v7.2-rc2             3057809ea9e09fb1c5fa9ed0c6f6d8dd0da772449c3804ee237ca23f2c93c6f3
 tinyconfig       x86_64  v7.1.3      48    mainline   2026-07-12_00-18-45  mainline-7.2-2026-07-12_00-18-45-v7.2-rc2             3057809ea9e09fb1c5fa9ed0c6f6d8dd0da772449c3804ee237ca23f2c93c6f3
@@ -1506,9 +1509,10 @@ tinyconfig       x86_64  v7.2-rc4    3     mainline   2026-07-22_16-14-52  mainl
 tinyconfig       x86_64  v7.2-rc4    3     mainline   2026-07-22_16-17-35  mainline-7.2-2026-07-22_16-17-35-v7.2-rc4             d4679834190871277698584c187f4c089236f38fad066349dadd67050e723e9f
 tinyconfig       x86_64  v7.2-rc4    3     mainline   2026-07-22_16-18-40  mainline-7.2-2026-07-22_16-18-40-v7.2-rc4             d4679834190871277698584c187f4c089236f38fad066349dadd67050e723e9f
 tinyconfig       x86_64  v7.2-rc5    0                                                                                           ac36bc5a6e21ae5c639dab6dd9915f5ed1f7e84c9c97a23675709a10c39e9659
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-07-28_23-04-45  mainline-7.2-2026-07-28_23-04-45-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-08-02_12-20-59  mainline-7.2-2026-08-02_12-20-59-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-08-02_12-21-22  mainline-7.2-2026-08-02_12-21-22-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-08-02_12-27-00  mainline-7.2-2026-08-02_12-27-00-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-08-02_12-40-45  mainline-7.2-2026-08-02_12-40-45-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
-tinyconfig       x86_64  v7.2-rc5    6     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-07-28_23-04-45  mainline-7.2-2026-07-28_23-04-45-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-02_12-20-59  mainline-7.2-2026-08-02_12-20-59-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-02_12-21-22  mainline-7.2-2026-08-02_12-21-22-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-02_12-27-00  mainline-7.2-2026-08-02_12-27-00-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-02_12-40-45  mainline-7.2-2026-08-02_12-40-45-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-02_21-33-27  mainline-7.2-2026-08-02_21-33-27-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
+tinyconfig       x86_64  v7.2-rc5    7     mainline   2026-08-04_16-55-56  mainline-7.2-2026-08-04_16-55-56-v7.2-rc5             dd053206d456e99abd9d217f6aae9d36e9cc21c16b719231e18ab153e531ceda
