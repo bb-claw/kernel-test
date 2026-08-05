@@ -7,17 +7,21 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 setup_git_stub
 
 make_build_dir() {
-    local bdir="$1" cfg="$2" arch="$3" build_status="$4" boot="${5:-}"
+    local bdir="$1" cfg="$2" arch="$3" build_status="$4" boot="${5:-}" \
+          kunit_pass="${6:-0}" kunit_fail="${7:-0}" tests_fail="${8:-0}" tests_pass="${9:-5}"
     local out="$bdir/$cfg-$arch"
     mkdir -p "$out"
     local sha
     sha=$(printf 'CONFIG_FAKE=y\n' | sha256sum | cut -d' ' -f1)
     printf 'STATUS=%s\nSTART_TIME=2026-01-01T10:00:00Z\nDURATION=30\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
         "$build_status" "$sha" "$KERNEL_TREE" > "$out/build.status"
-    printf 'CONFIG_FAKE=y\n' > "$out/$cfg-$arch.config"
+    printf 'CONFIG_FAKE=y\n' > "$out/.config"
     if [[ -n "$boot" ]]; then
-        printf 'BOOT=%s\nTESTS_PASS=5\nTESTS_FAIL=0\nTESTS_TOTAL=5\nKUNIT_PASS=0\nKUNIT_FAIL=0\nSTART_TIME=2026-01-01T10:00:30Z\nDURATION=10\n' \
-            "$boot" > "$out/vm.status"
+        local tests_total
+        tests_total=$(( tests_pass + tests_fail ))
+        printf 'BOOT=%s\nTESTS_PASS=%s\nTESTS_FAIL=%s\nTESTS_TOTAL=%s\nKUNIT_PASS=%s\nKUNIT_FAIL=%s\nSTART_TIME=2026-01-01T10:00:30Z\nDURATION=10\n' \
+            "$boot" "$tests_pass" "$tests_fail" "$tests_total" "$kunit_pass" "$kunit_fail" \
+            > "$out/vm.status"
     fi
     touch "$out/build.log"
 }
@@ -98,5 +102,67 @@ make_build_dir "$bdir" tinyconfig x86_64 PASS PASS
 run_report "$bdir" "tinyconfig" "x86_64"
 log=$(git -C "$DATA_REPO" log --oneline | head -3)
 assert_contains "$log" "chore(report)" "auto-commit present in data repo"
+
+# ── OVERALL=FAIL when kunit tests fail ───────────────────────────────────────
+
+begin_test "OVERALL=FAIL when kunit tests fail"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" kunitconfig x86_64 PASS PASS 257 2
+run_report "$bdir" "kunitconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+txt=$(cat "$run_dir/summary.txt")
+assert_contains "$txt" "Result:     FAIL" "FAIL when kunit_fail > 0"
+
+# ── OVERALL=FAIL when shell tests fail ───────────────────────────────────────
+
+begin_test "OVERALL=FAIL when shell tests fail"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS 0 0 1 4
+run_report "$bdir" "tinyconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+txt=$(cat "$run_dir/summary.txt")
+assert_contains "$txt" "Result:     FAIL" "FAIL when tests_fail > 0"
+
+# ── OVERALL=FAIL on config fingerprint mismatch ──────────────────────────────
+
+begin_test "OVERALL=FAIL when config fingerprint mismatches"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS
+# Overwrite SHA256 in build.status with a wrong value
+printf 'STATUS=PASS\nSTART_TIME=2026-01-01T10:00:00Z\nDURATION=30\nCONFIG_SHA256=%s\nKERNEL_TREE=%s\n' \
+    "0000000000000000000000000000000000000000000000000000000000000000" "$KERNEL_TREE" \
+    > "$bdir/tinyconfig-x86_64/build.status"
+run_report "$bdir" "tinyconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+txt=$(cat "$run_dir/summary.txt")
+assert_contains "$txt" "Result:     FAIL" "FAIL on fingerprint mismatch"
+assert_contains "$txt" "MISMATCH"         "MISMATCH visible in fingerprint table"
+
+# ── build-only config shows — in Tests column ────────────────────────────────
+
+begin_test "build-only config shows — in Tests column"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" allmodconfig x86_64 TIMEOUT
+run_report "$bdir" "allmodconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+txt=$(cat "$run_dir/summary.txt")
+assert_contains     "$txt" "build-only" "boot column shows build-only"
+assert_not_contains "$txt" "5/5"        "no test count for build-only"
+
+# ── kunit count format in Tests column ───────────────────────────────────────
+
+begin_test "kunit count format: kunit:N/N sh:M/M in Tests column"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" kunitconfig x86_64 PASS PASS 259 0 0 30
+run_report "$bdir" "kunitconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+txt=$(cat "$run_dir/summary.txt")
+assert_contains "$txt" "kunit:259/259" "kunit count format correct"
+assert_contains "$txt" "sh:30/30"      "shell test count alongside kunit"
 
 finish

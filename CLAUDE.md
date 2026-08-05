@@ -131,7 +131,10 @@ The goal is systematic community verification of each -rc kernel.
 | `tests/ci/test-diff.sh` | Tests `lib/diff.sh`: regression/fix detection, exit codes, output file |
 | `tests/ci/test-makefile-defaults.sh` | Tests Makefile variable defaults: ARCHS_ALL, CONFIGS, DATA_REPO, REPORT_DIR, TIMEOUT, BUILD_TIMEOUT, BUILD_ONLY_CONFIGS |
 | `tests/ci/test-migrate-reports.sh` | Tests `scripts/migrate-reports.sh`: dry-run, --apply rename, new-format skip, baseline symlink update |
-| `tests/ci/test-report.sh` | Tests `lib/report.sh`: OVERALL=PASS/FAIL logic, summary.txt structure, auto-commit to DATA_REPO |
+| `tests/ci/test-report.sh` | Tests `lib/report.sh`: OVERALL=PASS/FAIL logic (build/boot/kunit/shell/mismatch), kunit count format, build-only column, summary.txt structure, auto-commit to DATA_REPO |
+| `tests/ci/test-fetch.sh` | Tests `lib/fetch.sh`: local-tag fallback when ls-remote fails, version written to `.kernel-version`, latest tag selected from multiple |
+| `tests/ci/test-warnings.sh` | Tests `lib/warnings.sh`: warning extraction, build-dir prefix stripping, FAIL-build skip, warnings-summary.txt, cross-arch divergence, between-run diff |
+| `tests/ci/test-init-data-repo.sh` | Tests `scripts/init-data-repo.sh`: directory creation, initial commit, idempotency, error on non-git existing path |
 | `tests/ci/fixtures/` | Static fixtures for Tier 2 tests: two report dirs (rc1 all-pass, rc2 tinyconfig-FAIL), consolidation source indexes with overlapping SHA entries |
 | `.github/workflows/ci.yml` | GitHub Actions: `lint` job (every push/PR); `detect-changes` job (paths filter: `lib/**`, `scripts/**`, `tests/ci/**`, `Makefile`); `ci-test` job (only when tier2=true); concurrency cancel-in-progress |
 
