@@ -76,7 +76,7 @@ Each script under test gets a dedicated test file.  Tests use only the standard 
 
 | Test file | Script under test | What is tested |
 |---|---|---|
-| `tests/ci/test-report.sh` | `lib/report.sh` | HTML/txt output format, OVERALL logic, config fingerprint check |
+| `tests/ci/test-report.sh` | `lib/report.sh` | OVERALL logic (build/boot/kunit/shell/mismatch), kunit count format, build-only column, summary.txt, auto-commit |
 | `tests/ci/test-diff.sh` | `lib/diff.sh` | PASS→FAIL regression detection, FAIL→PASS fix detection, same-label filter |
 | `tests/ci/test-config-archive.sh` | `scripts/config-archive.sh` | archive filename naming, SHA256 dedup (passed wins), index format |
 | `tests/ci/test-consolidate-index.sh` | `scripts/consolidate-index.sh` | SOURCE column, dedup by (source, SHA256), zero-sources graceful exit |
@@ -84,6 +84,9 @@ Each script under test gets a dedicated test file.  Tests use only the standard 
 | `tests/ci/test-migrate-reports.sh` | `scripts/migrate-reports.sh` | dry-run output, `--apply` rename, baseline symlink update |
 | `tests/ci/test-config-bisect.sh` | `scripts/config-bisect.sh` | candidate extraction: archived − tinyconfig+bootability baseline |
 | `tests/ci/test-makefile-defaults.sh` | `Makefile` | `ARCHS_ALL`, `CONFIGS` default set, `DATA_REPO` default, `REPORT_DIR` default |
+| `tests/ci/test-fetch.sh` | `lib/fetch.sh` | local-tag fallback when ls-remote fails, version written to `.kernel-version`, latest tag selection |
+| `tests/ci/test-warnings.sh` | `lib/warnings.sh` | extraction, build-dir prefix stripping, FAIL-build skip, cross-arch divergence, between-run diff |
+| `tests/ci/test-init-data-repo.sh` | `scripts/init-data-repo.sh` | directory creation, initial commit, idempotency, error on non-git existing path |
 
 ### Test helpers — `tests/ci/lib.sh`
 
@@ -91,14 +94,17 @@ Each script under test gets a dedicated test file.  Tests use only the standard 
 assert_eq    <actual> <expected> [msg]
 assert_ne    <actual> <expected> [msg]
 assert_contains <haystack> <needle> [msg]
+assert_not_contains <haystack> <needle> [msg]
 assert_file_exists <path> [msg]
-assert_exit0 <cmd...>
-assert_exit1 <cmd...>
+assert_exit0 <msg> <cmd...>
+assert_exit1 <msg> <cmd...>
 pass <msg>
 fail <msg>
-setup_data_repo   # creates $TEST_DATA_REPO temp dir, exports DATA_REPO
-setup_kernel_tree # creates minimal $TEST_KERNEL_TREE dir, exports KERNEL_TREE
-teardown          # rm -rf all temp dirs; registered via trap EXIT
+tmpdir              # sets $_LAST_TMPDIR, tracks for cleanup — never call via $()
+setup_data_repo     # git-init temp repo; exports DATA_REPO and REPORT_DIR
+setup_kernel_tree   # git-init temp kernel tree with version Makefile; exports KERNEL_TREE
+setup_git_stub      # installs fake git that no-ops pull/push; exports PATH
+teardown            # rm -rf all temp dirs; registered via trap EXIT
 ```
 
 ### Fixtures — `tests/ci/fixtures/`
@@ -210,7 +216,7 @@ Tier 2 needs only `bash` and standard coreutils (also pre-installed).
 | `scripts/ci-run-tests.sh` | New — Tier 2 test runner |
 | `tests/ci/lib.sh` | New — assert helpers + setup/teardown |
 | `tests/ci/fixtures/` | New — synthetic fixture data |
-| `tests/ci/test-report.sh` | New |
+| `tests/ci/test-report.sh` | New; extended with KUNIT_FAIL, TESTS_FAIL, MISMATCH, build-only, kunit format cases |
 | `tests/ci/test-diff.sh` | New |
 | `tests/ci/test-config-archive.sh` | New |
 | `tests/ci/test-consolidate-index.sh` | New |
@@ -218,6 +224,9 @@ Tier 2 needs only `bash` and standard coreutils (also pre-installed).
 | `tests/ci/test-migrate-reports.sh` | New |
 | `tests/ci/test-config-bisect.sh` | New |
 | `tests/ci/test-makefile-defaults.sh` | New |
+| `tests/ci/test-fetch.sh` | New |
+| `tests/ci/test-warnings.sh` | New |
+| `tests/ci/test-init-data-repo.sh` | New |
 | `Makefile` | Add `lint` and `ci-test` targets; update `.PHONY` and `help` |
 | `CLAUDE.md` | Document `make lint`, `make ci-test`, `tests/ci/`, `scripts/ci-lint.sh` |
 | `memory/workflows.md` | Add `make lint` and `make ci-test` sections |
