@@ -120,6 +120,23 @@ The goal is systematic community verification of each -rc kernel.
 | `docs/consolidation-workflow.md` | Cross-machine failure consolidation: source labels, per-clone `make config-archive`, `scp index.txt` from Hetzner, `make consolidate-index`, reading the HTML output and deciding which issue to investigate next |
 | `docs/debian-support-plan.md` | Debian bookworm support: root/sudo auto-detection (`EUID=0` → no sudo), apt backports with priority-100 pin (prevents auto-upgrade of cross-compilers), arch-gated REQUIRED check, pahole version check; Hetzner-staging deployment notes (TCG timing, systemd timer pattern) |
 | `docs/warnings-analysis-plan.md` | Design doc for `make warnings`: extraction scope, cross-arch divergence (x86_64 baseline), per-combo files, between-run diff, baseline pin, output format |
+| `docs/ci-lint-test-plan.md` | Design doc for Tier 1 (`make lint`) + Tier 2 (`make ci-test`) CI: check table, test scope, fixture structure, GitHub Actions workflow layout, files changed |
+| `scripts/ci-lint.sh` | Tier 1 lint checks: `bash -n` on all .sh, shellcheck bash-mode on harness scripts, shellcheck sh-mode on Toybox test scripts, memory file size ≤ 150 lines, test-inventory coverage, design doc on feat/*/fix/* branches, PR title format (CI-only via `$GITHUB_EVENT_PATH`); run via `make lint`; all checks run even on failure — reports all errors at once |
+| `scripts/ci-run-tests.sh` | Tier 2 test runner: discovers and runs `tests/ci/test-*.sh` in sorted order, aggregates pass/fail counts, exits 1 with list of failed scripts; run via `make ci-test` |
+| `tests/ci/lib.sh` | Shared test harness for Tier 2: `begin_test`, `pass`, `fail`, `finish`; `tmpdir` (sets `$_LAST_TMPDIR`, tracks for cleanup); `setup_data_repo` (git-init temp DATA_REPO, sets+exports `DATA_REPO`/`REPORT_DIR`); `setup_kernel_tree` (git-init temp kernel tree with version Makefile, sets+exports `KERNEL_TREE`); `setup_git_stub` (fake git that no-ops pull/push, passes rest through); assert helpers: `assert_eq`, `assert_ne`, `assert_contains`, `assert_not_contains`, `assert_file_exists`, `assert_exit0`, `assert_exit1`; NOTE: always call `tmpdir`, `setup_data_repo`, `setup_kernel_tree`, `setup_git_stub` WITHOUT `$()` — they export variables that `$()` subshell isolation would hide |
+| `tests/ci/test-common.sh` | Tests `lib/common.sh`: `arch_cross_compile`, `arch_kernel_image`, `arch_toybox_name`, `apply_arch_overlay`, `read_kernel_makefile_version` |
+| `tests/ci/test-config-archive.sh` | Tests `scripts/config-archive.sh`: PASS→archive_passed, FAIL→archive_failed, dedup (passed wins), index files written |
+| `tests/ci/test-config-bisect.sh` | Tests `scripts/config-bisect.sh` pure-logic: filename parsing, candidate extraction (no kernel build) |
+| `tests/ci/test-consolidate-index.sh` | Tests `scripts/consolidate-index.sh`: 2-source merge, dedup, zero sources, HTML SOURCE column |
+| `tests/ci/test-diff.sh` | Tests `lib/diff.sh`: regression/fix detection, exit codes, output file |
+| `tests/ci/test-makefile-defaults.sh` | Tests Makefile variable defaults: ARCHS_ALL, CONFIGS, DATA_REPO, REPORT_DIR, TIMEOUT, BUILD_TIMEOUT, BUILD_ONLY_CONFIGS |
+| `tests/ci/test-migrate-reports.sh` | Tests `scripts/migrate-reports.sh`: dry-run, --apply rename, new-format skip, baseline symlink update |
+| `tests/ci/test-report.sh` | Tests `lib/report.sh`: OVERALL=PASS/FAIL logic (build/boot/kunit/shell/mismatch), kunit count format, build-only column, summary.txt structure, auto-commit to DATA_REPO |
+| `tests/ci/test-fetch.sh` | Tests `lib/fetch.sh`: local-tag fallback when ls-remote fails, version written to `.kernel-version`, latest tag selected from multiple |
+| `tests/ci/test-warnings.sh` | Tests `lib/warnings.sh`: warning extraction, build-dir prefix stripping, FAIL-build skip, warnings-summary.txt, cross-arch divergence, between-run diff |
+| `tests/ci/test-init-data-repo.sh` | Tests `scripts/init-data-repo.sh`: directory creation, initial commit, idempotency, error on non-git existing path |
+| `tests/ci/fixtures/` | Static fixtures for Tier 2 tests: two report dirs (rc1 all-pass, rc2 tinyconfig-FAIL), consolidation source indexes with overlapping SHA entries |
+| `.github/workflows/ci.yml` | GitHub Actions: `lint` job (every push/PR); `detect-changes` job (paths filter: `lib/**`, `scripts/**`, `tests/ci/**`, `Makefile`); `ci-test` job (only when tier2=true); concurrency cancel-in-progress |
 
 ## Conventions
 
@@ -214,6 +231,7 @@ scripts; the table below covers everything else.
 | Change build, fetch, or test pipeline behaviour | `memory/workflows.md` · `memory/project.md` |
 | Discover a new Toybox sh bug or workaround | `memory/code-quality.md` (Toybox pitfalls list) |
 | Change a git hook or quality gate | `memory/code-quality.md` (hooks table) |
+| Add or remove a `tests/ci/test-*.sh` file | `CLAUDE.md` Key files table (new/remove row) |
 | Change architecture or fundamental design | `memory/project.md` |
 
 The pre-push hook enforces:

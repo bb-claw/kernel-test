@@ -109,7 +109,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch help
+.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint ci-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -138,6 +138,18 @@ bootstrap:
 # Initialise kernel-test-data/ from scratch (one-time; prefer bootstrap which also pulls).
 init-data-repo:
 	$(Q)scripts/init-data-repo.sh "$(DATA_REPO)"
+
+# ── CI quality gates ──────────────────────────────────────────────────────────
+
+# Tier 1: fast static checks (shellcheck, bash -n, memory sizes, inventory,
+# design-doc, PR title). Runnable locally; PR-title check skipped when not in CI.
+lint:
+	$(Q)scripts/ci-lint.sh
+
+# Tier 2: fixture-based harness self-tests. Does not build kernels or run QEMU.
+# 'make test' already targets the kernel VM tests — this target is separate.
+ci-test:
+	$(Q)scripts/ci-run-tests.sh
 
 hooks:
 	@git config core.hooksPath .githooks
@@ -513,6 +525,8 @@ Targets:
   kconfig-check    Static analysis: find missing 'select' in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= VERIFY=1 PASS2=1 SKIP_CFGS=CONFIG_X GATE_CFGS=CONFIG_X)
   kconfig-build    Exhaustive build+boot sweep for all options in a subsystem Kconfig  (requires SUBSYSTEM=; opt: DRIVER= ARCHS= DRY_RUN=1 GATE_CFGS=)
   verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
+  lint             Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
+  ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
   clean            Remove build/ and cache/
   distclean        Remove build/ and cache/ (reports/archives in DATA_REPO — manage separately)
   help             Show this message

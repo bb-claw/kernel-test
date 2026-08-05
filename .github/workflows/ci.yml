@@ -1,0 +1,80 @@
+---
+name: CI — lint and test
+
+"on":
+  push:
+    branches:
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+      - "docs/**"
+      - "refactor/**"
+      - "test/**"
+  pull_request:
+    branches:
+      - main
+
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Detect which paths changed ─────────────────────────────────────────────
+  detect-changes:
+    name: Detect changed files
+    runs-on: ubuntu-latest
+    outputs:
+      tier2: ${{ steps.check.outputs.tier2 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Tier 2 path changes
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            # Push — compare all branch commits against main
+            BASE="origin/main"
+          fi
+          changed=$(git diff --name-only "${BASE}..HEAD" 2>/dev/null || echo "")
+          tier2=$(echo "$changed" | grep -E \
+            '^(lib/|scripts/|tests/ci/|Makefile$)' || true)
+          if [[ -n "$tier2" ]]; then
+            echo "tier2=true"  >> "$GITHUB_OUTPUT"
+            echo "Tier 2 paths changed — ci-test will run"
+          else
+            echo "tier2=false" >> "$GITHUB_OUTPUT"
+            echo "No Tier 2 paths changed — ci-test skipped"
+          fi
+
+  # ── Tier 1: static lint checks ────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run make lint
+        run: make lint
+
+  # ── Tier 2: harness self-tests (path-gated) ───────────────────────────────
+  ci-test:
+    name: Harness tests (Tier 2)
+    runs-on: ubuntu-latest
+    needs: [lint, detect-changes]
+    if: needs.detect-changes.outputs.tier2 == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git identity for test commits
+        run: |
+          git config --global user.name  "CI"
+          git config --global user.email "ci@kernel-test.local"
+
+      - name: Run make ci-test
+        run: make ci-test

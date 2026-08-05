@@ -456,7 +456,7 @@ git -C "$DATA_REPO" add "reports/$run_name"
 if git -C "$DATA_REPO" diff --cached --quiet; then
     info "data repo: nothing new to commit"
 else
-    git -C "$DATA_REPO" commit -m "chore(report): add ${LABEL} ${KERNEL_VERSION} results"
+    git -C "$DATA_REPO" commit -q -m "chore(report): add ${LABEL} ${KERNEL_VERSION} results"
 fi
 
 [[ $OVERALL == PASS ]] || exit 1

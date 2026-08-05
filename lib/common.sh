@@ -104,7 +104,7 @@ arch_toybox_name() {
 apply_arch_overlay() {
     local dot_config="$1" configs_dir="$2" profile="$3" arch="$4"
     local overlay="${configs_dir}/${profile}-${arch}.config"
-    [[ -f "$overlay" ]] && cat "$overlay" >> "$dot_config"
+    [[ -f "$overlay" ]] && cat "$overlay" >> "$dot_config" || true
 }
 
 # Usage: is_build_only <config>
