@@ -10,6 +10,7 @@ ARCH_SCRIPTS=(
     370_riscv-isa.sh
     380_arm64-features.sh
     400_perf-events.sh
+    410_arena-memory.sh
 )
 
 # ── Scripts present and executable ───────────────────────────────────────────
@@ -83,6 +84,14 @@ assert_contains "$out" "skip" "prints skip on x86_64"
 
 begin_test "arch-script-400-skip-no-binary"
 out=$(PERF_BIN=/nonexistent/perf-event bash "$REPO/tests/custom/400_perf-events.sh" 2>&1); rc=$?
+assert_eq   "$rc" "0"    "exits 0 when binary absent"
+assert_contains "$out" "skip" "prints skip when binary absent"
+
+# ── Skip guard: 410_arena-memory.sh skips when binary absent ─────────────────
+# /usr/bin/arena-test does not exist on the CI host (VM-only path) → must skip.
+
+begin_test "arch-script-410-skip-no-binary"
+out=$(bash "$REPO/tests/custom/410_arena-memory.sh" 2>&1); rc=$?
 assert_eq   "$rc" "0"    "exits 0 when binary absent"
 assert_contains "$out" "skip" "prints skip when binary absent"
 

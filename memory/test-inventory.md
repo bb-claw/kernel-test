@@ -58,8 +58,9 @@ and run in filename-sorted order by `/init`. Protocol:
 | `370_riscv-isa` | RISC-V ISA string from /proc/cpuinfo: base extensions I M A F D C present; 64-bit confirmed; skip on non-riscv |
 | `380_arm64-features` | ARM64 mandatory features from /proc/cpuinfo Features line: FP, NEON (asimd), LSE (atomics); optional SVE/PAC/MTE reported; skip on non-arm64 |
 | `400_perf-events` | perf_event_open(PERF_TYPE_SOFTWARE/TASK_CLOCK) via C helper; non-zero counter verified; skip if binary absent or CONFIG_PERF_EVENTS=n |
+| `410_arena-memory` | Arena allocator: alloc/reset/destroy correctness; pointer alignment (8-byte on 64-bit, 4-byte on i386); page-size block overflow; 32 MiB write stress; skip if binary absent |
 
-Next available slot: **410_** — 41 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **420_** — 42 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -80,6 +81,7 @@ Next available slot: **410_** — 41 total (tests/001_smoke.sh + tests/custom/*.
 | 370 riscv-isa | skip | skip | skip | skip | skip |
 | 380 arm64-features | skip | skip | skip | skip | skip |
 | 400 perf-events | PASS | skip | skip | varies | PASS |
+| 410 arena-memory | PASS | PASS | PASS | PASS | PASS |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 290–360 require ns-variant configs (tinynsconfig/defnsconfig); all skip on tinyconfig/allnoconfig.

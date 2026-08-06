@@ -125,6 +125,16 @@ else
     warn "perf-event binary not found ($PERF_BIN) — run: make bootstrap  (400_perf-events will skip)"
 fi
 
+# ── Copy arena-test binary ────────────────────────────────────────────────────
+
+ARENA_BIN="$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test"
+if [[ -x "$ARENA_BIN" ]]; then
+    cp "$ARENA_BIN" "$STAGE/usr/bin/"
+    info "arena-test binary installed → $STAGE/usr/bin/"
+else
+    warn "arena-test binary not found ($ARENA_BIN) — run: make bootstrap  (410_arena-memory will skip)"
+fi
+
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────
 
 info "Packing initramfs → $OUTPUT"
