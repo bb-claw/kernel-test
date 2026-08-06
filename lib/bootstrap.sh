@@ -163,6 +163,22 @@ else
     warn "tests/ns/ not found — namespace test binaries will not be available"
 fi
 
+# ── perf-event binary ─────────────────────────────────────────────────────────
+# Build the perf-event static C binary for all 4 arches.
+# Injected into the initramfs at usr/bin/perf-event for 400_perf-events.sh.
+
+PERF_DIR="$(cd "$(dirname "$0")/../tests/programs/perf-event" && pwd)"
+if [[ -d $PERF_DIR ]]; then
+    info "Building perf-event binary (tests/programs/perf-event/)..."
+    if make -C "$PERF_DIR" all; then
+        info "perf-event binary built OK"
+    else
+        warn "perf-event binary build failed — 400_perf-events will skip in the VM"
+    fi
+else
+    warn "tests/programs/perf-event/ not found — 400_perf-events will skip in the VM"
+fi
+
 # ── KVM access ────────────────────────────────────────────────────────────────
 
 setup_kvm() {

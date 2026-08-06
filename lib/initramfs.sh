@@ -115,6 +115,16 @@ else
     warn "Namespace test binaries not found ($NS_BIN_DIR) — run: make bootstrap  (ns-* tests will skip)"
 fi
 
+# ── Copy perf-event binary ────────────────────────────────────────────────────
+
+PERF_BIN="$SCRIPT_DIR/tests/programs/perf-event/bin/$ARCH/perf-event"
+if [[ -x "$PERF_BIN" ]]; then
+    cp "$PERF_BIN" "$STAGE/usr/bin/"
+    info "perf-event binary installed → $STAGE/usr/bin/"
+else
+    warn "perf-event binary not found ($PERF_BIN) — run: make bootstrap  (400_perf-events will skip)"
+fi
+
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────
 
 info "Packing initramfs → $OUTPUT"
