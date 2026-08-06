@@ -76,7 +76,7 @@ KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
 #   allmodconfig    — boot impractical: sanitizers + built-in self-tests take 100+ s; modules not in initramfs
 #   randconfig      — random config, boot result unpredictable; value is in build coverage
 # kunitrandconfig is booted: defconfig base is bootable; KUnit emits KTAP to serial; KUNIT_PASS/FAIL tracked.
-BUILD_ONLY_CONFIGS := allmodconfig randconfig
+BUILD_ONLY_CONFIGS := allmodconfig randconfig randnsconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
@@ -109,7 +109,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full local fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint ci-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -143,8 +143,12 @@ init-data-repo:
 
 # Tier 1: fast static checks (shellcheck, bash -n, memory sizes, inventory,
 # design-doc, PR title). Runnable locally; PR-title check skipped when not in CI.
-lint:
+lint: lint-context
 	$(Q)scripts/ci-lint.sh
+
+# Context-size enforcement only — fast subset of lint for quick local checks.
+lint-context:
+	$(Q)scripts/lint-context.sh
 
 # Tier 2: fixture-based harness self-tests. Does not build kernels or run QEMU.
 # 'make test' already targets the kernel VM tests — this target is separate.
@@ -199,6 +203,21 @@ smoke:
 
 full:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
+
+# Namespace regression smoke test: mirrors 'smoke' (kunit + tiny) with ns-variant configs.
+# Requires prior 'make bootstrap' to have built the ns-* test binaries.
+ns-smoke:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitnsconfig tinynsconfig"
+
+# Namespace full test: mirrors 'full' with ns-variant configs.
+ns-full:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig"
+
+# Complete verification: full + ns-full (10 configs). Sequential so ns-variant builds
+# benefit from ccache populated by full. Intended for Hetzner staging automation.
+extended:
+	+@$(MAKE) full
+	+@$(MAKE) ns-full
 
 # Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
 local:
@@ -503,6 +522,9 @@ Targets:
   fetch-next       linux-next branch fetch  (requires LINUX_NEXT=1; set automatically by presets/kernel-test-next.mk)
   smoke            Quick sanity: kunitconfig + tinyconfig, no fetch (preset auto-selected by directory name)
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
+  ns-smoke         Namespace smoke: kunitnsconfig + tinynsconfig (mirrors smoke; requires make bootstrap)
+  ns-full          Namespace full: kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig (mirrors full)
+  extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE

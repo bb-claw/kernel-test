@@ -48,15 +48,15 @@ make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific versio
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
 make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
 make full                                             # 5 bootable configs, preset auto-selected
+make ns-smoke                                         # kunitnsconfig + tinynsconfig (requires make bootstrap)
+make ns-full                                          # 5 ns-variant configs (mirrors full)
+make extended                                         # full then ns-full (10 configs); for staging automation
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 ```
 
-`make fetch` dispatches: `LINUX_NEXT=1` → error (use `make fetch-next`); `STABLE_RC_BRANCH` set →
-branch fetch+reset; `STABLE_RELEASE` set → stable tag; neither → mainline rc tag.
-`lib/fetch.sh` falls back to local tags when `ls-remote` fails (e.g. transient TLS error).
-Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
+`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
 
 ### Regression diff / baseline
 
@@ -75,7 +75,7 @@ make warnings                                         # (re-)analyse warnings fr
 make warnings-baseline                                # pin latest run as warning baseline; future runs auto-diff against it
 ```
 
-`lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`. Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts + cross-arch divergence vs x86_64 + new/fixed since prev run), `warnings-diff-prev.txt`. Informational only.
+`lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`/`make ns-smoke`. Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts + divergence vs x86_64 + new/fixed vs prev run), `warnings-diff-prev.txt`. Informational only.
 
 ### Config archive
 
@@ -139,10 +139,11 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 
 ### CI / linting
 
-```sh
-make lint       # Tier 1: bash -n, shellcheck (bash+sh modes), memory sizes, test-inventory, design doc
-make ci-test    # Tier 2: run tests/ci/test-*.sh (no kernel/QEMU needed; uses temp dirs + fixtures)
-```
+`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
+`make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
 
-PR-title check skipped locally (CI-only via `$GITHUB_EVENT_PATH`).
-GitHub Actions: lint on every push; ci-test only when `lib/**`, `scripts/**`, `tests/ci/**`, or `Makefile` changed.
+### Operational Notes
+
+- **`make clean` on tree switch** — always run when switching between mainline and stable trees; `build/` headers are tree-specific (e.g. `ucs_width_table.h` format differs between mainline and stable 7.1.x).
+- **GCC for stable** — set `GCC=gcc-15` for stable kernels that predate GCC 16.
+- **Stable-rc is not a tag** — `v7.1.4-rc2` is the tip of the rolling `linux-7.1.y` branch, not a git tag; use `make fetch-stable-rc`, not `make checkout`.

@@ -46,9 +46,9 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 - **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM when `/dev/kvm` is accessible, falls back to TCG (2× timeout) on non-KVM hosts (e.g. Hetzner); arm64/riscv always use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64 ≥8.x` — bookworm-backports for QEMU B-extension support); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64; Clang builds (`LLVM=1`) require `clang` + `lld` + `llvm` — all three packages installed by `make bootstrap` (clang does not pull in llvm on Arch or Debian)
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig); each uses two-layer fragments: arch-neutral base (`configs/<profile>.config`) + arch overlay (`configs/<profile>-<arch>.config` — serial driver, FPU; absent = silently skipped)
-- **Tests:** 30 total (1 smoke + 29 custom; see test-inventory.md); next slot: 290_
+- **Tests:** 38 total (1 smoke + 37 custom; see test-inventory.md); next slot: 370_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
-- **Current kernel (mainline clone):** v7.2-rc4
+- **Current kernel (mainline clone):** v7.2-rc6
 - **Hetzner-staging (stable-rc clone):** first full run 2026-07-26, v7.1.5-rc2, PASS 30/30 all 8 combos (tinyconfig+defconfig × 4 archs); TCG timings: i386 ~6 min (slowest), x86_64 ~2.5 min, arm64/riscv ~3–8 s (backports QEMU ≥8.x)
 
 ## Directory Structure
@@ -105,3 +105,5 @@ TEST_DONE
 
 `vm.sh` counts `^< TEST PASS:` and `^< TEST FAIL:` lines.
 `OVERALL=FAIL` when any build ≠ PASS, any boot ≠ PASS, TESTS_FAIL > 0, KUNIT_FAIL > 0, or config MISMATCH.
+Exit codes: `0` = pass, `1` = test failure, `2` = infrastructure/build error.
+KUnit: `vm.sh` detects `KTAP version` or `# Subtest:` in dmesg, strips ANSI codes, counts `ok`/`not ok` lines (suite summary lines included — one per suite, correctly reflect pass/fail state); report shows `kunit:N/N`.

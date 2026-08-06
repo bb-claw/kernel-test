@@ -146,6 +146,23 @@ download_toybox() {
 info "Downloading Toybox ${TOYBOX_VERSION} static binaries..."
 download_toybox
 
+# ── Namespace test binaries ───────────────────────────────────────────────────
+# Build the ns-* static C binaries for all 4 arches.
+# These are injected into the initramfs at usr/bin/ns-* so the VM tests can
+# exercise namespace regression paths that Toybox shell cannot cover directly.
+
+NS_DIR="$(cd "$(dirname "$0")/../tests/ns" && pwd)"
+if [[ -d $NS_DIR ]]; then
+    info "Building namespace test binaries (tests/ns/)..."
+    if make -C "$NS_DIR" all; then
+        info "Namespace test binaries built OK"
+    else
+        warn "Namespace test binaries build failed — ns-* tests will skip in the VM"
+    fi
+else
+    warn "tests/ns/ not found — namespace test binaries will not be available"
+fi
+
 # ── KVM access ────────────────────────────────────────────────────────────────
 
 setup_kvm() {

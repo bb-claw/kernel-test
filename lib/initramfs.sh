@@ -24,7 +24,7 @@ TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
 
 info "Building initramfs for $ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
 rm -rf "$STAGE"
-mkdir -p "$STAGE"/{bin,dev,proc,sys,tmp,tests}
+mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -98,6 +98,21 @@ if [[ -d "$SCRIPT_DIR/tests/custom" ]]; then
         cp "$f" "$STAGE/tests/"
         chmod +x "$STAGE/tests/$(basename "$f")"
     done
+fi
+
+# ── Copy ns-* test binaries ───────────────────────────────────────────────────
+
+NS_BIN_DIR="$SCRIPT_DIR/tests/ns/bin/$ARCH"
+if [[ -d "$NS_BIN_DIR" ]]; then
+    ns_count=0
+    for bin in "$NS_BIN_DIR"/ns-*; do
+        [[ -f $bin && -x $bin ]] || continue
+        cp "$bin" "$STAGE/usr/bin/"
+        ns_count=$((ns_count + 1))
+    done
+    [[ $ns_count -gt 0 ]] && info "Namespace test binaries installed: $ns_count binaries → $STAGE/usr/bin/"
+else
+    warn "Namespace test binaries not found ($NS_BIN_DIR) — run: make bootstrap  (ns-* tests will skip)"
 fi
 
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────

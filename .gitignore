@@ -30,6 +30,9 @@ dmesg/
 # Machine-local Makefile overrides (user-specific; presets/ handles repo defaults)
 local.mk
 
+# Compiled namespace test binaries — built by make bootstrap, not committed
+tests/ns/bin/
+
 # Module build artifacts (out-of-tree builds from modules/*/Makefile)
 modules/*/*.o
 modules/*/*.ko

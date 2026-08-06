@@ -64,22 +64,10 @@ else
     fi
 fi
 
-# ── 4. memory file size check (≤ 150 lines) ──────────────────────────────────
+# ── 4. context size enforcement (CLAUDE.md + memory/*.md) ────────────────────
 
-info "memory file size check (memory/*.md ≤ 150 lines) ..."
-mapfile -t MEM_FILES < <(git -C "$REPO_ROOT" ls-files 'memory/*.md')
-mem_errors=()
-for f in "${MEM_FILES[@]}"; do
-    lines=$(wc -l < "$REPO_ROOT/$f")
-    [[ $lines -le 150 ]] || mem_errors+=("$f (${lines} lines)")
-done
-if [[ ${#mem_errors[@]} -eq 0 ]]; then
-    ok "memory file sizes (${#MEM_FILES[@]} files)"
-else
-    for e in "${mem_errors[@]}"; do
-        fail "memory file over 150 lines: $e"
-    done
-fi
+info "context size enforcement ..."
+bash "$REPO_ROOT/scripts/lint-context.sh" || rc=1
 
 # ── 5. test-inventory coverage ────────────────────────────────────────────────
 
