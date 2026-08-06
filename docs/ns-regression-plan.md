@@ -29,7 +29,7 @@ are the structural weak spots worth encoding as permanent tests.
 | Namespace | CVE(s) | Reintroductions | What broke |
 |---|---|---|---|
 | User + mount (overlayfs) | CVE-2015-1328, CVE-2021-3493, CVE-2023-2640 | 3 | `security.capability` xattr write through overlayfs bypassed `init_user_ns` CAP check |
-| Mount + user | none | 2–3 | `MS_MOVE` across user ns boundary broken (5.1–5.3); `SB_I_NODEV` implicit on userns mounts (4.18); `propagate_mnt()` NULL deref (CVE-2022-50280, pre-6.2) |
+| Mount + user | none | 2–3 | `MS_MOVE` across user ns boundary broken (5.1–5.3); `SB_I_NODEV` implicit on userns mounts (4.18); `propagate_mnt()` NULL deref in shared→slave propagation tree (pre-6.2) |
 | Mount (runc runtime) | CVE-2019-5736, CVE-2021-30465, CVE-2024-21626 | 3 | fd-leak through `/proc/self/fd/` escaping mount ns isolation; CVE-2024-21626 introduced by security fix for CVE-2021-30465 |
 | Cgroup + user | CVE-2022-0492 | 1 (3-yr delay) | `cgroup_release_agent_write()` did not check `CAP_SYS_ADMIN` in `init_user_ns`; write was possible from unprivileged user ns |
 | PID | CVE-2025-40178 | 1+ | `task_active_pid_ns()` NULL deref in `pid_nr_ns()` during teardown edge cases; recurring pattern in PID ns init-death paths |
@@ -59,13 +59,14 @@ nsfs inode paths shared by all types.
 
 ## Config profiles
 
-Six new config profiles are added, each derived by applying `configs/namespaces.config` on
+Seven new config profiles are added, each derived by applying `configs/namespaces.config` on
 top of the corresponding base config.
 
 | Profile | Base | Key additions | Build time estimate |
 |---|---|---|---|
 | `tinynsconfig` | `tinyconfig` | `CONFIG_NAMESPACES` + all 8 types incl. `CONFIG_USER_NS` | ~4 min |
 | `defnsconfig` | `defconfig` | `CONFIG_USER_NS=y`, `CONFIG_TIME_NS=y` (already has others) | ~12 min |
+| `kunitnsconfig` | `kunitconfig` | namespaces + KUnit framework; used by `make ns-smoke` | ~12 min |
 | `rand500nsconfig` | `rand500config` | namespaces fragment wins; random 500 options on top | ~5 min |
 | `randdefnsconfig` | `randdefconfig` | namespaces fragment wins; random disable on top | ~12 min |
 | `kunitrandnsconfig` | `kunitrandconfig` | namespaces + KUnit module sweep | ~15 min |
@@ -88,22 +89,35 @@ CONFIG_PROC_FS=y
 CONFIG_NET=y
 ```
 
-**Makefile base mapping** — hardcoded explicit pairs so the derivation is always legible:
+**Base derivation** — `lib/build.sh` uses a `case` statement to derive `NS_BASE` from the
+profile name, then applies `configs/namespaces.config` on top:
 
-```makefile
-# ns-variant configs: apply namespaces.config on top of each base
-NS_CONFIG_PAIRS := tinynsconfig:tinyconfig defnsconfig:defconfig \
-    rand500nsconfig:rand500config randdefnsconfig:randdefconfig \
-    kunitrandnsconfig:kunitrandconfig randnsconfig:randconfig
+```bash
+case "$CONFIG" in
+    tinynsconfig)      NS_BASE=tinyconfig ;;
+    defnsconfig)       NS_BASE=defconfig ;;
+    kunitnsconfig)     NS_BASE=kunitconfig ;;
+    rand500nsconfig)   NS_BASE=rand500config ;;
+    randdefnsconfig)   NS_BASE=randdefconfig ;;
+    kunitrandnsconfig) NS_BASE=kunitrandconfig ;;
+    randnsconfig)      NS_BASE=randconfig ;;
+esac
 ```
 
 Build step for each `*nsconfig`: run the base config target, append
 `configs/namespaces.config`, run `olddefconfig`, then proceed identically to any other
 bootable config.
 
-All six profiles use `BUILD_ONLY_CONFIGS` exclusion: none (all are bootable by design).
-`randnsconfig` is an exception — like plain `randconfig`, it may build non-bootable kernels and
-should use `BUILD_TIMEOUT` protection.
+`randnsconfig` is build-only (like plain `randconfig`); it is listed in `BUILD_ONLY_CONFIGS`.
+All other ns-variant profiles are bootable.
+
+**Convenience targets** — mirrors of `make smoke` and `make full` for ns-variant configs:
+
+```sh
+make ns-smoke   # kunitnsconfig + tinynsconfig (fast sanity — requires make bootstrap)
+make ns-full    # kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig
+make extended   # make full then make ns-full (10 configs total); intended for staging automation
+```
 
 ---
 
@@ -159,7 +173,7 @@ Each binary accepts a subcommand:
 | `ns-net` | `clone` (verify only `lo` visible in new net ns), `proc-net` (verify `/proc/net/dev` is ns-scoped) |
 | `ns-user` | `idmap` (write uid_map, verify cat /proc/self/uid_map), `nested-6` (nested ns with 6 UID ranges, verify EACCES on host file) |
 | `ns-cgroup` | `release-agent` (write to release_agent from userns, must EPERM), `scoping` (verify /sys/fs/cgroup shows ns root, not host root) |
-| `ns-time` | `offset` (CLOCK_MONOTONIC offset in new time ns), `setns-mt` (setns from multi-threaded process must EINVAL) |
+| `ns-time` | `offset` (CLOCK_MONOTONIC offset in new time ns), `setns-mt` (setns from multi-threaded process must EINVAL or EUSERS) |
 
 ---
 
@@ -225,8 +239,8 @@ distinct regressions from the same developers.
 - `mknod` in userns mount (`ns-mount mknod`): create `/dev/null c 1 3` in a tmpfs mounted
   in a user+mount namespace; must succeed; regression in 4.18 set `SB_I_NODEV` implicitly
 - Mount propagation tree (`ns-mount propagate`): create shared→slave→private tree, bind mount
-  through it; must not crash kernel; regression: CVE-2022-50280 (`propagate_mnt()` NULL deref,
-  fixed in 6.2-rc1)
+  through it; must not crash kernel; regression: `propagate_mnt()` NULL deref in slave
+  propagation path (no CVE anchor found; fixed pre-6.2)
 - `pivot_root` (`ns-mount pivot`): in a new mount namespace, create minimal rootfs in `/tmp`,
   bind-mount `/proc`, call `pivot_root`; must succeed and `/proc/self/mountinfo` inside must
   reflect new root; exercises exact container startup sequence
@@ -278,8 +292,9 @@ Skip guard: `[ -e /proc/self/ns/time ] || { echo "skip: CONFIG_TIME_NS=n"; exit 
 - `ns-time offset`: in a new time namespace, set `CLOCK_MONOTONIC` offset +100s via
   `/proc/self/timens_offsets`; read `CLOCK_MONOTONIC`; verify it differs from host by ~100s
 - `ns-time setns-mt`: from a process with two threads, attempt `setns` into a time namespace;
-  must return `EINVAL`; motivation: CVE-2023-23586 (io_uring bypassed this check via
-  `current_is_single_threaded()` — our test confirms the check is in place)
+  must return `EINVAL` or `EUSERS` (`timens_install()` returns `EUSERS` when
+  `current_is_single_threaded()` fails); motivation: CVE-2023-23586 (io_uring bypassed this
+  check — our test confirms the check is in place)
 - `/proc/self/timens_offsets`: readable, shows `monotonic 0 0` and `boottime 0 0` in init timens
 - Inode uniqueness: `unshare -T` creates distinct time ns inode
 - `pid_for_children` / `time_for_children` both present as `/proc/self/ns/` symlinks
@@ -323,7 +338,7 @@ gets a corresponding `tests/ci/test-ns-*.sh` fixture test.
 
 | Test file | What is fixture-tested |
 |---|---|
-| `tests/ci/test-ns-configs.sh` | `configs/namespaces.config` fragment applies correctly; Makefile NS_CONFIG_PAIRS are complete; base configs exist |
+| `tests/ci/test-ns-configs.sh` | `configs/namespaces.config` fragment options; NS_BASE derivation for all 7 profiles; `ns-smoke`/`ns-full` targets in Makefile |
 | `tests/ci/test-ns-build.sh` | `tests/ns/Makefile` produces binaries for all 4 arches; binaries are statically linked; `file` output shows static ELF |
 | `tests/ci/test-ns-initramfs.sh` | `lib/initramfs.sh` with ns binaries present: `/usr/bin/ns-uts` etc. appear in cpio listing; absent binaries produce warning not error |
 | `tests/ci/test-ns-scripts.sh` | Each `tests/custom/290_ns-*.sh` skip-guard logic: simulate `CONFIG_NAMESPACES=n` by removing `/proc/self/ns/uts` equivalent; verify exit 0 with skip message |
@@ -360,13 +375,14 @@ and skip guard correctness.
 | `tests/custom/360_ns-setns.sh` | New — nsenter / setns path |
 | `lib/initramfs.sh` | Extend: copy `tests/ns/bin/<arch>/ns-*` to `/usr/bin/` in initramfs |
 | `lib/bootstrap.sh` | Extend: `make -C tests/ns all` to build all C binaries |
-| `Makefile` | Add `NS_CONFIG_PAIRS`, build logic for 6 ns-variant profiles; update `PHONY`, `help` |
-| `tests/ci/test-ns-configs.sh` | New — CI: namespaces.config fragment + Makefile pairs |
+| `Makefile` | Add `ns-smoke` + `ns-full` targets; update `PHONY`, `help` |
+| `lib/build.sh` | Add `NS_BASE` case statement for 7 ns-variant profiles; apply `namespaces.config` fragment |
+| `tests/ci/test-ns-configs.sh` | New — CI: namespaces.config fragment + ns-base derivation + Makefile targets |
 | `tests/ci/test-ns-build.sh` | New — CI: ns binary build produces static ELFs |
 | `tests/ci/test-ns-initramfs.sh` | New — CI: initramfs includes ns binaries |
 | `tests/ci/test-ns-scripts.sh` | New — CI: skip-guard logic in each ns test script |
 | `memory/test-inventory.md` | Add 8 new test script rows |
-| `memory/config-profiles.md` | Add 6 ns-variant profiles |
+| `memory/config-profiles.md` | Add 7 ns-variant profiles (incl. kunitnsconfig) |
 | `CLAUDE.md` | Add all new files to Key files table |
 
 ---
@@ -374,18 +390,16 @@ and skip guard correctness.
 ## Verification checklist
 
 1. `make bootstrap` builds `tests/ns/bin/{x86_64,i386,arm64,riscv}/ns-*` (8 × 4 = 32 binaries)
-2. `make all NO_FETCH=1 CONFIGS=tinynsconfig ARCHS=x86_64` completes; all namespace tests run
-3. `make all NO_FETCH=1 CONFIGS=tinynsconfig ARCHS=x86_64` with a patched `290_ns-uts-ipc.sh`
-   that forces FAIL exits 1 (OVERALL=FAIL propagated correctly)
-4. `make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64` — namespace tests skip gracefully
-   (tinyconfig has no `CONFIG_NAMESPACES`)
-5. `make all NO_FETCH=1 CONFIGS=defnsconfig ARCHS=x86_64` — USER_NS tests run (defnsconfig
+2. `make ns-smoke NO_FETCH=1` completes; all 38 tests pass on all 4 arches × kunitnsconfig + tinynsconfig (8 combos)
+3. `make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64` — namespace tests skip gracefully
+   (tinyconfig without namespaces fragment has no `CONFIG_NAMESPACES`)
+4. `make all NO_FETCH=1 CONFIGS=defnsconfig ARCHS=x86_64` — USER_NS tests run (defnsconfig
    adds `CONFIG_USER_NS=y`)
-6. `make ci-test` passes all four `test-ns-*.sh` CI tests
-7. nsenter test `360_ns-setns.sh` passes on defnsconfig x86_64 (verifies inode match end-to-end)
-8. `310_ns-mount.sh` pivot_root subtest passes (new tmpfs rootfs in /tmp, pivot succeeds)
-9. `330_ns-user.sh` nested-6 idmap subtest: `open("/etc/shadow", O_RDONLY)` returns EACCES
-10. `350_ns-time.sh` setns-mt subtest: `ns-time setns-mt` returns EINVAL from multi-threaded context
+5. `make ci-test` passes all 16 CI tests including the four `test-ns-*.sh` fixtures
+6. `360_ns-setns.sh` passes on defnsconfig x86_64 (cross-setns inode match end-to-end)
+7. `310_ns-mount.sh` pivot_root subtest passes (new tmpfs rootfs in /tmp, pivot succeeds)
+8. `330_ns-user.sh` nested-6 idmap subtest: `open("/etc/shadow", O_RDONLY)` returns EACCES
+9. `350_ns-time.sh` setns-mt subtest: `ns-time setns-mt` returns EINVAL or EUSERS from multi-threaded context
 
 ---
 

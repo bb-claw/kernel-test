@@ -8,7 +8,7 @@
 |---|---|---|
 | `pre-commit` | every commit | shellcheck on staged `.sh` files; executable bit on staged `tests/**/*.sh`; guard against staged `build/` `cache/` `reports/` |
 | `commit-msg` | every commit | conventional commit format: `<type>[(<scope>)]: <desc>` |
-| `pre-push` | every push | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh`; test-inventory coverage; design doc on `feat/*`/`fix/*` branches; memory file size (≤ 150 lines); `awk` ban in VM test scripts |
+| `pre-push` | every push | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh`; test-inventory coverage; design doc on `feat/*`/`fix/*` branches; context size (CLAUDE.md ≤ 150 lines, memory/*.md ≤ 150 lines); `awk` ban in VM test scripts |
 
 Skip in emergencies only: `git commit --no-verify` / `git push --no-verify`
 
@@ -35,6 +35,7 @@ Examples:
 1. Name: `<type>/<kebab-slug>` (e.g. `feat/200-ipc-test`, `fix/190-scheduler-i386`)
 2. Create `docs/<slug>-plan.md` from `docs/plan-template.md` — required for `feat/*` and `fix/*` (enforced by pre-push)
 3. Open a PR to `main` — never commit directly to `main`
+4. **Merge strategy**: always merge commits (never squash or rebase); PR title = merge commit subject; `main` has branch protection (PRs required, force-push disabled)
 
 ---
 
@@ -77,9 +78,11 @@ Examples:
 - **`elif`** → Toybox sh 0.8.9 bug: when `if` condition is true, both the `if` body and the `else` body execute (double output). Fix: use nested `if/else/fi` inside the `else` branch instead of `elif`.
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
 - **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
+- **`if out=$(cmd); then`** → Toybox sh bug: a variable assignment always exits 0, so the command's real exit code is swallowed and the branch always evaluates as true. Use `cmd > /tmp/out.txt 2>&1` to redirect to a file; check `$?`; read the file for diagnostics.
 - **`tr`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `sed 's/old/new/g'` for character substitution or `grep -o` for character filtering.
 - **Multi-line string comparison in `[ ]`** → Toybox sh 0.8.9 bug: `[ "$var" = "line1\nline2" ]` returns false even when `$var` is exactly that content. Fix: use `grep -q "^pattern$" file` or compare individual lines instead of comparing a multi-line captured variable against a literal multi-line string.
 - **FIFO blocking open with `&`** → `printf 'x' > "$FIFO" &` + `cat "$FIFO"`: both the background writer and the reader block in `open()` waiting for the other end; if the background fork is not scheduled before the reader, both deadlock until VM timeout. Fix: open with `exec 3<>"$FIFO"` (O_RDWR, non-blocking) and close immediately, or use only inode-level tests (mkfifo + `-p`). Do not attempt write+read on the same fd — Toybox sh 0.8.9's `read` builtin ignores `<&N` redirects when reading from a pipe fd, always returning empty.
+- **`case "$val" in N*)` numeric glob on arm64/riscv** → pattern like `1*|2*|3*` fails to match numeric strings (e.g. `3884`) on arm64/riscv Toybox sh. Fix: use `[ "$val" -gt 0 ] 2>/dev/null` for positive-integer checks instead of glob patterns.
 
 ---
 
@@ -99,6 +102,20 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 
 ---
 
+## Memory File Update Triggers
+
+| When you… | Update |
+|---|---|
+| Add a test script | `test-inventory.md` (new row, update next slot) · `project.md` |
+| Remove a test script | `test-inventory.md` (remove row) · `project.md` |
+| Add/remove a config profile | `config-profiles.md` · `project.md` |
+| Change a Makefile variable (name, default, purpose) | `workflows.md` |
+| Change build, fetch, or test pipeline behaviour | `workflows.md` · `project.md` |
+| Discover a new Toybox sh bug | `code-quality.md` (Toybox pitfalls list) |
+| Change a git hook or quality gate | `code-quality.md` (hooks table) |
+
+---
+
 ## Review Checklist (before opening a PR)
 
 - [ ] `shellcheck --severity=warning` clean (pre-push does this automatically)
@@ -107,5 +124,4 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 - [ ] New test: skip guard present for missing kernel options
 - [ ] All error paths in lib scripts write `STATUS=FAIL` before `die`
 - [ ] Memory files updated (`memory/test-inventory.md`, `memory/code-quality.md`)
-- [ ] `CLAUDE.md` Key files table updated (new tests, lib changes)
 - [ ] Design doc (`docs/<slug>-plan.md`) complete and accurate

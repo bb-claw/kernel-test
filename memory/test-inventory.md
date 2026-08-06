@@ -47,8 +47,16 @@ and run in filename-sorted order by `/init`. Protocol:
 | `260_vfs-links` | Symlink create/readlink/dangling, hard link aliasing, FIFO mkfifo+type check+open/close via exec 3<> (O_RDWR — no fork, no blocking I/O, safe on all arches) |
 | `270_proc-sys-vm` | `/proc/sys/vm` range validation: overcommit_memory∈{0,1,2}, swappiness 0–200, dirty_ratio/dirty_background_ratio 1–100; /proc/buddyinfo + /proc/zoneinfo sanity; skips when procfs absent |
 | `280_proc-self-extended` | `/proc/self/fd` (stdin/stdout/stderr), `fdinfo/1` (pos/flags), `limits` (Max open files/processes), `io` (read_bytes/write_bytes); skips when procfs absent |
+| `290_ns-uts-ipc` | nsfs inode format for all 8 ns types; `/proc/sys/user` limits; UTS hostname isolation via unshare; ns-uts/ns-ipc C binaries |
+| `300_ns-pid` | PID namespace inode change via unshare -fp; ns-pid clone (PID=1) + init-death cascade SIGKILL |
+| `310_ns-mount` | Mount ns inode + bind visibility; ns-mount: MS_MOVE, mknod SB_I_NODEV, propagate_mnt, pivot_root |
+| `320_ns-net` | Net ns inode + lo-only isolation (no host interface leak); ns-net clone + proc-net |
+| `330_ns-user` | User ns inode + uid 0 in ns; ns-user idmap + nested-6 (CVE-2018-18955) |
+| `340_ns-cgroup` | Cgroup ns inode + /sys/fs/cgroup; ns-cgroup scoping + release-agent (CVE-2022-0492) |
+| `350_ns-time` | Time ns timens_offsets; ns-time offset (+100s CLOCK_MONOTONIC) + setns-mt (CVE-2023-23586) |
+| `360_ns-setns` | setns(2) code path via ns-uts setns: self-setns + cross-setns into foreign UTS ns |
 
-Next available slot: **290_** — 30 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **370_** — 38 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -65,8 +73,10 @@ Next available slot: **290_** — 30 total (tests/001_smoke.sh + tests/custom/*.
 | 260 vfs-links | PASS | PASS | PASS | PASS | PASS |
 | 270 proc-sys-vm | PASS | skip | skip | varies | PASS |
 | 280 proc-self | PASS | skip | skip | varies | PASS |
+| 290–360 ns-* | PASS (ns configs) | skip | skip | skip | skip |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
+290–360 require ns-variant configs (tinynsconfig/defnsconfig); all skip on tinyconfig/allnoconfig.
 
 ---
 

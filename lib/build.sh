@@ -62,7 +62,23 @@ mkdir -p "$CCACHE_DIR"
 command -v ccache &>/dev/null || die "ccache not found in PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-FRAGMENT="$SCRIPT_DIR/configs/${CONFIG}.config"
+
+# ── Namespace variant: derive base config ─────────────────────────────────────
+# Configs like tinynsconfig, defnsconfig, rand500nsconfig are base configs with
+# configs/namespaces.config appended.  Strip the 'ns' infix to get the base.
+NS_BASE=""
+case "$CONFIG" in
+    tinynsconfig)      NS_BASE=tinyconfig ;;
+    defnsconfig)       NS_BASE=defconfig ;;
+    kunitnsconfig)     NS_BASE=kunitconfig ;;
+    kunitrandnsconfig) NS_BASE=kunitrandconfig ;;
+    randnsconfig)      NS_BASE=randconfig ;;
+    rand500nsconfig)   NS_BASE=rand500config ;;
+    randdefnsconfig)   NS_BASE=randdefconfig ;;
+esac
+EFFECTIVE_CONFIG="${NS_BASE:-$CONFIG}"
+
+FRAGMENT="$SCRIPT_DIR/configs/${EFFECTIVE_CONFIG}.config"
 
 # Kernel make wrapper — respects V for verbosity.
 # Pass --timed as the first argument to enforce BUILD_TIMEOUT on the make call.
@@ -102,7 +118,7 @@ if [[ -n "${SEED_CONFIG:-}" ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed (seed olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
     fi
-elif [[ $CONFIG == rand500config ]]; then
+elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     # Base: tinyconfig (tiny, known-bootable kernel)
     if ! kmake tinyconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
@@ -126,7 +142,7 @@ elif [[ $CONFIG == rand500config ]]; then
         | tee "$OUT_DIR/rand-sampled.config" >> "$PWD/$OUT_DIR/.config"
     rm -rf "$RAND_TMP"
     trap - EXIT
-elif [[ $CONFIG == randdefconfig ]]; then
+elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
     # Base: defconfig (broad, coherent, realistic baseline)
     if ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
@@ -139,7 +155,7 @@ elif [[ $CONFIG == randdefconfig ]]; then
     grep '^CONFIG_[A-Z0-9_]*=[ym]$' "$PWD/$OUT_DIR/.config" | shuf -n 300 \
         | sed 's/=[ym]$/=n/' > "$OUT_DIR/randdef-disabled.config"
     cat "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
-elif [[ $CONFIG == kunitconfig ]]; then
+elif [[ $EFFECTIVE_CONFIG == kunitconfig ]]; then
     # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
     # 'kunitconfig' is not a kernel make target — use defconfig as the base.
     if ! kmake defconfig; then
@@ -147,7 +163,7 @@ elif [[ $CONFIG == kunitconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
-elif [[ $CONFIG == kunitrandconfig ]]; then
+elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
     # Enumerate every CONFIG_*KUNIT* from a fresh randconfig (full option set for
     # this arch), append to defconfig base.  olddefconfig (step 1b) drops any
     # module whose deps are unmet — only valid, buildable options survive.
@@ -166,7 +182,7 @@ elif [[ $CONFIG == kunitrandconfig ]]; then
         | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
     rm -rf "$RAND_TMP"
     trap - EXIT
-elif [[ $CONFIG == localconfig ]]; then
+elif [[ $EFFECTIVE_CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.
     if [[ $ARCH != x86_64 ]]; then
@@ -185,7 +201,7 @@ elif [[ $CONFIG == localconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
-elif ! kmake "$CONFIG"; then
+elif ! kmake "$EFFECTIVE_CONFIG"; then
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
@@ -195,12 +211,18 @@ fi
 # Skip for seed replay — the archived config already has both baked in.
 # KCONFIG_ALLCONFIG is NOT used because some targets (e.g. tinyconfig) override it
 # internally, silently discarding our fragment.  cat >> .config is reliable for all.
-ARCH_OVERLAY="$SCRIPT_DIR/configs/${CONFIG}-${ARCH}.config"
+ARCH_OVERLAY="$SCRIPT_DIR/configs/${EFFECTIVE_CONFIG}-${ARCH}.config"
+NS_FRAGMENT="$SCRIPT_DIR/configs/namespaces.config"
 if [[ -z "${SEED_CONFIG:-}" ]]; then
     _applied=0
     if [[ -f $FRAGMENT ]]; then
         info "Applying config fragment: $FRAGMENT"
         cat "$FRAGMENT" >> "$PWD/$OUT_DIR/.config"
+        _applied=1
+    fi
+    if [[ -n $NS_BASE && -f $NS_FRAGMENT ]]; then
+        info "Applying namespace fragment: $NS_FRAGMENT"
+        cat "$NS_FRAGMENT" >> "$PWD/$OUT_DIR/.config"
         _applied=1
     fi
     if [[ -f "$ARCH_OVERLAY" ]]; then
@@ -251,7 +273,7 @@ BOOT_BASELINE_OPTS=(
     CONFIG_TMPFS=y
 )
 CONFIG_CORRECTED=0
-if ! is_build_only "$CONFIG"; then
+if ! is_build_only "$EFFECTIVE_CONFIG"; then
     _correction_pass=0
     while [[ $_correction_pass -lt 3 ]]; do
         _correction_pass=$(( _correction_pass + 1 ))
