@@ -1,0 +1,19 @@
+[    0.000000] Linux version 7.2.0-rc6 (gcc version 14.2.0) #1 SMP PREEMPT_DYNAMIC
+[    0.123456] Freeing unused kernel image (initmem) memory: 1024K
+[    1.234567] Run /init as init process
+BOOT_OK: kernel reached init
+> TEST RUN: 010_check-proc
+ok: /proc/version readable
+ok: /proc/meminfo readable
+< TEST PASS: 010_check-proc
+> TEST RUN: 020_check-sysfs
+ok: /sys/kernel readable
+ok: /sys/block readable
+< TEST PASS: 020_check-sysfs
+> TEST RUN: 030_check-dmesg
+ok: version string ok
+< TEST PASS: 030_check-dmesg
+> TEST RUN: 040_check-devnodes
+FAIL: /dev/urandom missing
+< TEST FAIL: 040_check-devnodes
+TEST_DONE

@@ -1,0 +1,7 @@
+[    0.000000] Linux version 7.2.0-rc6 (gcc version 14.2.0) #1 SMP PREEMPT_DYNAMIC
+[    0.123456] Freeing unused kernel image (initmem) memory: 1024K
+[    0.500000] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+[    0.501000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 7.2.0-rc6 #1
+[    0.502000] Call Trace:
+[    0.503000]  panic+0x1a8/0x360
+[    0.504000]  mount_root_generic+0x1f4/0x2f0

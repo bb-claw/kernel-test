@@ -1,0 +1,9 @@
+[    0.000000] Linux version 7.2.0-rc6 (gcc version 14.2.0) #1 SMP PREEMPT_DYNAMIC
+[    0.100000] [BOOT_CANARY] early_initcall reached — CONFIG_BOOT_CANARY is active
+[    1.234567] Run /init as init process
+BOOT_OK: kernel reached init
+> TEST RUN: 001_smoke
+ok: /dev/null writable
+ok: shell arithmetic works
+< TEST PASS: 001_smoke
+TEST_DONE
