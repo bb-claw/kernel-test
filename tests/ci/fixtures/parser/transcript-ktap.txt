@@ -1,0 +1,12 @@
+[    0.000000] Linux version 7.2.0-rc6 (gcc version 14.2.0) #1 SMP PREEMPT_DYNAMIC
+[    1.234567] Run /init as init process
+BOOT_OK: kernel reached init
+[    2.000000] KTAP version 1
+[    2.001000] # Subtest: kunit-test-suite
+[    2.002000] ok 1 - test_alpha
+[    2.003000] ok 2 - test_beta
+[    2.004000] ok 3 - test_gamma
+[    2.005000] not ok 4 - test_delta
+[    2.006000] not ok 5 - test_epsilon
+[    2.100000] not ok 1 - kunit-test-suite
+TEST_DONE

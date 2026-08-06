@@ -3,7 +3,8 @@
 # pass/fail, and write build/<config>-<arch>/vm.status.
 # Usage: vm.sh <config> <arch>
 set -euo pipefail
-. "$(dirname "$0")/common.sh"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$REPO_ROOT/lib/common.sh"
 
 CONFIG=${1:?usage: vm.sh <config> <arch>}
 ARCH=${2:?usage: vm.sh <config> <arch>}
@@ -105,135 +106,18 @@ timeout "$VM_TIMEOUT" "$QEMU" \
     > /dev/null 2> "$QEMU_LOG" \
     || QEMU_EXIT=$?
 
-# ── Parse serial output ───────────────────────────────────────────────────────
+VM_DURATION=$(( $(date -u +%s) - VM_START_EPOCH ))
 
-BOOT_OK=0
-PANIC=0
-OOPS=0
-TEST_DONE=0
-PASS_COUNT=0
-FAIL_COUNT=0
-TESTS_TOTAL=0
-KUNIT_PASS=0
-KUNIT_FAIL=0
-FAILED_TESTS=''
-CANARY_EARLY=''
+# ── Parse, evaluate, record, and report ──────────────────────────────────────
 
-if [[ -s $DMESG_FILE ]]; then
-    grep -q  "BOOT_OK:"   "$DMESG_FILE" 2>/dev/null && BOOT_OK=1   || true
-    grep -qi "Kernel panic" "$DMESG_FILE" 2>/dev/null && PANIC=1   || true
-    grep -q  "Oops:"      "$DMESG_FILE" 2>/dev/null && OOPS=1      || true
-    grep -qF "TEST_DONE"  "$DMESG_FILE" 2>/dev/null && TEST_DONE=1 || true
+parse_serial_output   "$DMESG_FILE"
+determine_boot_status "$DMESG_FILE" "$QEMU_EXIT" 0
+write_run_status      "$STATUS_FILE" "$VM_START_TIME" "$VM_DURATION"
 
-    # Count test-level results from the init wrapper markers.
-    # grep -c exits 1 on zero matches — use "|| true" not "|| echo 0" (avoids "0\n0").
-    PASS_COUNT=$(grep -c "^< TEST PASS:" "$DMESG_FILE" 2>/dev/null || true)
-    FAIL_COUNT=$(grep -c "^< TEST FAIL:" "$DMESG_FILE" 2>/dev/null || true)
-    PASS_COUNT=${PASS_COUNT:-0}
-    FAIL_COUNT=${FAIL_COUNT:-0}
-    TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
-    # Space-separated list of failed test names for reporting
-    FAILED_TESTS=$(grep "^< TEST FAIL:" "$DMESG_FILE" 2>/dev/null \
-        | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
-    FAILED_TESTS=${FAILED_TESTS:-}
-
-    # Check for boot canary marker (CANARY=1 builds only).
-    if [[ "${CANARY:-0}" == 1 ]]; then
-        if grep -q '\[BOOT_CANARY\]' "$DMESG_FILE" 2>/dev/null; then
-            CANARY_EARLY=reached
-        else
-            CANARY_EARLY=missing
-        fi
-    fi
-
-    # Count KUnit KTAP results.
-    # The kernel emits KTAP lines with ANSI color codes (\e[32m prefix, \e[0m after
-    # the timestamp) and without KTAP indentation — printk flattens the hierarchy.
-    # Strip ANSI codes and \r before matching; the {4,} indent filter is removed
-    # because all ok/not ok lines are flat after stripping.
-    # Suite summary lines (one per suite) are included in the count — they mirror
-    # the pass/fail state of their tests and are few relative to the total.
-    if grep -qE 'KTAP version|# Subtest:' "$DMESG_FILE" 2>/dev/null; then
-        KUNIT_PASS=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$DMESG_FILE" \
-            | grep -cE '^\[[ 0-9.]+\] ok [0-9]+'     || true)
-        KUNIT_FAIL=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$DMESG_FILE" \
-            | grep -cE '^\[[ 0-9.]+\] not ok [0-9]+' || true)
-        KUNIT_PASS=${KUNIT_PASS:-0}
-        KUNIT_FAIL=${KUNIT_FAIL:-0}
-    fi
-fi
-
-# ── Determine overall result ──────────────────────────────────────────────────
-
-if [[ $BOOT_OK -eq 1 && $PANIC -eq 0 && $OOPS -eq 0 ]]; then
-    if [[ $TEST_DONE -eq 0 ]]; then
-        BOOT_STATUS=FAIL
-        FAIL_REASON="Init started but TEST_DONE not reached — VM may have crashed mid-test"
-    else
-        BOOT_STATUS=PASS
-        FAIL_REASON=''
-    fi
-else
-    BOOT_STATUS=FAIL
-    if   [[ $PANIC -eq 1 ]]; then
-        FAIL_REASON=$(grep -m1 "Kernel panic" "$DMESG_FILE" 2>/dev/null || echo "Kernel panic")
-    elif [[ $OOPS -eq 1 ]]; then
-        FAIL_REASON=$(grep -m1 "Oops:"        "$DMESG_FILE" 2>/dev/null || echo "Oops")
-    elif [[ $QEMU_EXIT -eq 0 && ! -s $DMESG_FILE ]]; then
-        FAIL_REASON="No console output (QEMU exit 0)"
-    elif [[ $QEMU_EXIT -eq 124 ]]; then
-        FAIL_REASON="Timeout after ${VM_TIMEOUT}s — kernel did not reach init"
-    else
-        FAIL_REASON="Did not reach init (QEMU exit ${QEMU_EXIT})"
-    fi
-fi
-
-# ── Write status file ─────────────────────────────────────────────────────────
-
-{
-    printf 'BOOT=%s\n'        "$BOOT_STATUS"
-    printf 'TEST_DONE=%d\n'   "$TEST_DONE"
-    printf 'TESTS_TOTAL=%d\n' "$TESTS_TOTAL"
-    printf 'TESTS_PASS=%d\n'  "$PASS_COUNT"
-    printf 'TESTS_FAIL=%d\n'  "$FAIL_COUNT"
-    printf 'KUNIT_PASS=%d\n'  "$KUNIT_PASS"
-    printf 'KUNIT_FAIL=%d\n'  "$KUNIT_FAIL"
-    printf 'START_TIME=%s\n'  "$VM_START_TIME"
-    printf 'DURATION=%d\n'    "$(( $(date -u +%s) - VM_START_EPOCH ))"
-    [[ -n $FAIL_REASON    ]] && printf 'FAIL_REASON=%s\n'    "$FAIL_REASON"
-    [[ -n $FAILED_TESTS   ]] && printf 'FAILED_TESTS=%s\n'   "$FAILED_TESTS"
-    [[ -n $CANARY_EARLY   ]] && printf 'CANARY_EARLY=%s\n'   "$CANARY_EARLY"
-} > "$STATUS_FILE"
-
-# ── Report result ─────────────────────────────────────────────────────────────
-
-KUNIT_TOTAL=$(( KUNIT_PASS + KUNIT_FAIL ))
-TOTAL_FAIL=$(( FAIL_COUNT + KUNIT_FAIL ))
-
-if [[ $BOOT_STATUS == PASS ]]; then
-    if [[ $TOTAL_FAIL -eq 0 ]]; then
-        if [[ $KUNIT_TOTAL -gt 0 ]]; then
-            info "PASS  $CONFIG / $ARCH — boot OK, tests ${PASS_COUNT}/${TESTS_TOTAL}, kunit ${KUNIT_PASS}/${KUNIT_TOTAL}"
-        else
-            info "PASS  $CONFIG / $ARCH — boot OK, tests ${PASS_COUNT}/${TESTS_TOTAL}"
-        fi
-    else
-        if [[ $FAIL_COUNT -gt 0 && $KUNIT_FAIL -gt 0 ]]; then
-            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${FAIL_COUNT} test(s) and ${KUNIT_FAIL} kunit test(s) failed"
-        elif [[ $FAIL_COUNT -gt 0 ]]; then
-            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${FAIL_COUNT} test(s) failed"
-        else
-            warn "PARTIAL  $CONFIG / $ARCH — booted, but ${KUNIT_FAIL} kunit test(s) failed"
-        fi
-        for _ft in $FAILED_TESTS; do
-            warn "  FAIL: $_ft"
-        done
-        exit 1
-    fi
-else
-    warn "FAIL  $CONFIG / $ARCH — ${FAIL_REASON}"
-    if [[ "${CANARY:-0}" == 1 ]]; then
-        if [[ "$CANARY_EARLY" == reached ]]; then
+if ! log_run_result "$CONFIG / $ARCH"; then
+    # CANARY diagnostics on boot failure only (not on partial test failures).
+    if [[ "${CANARY:-0}" == 1 && "$BOOT_STATUS" == FAIL ]]; then
+        if [[ "${CANARY_EARLY:-}" == reached ]]; then
             warn "CANARY: early_initcall reached — kernel ran but console/earlycon produced no output"
         else
             warn "CANARY: [BOOT_CANARY] not found — kernel did not reach early_initcall"
@@ -242,6 +126,6 @@ else
     exit 1
 fi
 
-if [[ "${CANARY:-0}" == 1 && "$CANARY_EARLY" == missing && "$BOOT_STATUS" == PASS ]]; then
+if [[ "${CANARY:-0}" == 1 && "${CANARY_EARLY:-}" == missing && "$BOOT_STATUS" == PASS ]]; then
     warn "CANARY: [BOOT_CANARY] not found despite successful boot — CONFIG_BOOT_CANARY may not be built in (run 'make canary-patch' first)"
 fi
