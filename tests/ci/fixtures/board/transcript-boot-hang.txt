@@ -1,0 +1,14 @@
+U-Boot 2021.10 (Oct 01 2021 - 12:00:00 +0000)
+StarFive VisionFive 2
+Hit any key to stop autoboot:  0
+Starting kernel ...
+
+[    0.000000] Linux version 7.2.0-rc6-vf2 (gcc version 15.0.0) #1 SMP PREEMPT
+[    0.500000] NET: Registered PF_INET protocol family
+[    1.000000] VFS: Mounted root (tmpfs filesystem) on device 0:15.
+[    1.100000] Run /init as init process
+BOOT_OK: kernel reached init
+> TEST RUN: 001_smoke
+ok: arithmetic works
+< TEST PASS: 001_smoke
+> TEST RUN: 010_check-proc

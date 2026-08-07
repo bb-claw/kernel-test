@@ -195,6 +195,21 @@ else
     warn "tests/programs/arena-test/ not found — 410_arena-memory will skip in the VM"
 fi
 
+# Build the host-side serial-capture binary.
+# Used by lib/board.sh for robust UART capture in Phase 6+ (not injected into initramfs).
+
+SC_DIR="$(cd "$(dirname "$0")/../tests/programs/serial-capture" && pwd)"
+if [[ -d $SC_DIR ]]; then
+    info "Building serial-capture binary (tests/programs/serial-capture/)..."
+    if make -C "$SC_DIR" all; then
+        info "serial-capture binary built OK (used by make board / make board-smoke)"
+    else
+        warn "serial-capture binary build failed — lib/board.sh will fall back to Bash capture"
+    fi
+else
+    warn "tests/programs/serial-capture/ not found"
+fi
+
 # ── KVM access ────────────────────────────────────────────────────────────────
 
 setup_kvm() {

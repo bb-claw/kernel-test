@@ -131,7 +131,7 @@ make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv   # builds + boots in QEMU ris
 
 ---
 
-### Phase 5 — `feat/board-serial`
+### Phase 5 — `feat/board-serial` *(in progress — branch: feat/board-serial)*
 
 **What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`:
 

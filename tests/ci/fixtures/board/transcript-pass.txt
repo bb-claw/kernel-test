@@ -1,0 +1,38 @@
+U-Boot 2021.10 (Oct 01 2021 - 12:00:00 +0000)
+StarFive VisionFive 2
+CPU:   rv64imafdc
+Board: StarFive VisionFive 2
+Hit any key to stop autoboot:  0
+Loading kernel via tftp...
+Bytes transferred = 12345678 (bc614e hex)
+## Loading init Ramdisk from Legacy Image at ...
+Starting kernel ...
+
+[    0.000000] Linux version 7.2.0-rc6-vf2 (gcc version 15.0.0) #1 SMP PREEMPT
+[    0.000000] Machine model: StarFive VisionFive 2
+[    0.100000] riscv: base ISA extensions acdfim
+[    0.200000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff
+[    0.500000] NET: Registered PF_INET protocol family
+[    1.000000] VFS: Mounted root (tmpfs filesystem) on device 0:15.
+[    1.100000] Run /init as init process
+BOOT_OK: kernel reached init
+> TEST RUN: 001_smoke
+ok: arithmetic works
+ok: /dev/null writable
+ok: /proc/version contains Linux
+ok: /sys/kernel present
+< TEST PASS: 001_smoke
+> TEST RUN: 010_check-proc
+ok: /proc/version readable
+ok: /proc/meminfo readable
+< TEST PASS: 010_check-proc
+> TEST RUN: 100_network-loopback
+FAIL: ping 127.0.0.1 failed
+< TEST FAIL: 100_network-loopback
+KTAP version 1
+# Subtest: kunit-example-suite
+[    5.100000] ok 1 example_simple_test
+[    5.101000] not ok 2 example_skipped_test
+# 2 subtests run, 1 passed, 1 failed
+[    5.102000] not ok 1 kunit-example-suite
+TEST_DONE

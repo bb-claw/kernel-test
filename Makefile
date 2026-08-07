@@ -60,6 +60,7 @@ BASE           ?=
 COMPILER       ?= both
 VERIFY_ARCHS   ?= $(ARCHS)
 CLEAN          ?= 0
+BOARD_TTY      ?= /dev/ttyUSB0
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -96,7 +97,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS CLEAN
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_TTY
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -226,6 +227,18 @@ local:
 # VisionFive 2 (StarFive JH7110) QEMU build: vf2config riscv only.
 vf2:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv
+
+# Board serial capture: read from a live board UART, write vm.status.
+# board-smoke: capture-only (board already running; no build/reset/report).
+# board:       full flow placeholder — Phase 6 adds tftp delivery + USB relay reset.
+# Both require BOARD_TTY to point to a real device (default /dev/ttyUSB0).
+board-smoke:
+	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
+	    bash lib/board.sh vf2config riscv
+
+board:
+	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
+	    bash lib/board.sh vf2config riscv
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -531,6 +544,8 @@ Targets:
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
+  board-smoke      Capture serial from live board (BOARD_TTY=/dev/ttyUSB0); no build/reset; Phase 5
+  board            Full board flow (BOARD_TTY=): initramfs + serial capture; tftp/reset added in Phase 6
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
