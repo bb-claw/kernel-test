@@ -26,12 +26,10 @@ printf '%s' "$fp" | grep -q ' fp ' \
 printf '%s' "$fp" | grep -q ' asimd ' \
     && ok "NEON (asimd) present" || fail "NEON (asimd) absent (ARMv8-A regression)"
 
-# LSE (Large System Extensions) — mandatory on ARMv8.1-A; present in QEMU virt
-printf '%s' "$fp" | grep -q ' atomics ' \
-    && ok "LSE (atomics) present" || fail "LSE (atomics) absent (ARMv8.1-A regression)"
-
-# Optional extensions — report presence without failing on absence.
-for opt in sve paca pacg mte; do
+# Optional extensions — report presence, skip if absent.
+# atomics (LSE) requires ARMv8.1-A; QEMU uses -cpu cortex-a57 (ARMv8.0-A) so it is not
+# advertised in /proc/cpuinfo on this host — absent is expected, not a regression.
+for opt in atomics sve paca pacg mte; do
     if printf '%s' "$fp" | grep -q " $opt "; then
         ok "optional: $opt present"
     else

@@ -46,10 +46,12 @@ align_bytes=$(get align_bytes)
 # align_bytes must be 8 (64-bit arches) or 4 (i386)
 if [ "$align_bytes" -eq 8 ] 2>/dev/null; then
     ok "align: 64-bit pointer size"
-elif [ "$align_bytes" -eq 4 ] 2>/dev/null; then
-    ok "align: 32-bit pointer size (i386)"
 else
-    fail "align: unexpected align_bytes=$align_bytes"
+    if [ "$align_bytes" -eq 4 ] 2>/dev/null; then
+        ok "align: 32-bit pointer size (i386)"
+    else
+        fail "align: unexpected align_bytes=$align_bytes"
+    fi
 fi
 
 # ── Page size ─────────────────────────────────────────────────────────────────
