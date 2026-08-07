@@ -182,6 +182,19 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
         | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
     rm -rf "$RAND_TMP"
     trap - EXIT
+elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
+    # vf2config: StarFive JH7110 (VisionFive 2) — riscv-only; uses defconfig as base.
+    # 'vf2config' is not a kernel make target; defconfig is the correct base for riscv.
+    if [[ $ARCH != riscv ]]; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=0\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "vf2config is riscv-only (StarFive JH7110 SoC) — use ARCHS=riscv"
+    fi
+    if ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
 elif [[ $EFFECTIVE_CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
     # Requires CONFIG_IKCONFIG_PROC=y (provides /proc/config.gz). x86_64 only.

@@ -23,7 +23,7 @@ next phase begins. Dependencies are noted; parallel work is called out explicitl
 
 ---
 
-### Phase 1 — `refactor/common-serial-parser`
+### Phase 1 — `refactor/common-serial-parser` ✓ DONE (branch merged to main)
 
 **What:** Extract the serial output parser and `vm.status` writer from `lib/vm.sh` into
 shared helpers in `lib/common.sh`. `lib/vm.sh` becomes a thin QEMU wrapper that calls
@@ -46,7 +46,7 @@ make ci-test                                                   # all Tier 2 test
 
 ---
 
-### Phase 2 — `feat/arch-tests` *(parallel with Phase 3)*
+### Phase 2 — `feat/arch-tests` *(parallel with Phase 3)* ✓ DONE (branch merged to main)
 
 **What:** Three new VM test scripts covering architecture-specific kernel behaviour:
 
@@ -83,7 +83,7 @@ make ci-test   # CI test verifies skip guards, executable bit, inventory entry
 
 ---
 
-### Phase 3 — `feat/watchdog-test` *(parallel with Phase 2)*
+### Phase 3 — `feat/watchdog-test` *(parallel with Phase 2)* ✓ DONE (branch merged to main)
 
 **What:** `390_watchdog.sh` — verify `/dev/watchdog` node exists and is a character
 device; verify `CONFIG_WATCHDOG=y` via `/proc/config.gz` if available; skip gracefully
@@ -105,14 +105,15 @@ make ci-test
 
 ---
 
-### Phase 4 — `feat/visionfive2-config`
+### Phase 4 — `feat/visionfive2-config` ✓ DONE (branch merged to main)
 
 **What:** New config profile `vf2config` for the StarFive JH7110 SoC:
 
 - Base: `riscv defconfig` (already includes most upstream JH7110 drivers)
-- Fragment `configs/vf2config.config`: pin JH7110 SoC, UART (8250 + STARFIVE serial),
-  GPIO, SD/MMC, Ethernet (dwmac-starfive), USB, RTC, StarFive watchdog; disable heavy
-  subsystems that bloat boot time; `CONFIG_LOCALVERSION="-vf2"` for uname identification
+- Fragment `configs/vf2config.config`: pin JH7110 SoC identity (LOCALVERSION=-vf2);
+  promote JH7110 drivers from =m to =y (Ethernet/DWMAC, USB/Cadence, PCIe, CLK AON/STG/VOUT/ISP,
+  PHY USB/PCIe, hardware RNG, DMA/PL08x, hardware crypto/AES); watchdog sysfs;
+  disable DRM/SOUND/MEDIA/STAGING; no JH7110 RTC driver exists upstream (PMIC-managed)
 - Arch overlay `configs/vf2config-riscv.config`: serial console options for VF2 UART
 
 **Why separate from board.sh:** the config profile is independent of the boot mechanism.
