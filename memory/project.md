@@ -13,7 +13,7 @@ Goal: systematic community verification of each -rc kernel.
 make all
   └─ lib/fetch.sh / lib/fetch-stable-rc.sh   auto-dispatch by preset: mainline rc tag / stable vX.Y.* tag / stable-rc branch tip
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
-  └─ lib/initramfs.sh    Toybox cpio initramfs + inject test scripts
+  └─ lib/initramfs.sh    Toybox cpio initramfs; inject tests/custom/*.sh + ns-* binaries (tests/ns/) + perf-event + arena-test (tests/programs/)
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline; calls warnings.sh
   └─ lib/warnings.sh     extract ': warning:' lines from build logs (PASS builds only); per-combo files + summary (counts, NEW/FIXED since prev, cross-arch divergence vs x86_64); make warnings standalone
@@ -44,9 +44,9 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 ## Current State (2026-07-26)
 
-- **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM when `/dev/kvm` is accessible, falls back to TCG (2× timeout) on non-KVM hosts (e.g. Hetzner); arm64/riscv always use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64 ≥8.x` — bookworm-backports for QEMU B-extension support); Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64; Clang builds (`LLVM=1`) require `clang` + `lld` + `llvm` — all three packages installed by `make bootstrap` (clang does not pull in llvm on Arch or Debian)
+- **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM when `/dev/kvm` is accessible, falls back to TCG (2× timeout) on non-KVM hosts (e.g. Hetzner); arm64/riscv always use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64 ≥8.x` — bookworm-backports for QEMU B-extension support); arm64 QEMU uses `-cpu cortex-a57` (ARMv8.0-A) — LSE atomics (ARMv8.1-A mandatory) are absent from `/proc/cpuinfo Features`, which is expected, not a regression; Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64; Clang builds (`LLVM=1`) require `clang` + `lld` + `llvm` — all three packages installed by `make bootstrap` (clang does not pull in llvm on Arch or Debian)
 - **Config profiles:** 9 (defconfig tinyconfig allnoconfig kunitconfig kunitrandconfig allmodconfig randconfig rand500config randdefconfig); each uses two-layer fragments: arch-neutral base (`configs/<profile>.config`) + arch overlay (`configs/<profile>-<arch>.config` — serial driver, FPU; absent = silently skipped)
-- **Tests:** 38 total (1 smoke + 37 custom; see test-inventory.md); next slot: 370_
+- **Tests:** 42 total (1 smoke + 41 custom; see test-inventory.md); next slot: 420_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
 - **Current kernel (mainline clone):** v7.2-rc6
 - **Hetzner-staging (stable-rc clone):** first full run 2026-07-26, v7.1.5-rc2, PASS 30/30 all 8 combos (tinyconfig+defconfig × 4 archs); TCG timings: i386 ~6 min (slowest), x86_64 ~2.5 min, arm64/riscv ~3–8 s (backports QEMU ≥8.x)
@@ -60,7 +60,10 @@ kernel-test/
 ├── scripts/        on-demand tools: kconfig-check.sh kconfig-enumerate.sh build-kconfig.sh config-archive.sh config-bisect.sh canary-patch.sh migrate-reports.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   └── custom/     001_print-dmesg + 010_ … 280_ (29 scripts)
+│   ├── custom/     001_print-dmesg + 010_ … 410_ (41 scripts)
+│   ├── ci/         host-side harness self-tests (test-*.sh, lib.sh, fixtures/)
+│   ├── ns/         C binaries for namespace regression tests (ns-uts … ns-time, Makefile)
+│   └── programs/   C helper programs injected into the initramfs (perf-event, arena-test)
 ├── configs/        *.config fragments applied post-config; <profile>-<arch>.config overlays; archive_passed/ + archive_failed/ (committed config archive)
 ├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
 ├── memory/         this directory — persistent AI context

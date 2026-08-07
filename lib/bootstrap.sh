@@ -163,6 +163,38 @@ else
     warn "tests/ns/ not found — namespace test binaries will not be available"
 fi
 
+# ── perf-event binary ─────────────────────────────────────────────────────────
+# Build the perf-event static C binary for all 4 arches.
+# Injected into the initramfs at usr/bin/perf-event for 400_perf-events.sh.
+
+PERF_DIR="$(cd "$(dirname "$0")/../tests/programs/perf-event" && pwd)"
+if [[ -d $PERF_DIR ]]; then
+    info "Building perf-event binary (tests/programs/perf-event/)..."
+    if make -C "$PERF_DIR" all; then
+        info "perf-event binary built OK"
+    else
+        warn "perf-event binary build failed — 400_perf-events will skip in the VM"
+    fi
+else
+    warn "tests/programs/perf-event/ not found — 400_perf-events will skip in the VM"
+fi
+
+# ── arena-test binary ─────────────────────────────────────────────────────────
+# Build the arena-test static C binary for all 4 arches.
+# Injected into the initramfs at usr/bin/arena-test for 410_arena-memory.sh.
+
+ARENA_DIR="$(cd "$(dirname "$0")/../tests/programs/arena-test" && pwd)"
+if [[ -d $ARENA_DIR ]]; then
+    info "Building arena-test binary (tests/programs/arena-test/)..."
+    if make -C "$ARENA_DIR" all; then
+        info "arena-test binary built OK"
+    else
+        warn "arena-test binary build failed — 410_arena-memory will skip in the VM"
+    fi
+else
+    warn "tests/programs/arena-test/ not found — 410_arena-memory will skip in the VM"
+fi
+
 # ── KVM access ────────────────────────────────────────────────────────────────
 
 setup_kvm() {

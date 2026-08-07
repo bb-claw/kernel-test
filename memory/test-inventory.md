@@ -55,8 +55,12 @@ and run in filename-sorted order by `/init`. Protocol:
 | `340_ns-cgroup` | Cgroup ns inode + /sys/fs/cgroup; ns-cgroup scoping + release-agent (CVE-2022-0492) |
 | `350_ns-time` | Time ns timens_offsets; ns-time offset (+100s CLOCK_MONOTONIC) + setns-mt (CVE-2023-23586) |
 | `360_ns-setns` | setns(2) code path via ns-uts setns: self-setns + cross-setns into foreign UTS ns |
+| `370_riscv-isa` | RISC-V ISA string from /proc/cpuinfo: base extensions I M A F D C present; 64-bit confirmed; skip on non-riscv |
+| `380_arm64-features` | ARM64 mandatory features from /proc/cpuinfo Features line: FP + NEON (asimd); atomics (LSE) and SVE/PAC/MTE optional (QEMU `-cpu cortex-a57` is ARMv8.0-A — LSE absent is expected, not a regression); skip on non-arm64 |
+| `400_perf-events` | perf_event_open(PERF_TYPE_SOFTWARE/TASK_CLOCK) via C helper; non-zero counter verified; skip if binary absent or CONFIG_PERF_EVENTS=n |
+| `410_arena-memory` | Arena allocator: alloc/reset/destroy correctness; pointer alignment (8-byte on 64-bit, 4-byte on i386); page-size block overflow; 32 MiB write stress; skip if binary absent |
 
-Next available slot: **370_** — 38 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **420_** — 42 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -74,9 +78,15 @@ Next available slot: **370_** — 38 total (tests/001_smoke.sh + tests/custom/*.
 | 270 proc-sys-vm | PASS | skip | skip | varies | PASS |
 | 280 proc-self | PASS | skip | skip | varies | PASS |
 | 290–360 ns-* | PASS (ns configs) | skip | skip | skip | skip |
+| 370 riscv-isa | skip | skip | skip | skip | skip |
+| 380 arm64-features | skip | skip | skip | skip | skip |
+| 400 perf-events | PASS | skip | skip | varies | PASS |
+| 410 arena-memory | PASS | PASS | PASS | PASS | PASS |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 290–360 require ns-variant configs (tinynsconfig/defnsconfig); all skip on tinyconfig/allnoconfig.
+370/380 skip on all non-riscv/non-arm64 arches (x86_64, i386 runs always skip).
+400 requires CONFIG_PERF_EVENTS=y (present in defconfig/randdef, absent in tinyconfig/allnoconfig).
 
 ---
 
