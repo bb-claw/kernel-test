@@ -223,6 +223,10 @@ extended:
 local:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
 
+# VisionFive 2 (StarFive JH7110) QEMU build: vf2config riscv only.
+vf2:
+	+@$(MAKE) all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv
+
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
 # The exported RUN_STAMP is inherited, so all stages share one timestamp.
@@ -526,6 +530,7 @@ Targets:
   ns-full          Namespace full: kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig (mirrors full)
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
+  vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
@@ -562,6 +567,7 @@ Config profiles (CONFIGS=):
   rand500config    Boot+test  tinyconfig + 500 random =y options (constrained: no sanitizers, torture tests, non-gzip compressors)
   randdefconfig    Boot+test  defconfig with 300 randomly disabled options; heavy subsystems forced off; KERNEL_GZIP pinned
   localconfig      Boot+test  /proc/config.gz base (running kernel); daily-driver; not in default CONFIGS
+  vf2config        Boot+test  StarFive JH7110 (VisionFive 2); riscv-only; defconfig base + JH7110 built-in drivers + LOCALVERSION=-vf2; not in default CONFIGS
   allmodconfig     Build only All options as modules — catches build-time regressions
   randconfig       Build only Fully random config — catches compile-time regressions; constrained to exclude non-gzip compressors (BUILD_TIMEOUT capped)
   randkconfigconfig-<OPT>  Boot+test  Generated per-option by kconfig-build sweep; not in default CONFIGS; one per subsystem config entry
