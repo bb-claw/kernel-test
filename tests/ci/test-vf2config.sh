@@ -43,6 +43,8 @@ assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_USB=y"  "PHY USB=y"
 assert_contains "$frag" "CONFIG_PCIE_STARFIVE_HOST=y"       "PCIE_STARFIVE_HOST=y (M.2 slot)"
 assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_PCIE=y"  "PHY PCIE=y"
 assert_contains "$frag" "CONFIG_HW_RANDOM_JH7110=y"          "HW_RANDOM_JH7110=y (hardware TRNG)"
+assert_contains "$frag" "CONFIG_AMBA_PL08X=y"                "AMBA_PL08X=y (PL08x DMA, dep for crypto)"
+assert_contains "$frag" "CONFIG_CRYPTO_DEV_JH7110=y"         "CRYPTO_DEV_JH7110=y (hardware AES/SHA)"
 
 begin_test "vf2config-heavy-subsystems-off"
 frag=$(cat "$FRAG")

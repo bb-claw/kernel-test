@@ -123,6 +123,12 @@ disabled. These add significant build time and module compilation without contri
 to any test in the suite. The riscv defconfig builds them as modules (`=m`); with
 `MODULES=y` retained, `olddefconfig` sets them to `=n` when overridden in the fragment.
 
+### No JH7110-specific RTC driver upstream
+
+The ROADMAP Phase 4 scope listed "RTC" as one of the fragment items. Investigation shows
+no `CONFIG_RTC_DRV_STARFIVE` or equivalent in the kernel Kconfig tree as of v7.2-rc6.
+The JH7110 RTC is accessed via PMIC (no dedicated kernel driver). Nothing to promote.
+
 ### `MODULES=y` retained
 
 Setting `MODULES=n` would force `olddefconfig` to disable every `=m` option not
