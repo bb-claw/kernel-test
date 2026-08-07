@@ -56,7 +56,7 @@ done
 begin_test "arch-scripts-inventory"
 inv="$REPO/memory/test-inventory.md"
 assert_file_exists "$inv" "test-inventory.md exists"
-for slot in 370 380 400; do
+for slot in 370 380 400 410; do
     assert_contains "$(cat "$inv")" "${slot}_" "slot ${slot}_ in inventory"
 done
 
