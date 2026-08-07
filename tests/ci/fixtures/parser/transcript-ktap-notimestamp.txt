@@ -1,0 +1,11 @@
+[    0.000000] Linux version 7.2.0-rc6 (gcc version 14.2.0) #1 SMP PREEMPT_DYNAMIC
+[    1.234567] Run /init as init process
+BOOT_OK: kernel reached init
+KTAP version 1
+# Subtest: kunit-notimestamp-suite
+ok 1 - test_alpha
+ok 2 - test_beta
+not ok 3 - test_gamma
+not ok 4 - test_delta
+not ok 1 - kunit-notimestamp-suite
+TEST_DONE

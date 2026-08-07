@@ -41,6 +41,12 @@ assert_eq "$KUNIT_PASS" "3" "KUNIT_PASS"
 assert_eq "$KUNIT_FAIL" "3" "KUNIT_FAIL"
 assert_eq "$BOOT_OK"    "1" "BOOT_OK"
 
+begin_test "parse: KTAP block no timestamps — KUNIT_PASS=2, KUNIT_FAIL=3 (CONFIG_PRINTK_TIME=n)"
+parse_serial_output "$FX/transcript-ktap-notimestamp.txt"
+assert_eq "$KUNIT_PASS" "2" "KUNIT_PASS (no timestamps)"
+assert_eq "$KUNIT_FAIL" "3" "KUNIT_FAIL (2 subtests + 1 suite summary, no timestamps)"
+assert_eq "$BOOT_OK"    "1" "BOOT_OK"
+
 begin_test "parse: CANARY marker present — CANARY_EARLY=reached (no CANARY=1 needed)"
 CANARY=0 parse_serial_output "$FX/transcript-canary.txt"
 assert_eq "$CANARY_EARLY" "reached" "CANARY_EARLY"

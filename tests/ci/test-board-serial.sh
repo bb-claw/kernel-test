@@ -24,6 +24,15 @@ begin_test "board-socat-available"
 if command -v socat &>/dev/null; then pass "socat available"
 else fail "socat not installed (run: make bootstrap)"; fi
 
+begin_test "board-serial-capture-backend"
+SC_BIN="$REPO/tests/programs/serial-capture/bin/serial-capture"
+# Build serial-capture if gcc is available so CI exercises the C backend path.
+if [[ ! -x "$SC_BIN" ]] && command -v gcc &>/dev/null; then
+    make -C "$REPO/tests/programs/serial-capture" >/dev/null 2>&1 || true
+fi
+if [[ -x "$SC_BIN" ]]; then pass "serial-capture binary present — C backend active"
+else pass "serial-capture binary absent — Bash fallback active (run: make bootstrap)"; fi
+
 # ── Helper: run board.sh against a socat pty fed from a transcript ────────────
 #
 # run_board_replay <fixture> <build_dir> <timeout>
@@ -34,7 +43,7 @@ RBR_STATUS=''
 RBR_DMESG=''
 run_board_replay() {
     local fixture="$1" build_dir="$2" timeout_val="$3"
-    local tx rx socat_pid wait_count
+    local tx rx socat_pid wait_count board_pid
     # Clear globals so callers never see stale paths from a prior run.
     RBR_STATUS=''; RBR_DMESG=''
 
@@ -53,11 +62,22 @@ run_board_replay() {
         [[ $wait_count -lt 20 ]] || { kill "$socat_pid" 2>/dev/null || true; return 1; }
     done
 
-    # Feed transcript; background so board.sh runs concurrently.
-    cat "$fixture" > "$tx" &
-
+    # Start board.sh in background so we can control when data arrives.
     BUILD_DIR="$build_dir" TIMEOUT="$timeout_val" BOARD_TTY="$rx" \
-        bash "$BOARD_SH" vf2config riscv || true
+        bash "$BOARD_SH" vf2config riscv &
+    board_pid=$!
+
+    # Give the capture backend time to open the pty before sending data.
+    # Both paths need this: C backend (serial-capture spawn) and Bash (exec 3<>).
+    sleep 0.5
+
+    # Open TX and write transcript; keep TX fd open until board.sh finishes.
+    # This prevents socat from exiting on EOF before the capture backend drains the buffer.
+    exec 4>"$tx"
+    cat "$fixture" >&4
+
+    wait "$board_pid" || true
+    exec 4>&-   # close TX only after board.sh is done
 
     kill "$socat_pid" 2>/dev/null || true
     wait "$socat_pid" 2>/dev/null || true

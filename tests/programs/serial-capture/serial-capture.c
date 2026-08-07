@@ -81,10 +81,11 @@ static int open_serial(const char *device, int baud) {
     tty.c_cflag &= ~CSTOPB;          /* 1 stop bit */
     tty.c_cflag &= ~CRTSCTS;         /* no hardware flow control */
 
-    /* Non-canonical read: return as soon as >=1 byte is available,
-     * or after 1 decisecond with nothing — keeps us responsive
-     * without busy-polling. */
-    tty.c_cc[VMIN]  = 1;
+    /* Pure timeout read: return after 1 decisecond even with no data.
+     * VMIN=0 ensures SIGTERM can wake us — with VMIN=1, Linux signal()
+     * sets SA_RESTART and the blocked read() is automatically restarted,
+     * so the signal handler's running=0 is never checked until data arrives. */
+    tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = 1;
 
     if (tcsetattr(fd, TCSANOW, &tty) < 0) {

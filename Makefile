@@ -61,6 +61,7 @@ COMPILER       ?= both
 VERIFY_ARCHS   ?= $(ARCHS)
 CLEAN          ?= 0
 BOARD_TTY      ?= /dev/ttyUSB0
+TFTP_DIR       ?= /srv/tftp
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -97,7 +98,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_TTY
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_TTY TFTP_DIR
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -237,6 +238,14 @@ board-smoke:
 	    bash lib/board.sh vf2config riscv
 
 board:
+	@mkdir -p $(TFTP_DIR) 2>/dev/null || true
+	@cp $(BUILD_DIR)/vf2config-riscv/arch/riscv/boot/Image $(TFTP_DIR)/Image \
+	    && printf '[board] kernel   → %s/Image\n' $(TFTP_DIR) \
+	    || printf '[board] WARN: kernel not found — run: make vf2 first\n'
+	@cp $(BUILD_DIR)/initramfs-riscv.cpio.gz $(TFTP_DIR)/initramfs-riscv.cpio.gz \
+	    && printf '[board] initramfs → %s/initramfs-riscv.cpio.gz\n' $(TFTP_DIR) \
+	    || printf '[board] WARN: initramfs not found — run: make initramfs ARCHS=riscv first\n'
+	@printf '[board] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
 	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
 	    bash lib/board.sh vf2config riscv
 
@@ -544,8 +553,8 @@ Targets:
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
-  board-smoke      Capture serial from live board (BOARD_TTY=/dev/ttyUSB0); no build/reset; Phase 5
-  board            Full board flow (BOARD_TTY=): initramfs + serial capture; tftp/reset added in Phase 6
+  board-smoke      Capture serial from live board (BOARD_TTY=/dev/ttyUSB0); capture only, no build/reset
+  board            Board flow: copy kernel+initramfs to TFTP_DIR=/srv/tftp, then capture serial; Phase 6 adds relay reset
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
