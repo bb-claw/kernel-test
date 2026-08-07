@@ -60,6 +60,8 @@ BASE           ?=
 COMPILER       ?= both
 VERIFY_ARCHS   ?= $(ARCHS)
 CLEAN          ?= 0
+BOARD_CONFIG   ?= vf2config
+BOARD_ARCH     ?= riscv
 BOARD_TTY      ?= /dev/ttyUSB0
 TFTP_DIR       ?= /srv/tftp
 
@@ -98,7 +100,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_TTY TFTP_DIR
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -235,19 +237,27 @@ vf2:
 # Both require BOARD_TTY to point to a real device (default /dev/ttyUSB0).
 board-smoke:
 	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
-	    bash lib/board.sh vf2config riscv
+	    bash lib/board.sh $(BOARD_CONFIG) $(BOARD_ARCH)
 
 board:
-	@mkdir -p $(TFTP_DIR) 2>/dev/null || true
-	@cp $(BUILD_DIR)/vf2config-riscv/arch/riscv/boot/Image $(TFTP_DIR)/Image \
-	    && printf '[board] kernel   → %s/Image\n' $(TFTP_DIR) \
-	    || printf '[board] WARN: kernel not found — run: make vf2 first\n'
-	@cp $(BUILD_DIR)/initramfs-riscv.cpio.gz $(TFTP_DIR)/initramfs-riscv.cpio.gz \
-	    && printf '[board] initramfs → %s/initramfs-riscv.cpio.gz\n' $(TFTP_DIR) \
-	    || printf '[board] WARN: initramfs not found — run: make initramfs ARCHS=riscv first\n'
+	@bd="$(BUILD_DIR)/$(BOARD_CONFIG)-$(BOARD_ARCH)"; \
+	mkdir -p $(TFTP_DIR) 2>/dev/null || true; \
+	img=$$(find "$$bd/arch" -name "Image" -o -name "bzImage" 2>/dev/null | head -1); \
+	if [[ -n "$$img" ]]; then \
+	    cp "$$img" "$(TFTP_DIR)/"; \
+	    printf '[board] kernel   → %s/%s\n' '$(TFTP_DIR)' "$$(basename $$img)"; \
+	else \
+	    printf '[board] WARN: kernel not found in %s/arch — run: make vf2 or make build first\n' "$$bd"; \
+	fi; \
+	if cp "$(BUILD_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" "$(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" 2>/dev/null; then \
+	    printf '[board] initramfs → %s/initramfs-$(BOARD_ARCH).cpio.gz\n' '$(TFTP_DIR)'; \
+	else \
+	    printf '[board] WARN: initramfs not found — run: make initramfs ARCHS=$(BOARD_ARCH) first\n'; \
+	fi
 	@printf '[board] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
 	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
-	    bash lib/board.sh vf2config riscv
+	    CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) \
+	    bash lib/board.sh $(BOARD_CONFIG) $(BOARD_ARCH)
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -553,8 +563,8 @@ Targets:
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
-  board-smoke      Capture serial from live board (BOARD_TTY=/dev/ttyUSB0); capture only, no build/reset
-  board            Board flow: copy kernel+initramfs to TFTP_DIR=/srv/tftp, then capture serial; Phase 6 adds relay reset
+  board-smoke      Capture serial from live board (BOARD_TTY=/dev/ttyUSB0); capture only, no build/reset; BOARD_CONFIG/BOARD_ARCH selectable
+  board            Board flow: copy kernel+initramfs to TFTP_DIR=/srv/tftp, then capture serial + report; Phase 6 adds relay reset
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
@@ -633,6 +643,8 @@ Variables (current values):
   COMPILER            = $(COMPILER)  (gcc|clang|both — compiler selection for make verify-patch; default: both)
   VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; defaults to ARCHS so ARCHS=x86_64 works as expected)
   CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
+  BOARD_CONFIG        = $(BOARD_CONFIG)  (config profile for make board / make board-smoke; default: vf2config)
+  BOARD_ARCH          = $(BOARD_ARCH)  (arch for make board / make board-smoke; default: riscv)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report

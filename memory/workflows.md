@@ -31,6 +31,8 @@
 | `COMPILER` | `both` | `COMPILER=gcc\|clang\|both` — compiler selection for `make verify-patch` |
 | `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
 | `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
+| `BOARD_CONFIG` | `vf2config` | Config profile for `make board` / `make board-smoke` |
+| `BOARD_ARCH` | `riscv` | Arch for `make board` / `make board-smoke` |
 | `BOARD_TTY` | `/dev/ttyUSB0` | `BOARD_TTY=/dev/ttyUSB1` — USB-UART device for `make board-smoke` / `make board` |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
@@ -56,7 +58,7 @@ make local                                            # localconfig x86_64, no b
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 make board-smoke BOARD_TTY=/dev/ttyUSB0              # capture serial from live board; no build/reset
-make board BOARD_TTY=/dev/ttyUSB0                    # board serial capture (Phase 5: capture only)
+make board BOARD_TTY=/dev/ttyUSB0                    # board: tftp copy + serial capture + auto-report (BOARD_CONFIG=vf2config BOARD_ARCH=riscv)
 ```
 
 `make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
@@ -145,5 +147,4 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
 `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
 
-**Operational:** `make clean` on tree switch (headers are tree-specific); set `GCC=gcc-15` for stable kernels that predate GCC 16; `Stable-rc` is not a tag — use `make fetch-stable-rc`.
-- **Stable-rc is not a tag** — `v7.1.4-rc2` is the tip of the rolling `linux-7.1.y` branch, not a git tag; use `make fetch-stable-rc`, not `make checkout`.
+**Operational:** `make clean` on tree switch (headers are tree-specific); set `GCC=gcc-15` for stable kernels that predate GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the tip of the rolling `linux-7.1.y` branch; use `make fetch-stable-rc`, not `make checkout`.
