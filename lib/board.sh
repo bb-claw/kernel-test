@@ -33,7 +33,7 @@ board_reset() {
 # ── Capture backend selection ─────────────────────────────────────────────────
 # Prefer the C binary (proper termios: O_NOCTTY, tcflush, fdatasync, binary-safe).
 # Fall back to Bash stty+read when the binary is absent (e.g. make bootstrap not run).
-SERIAL_CAPTURE="$REPO_ROOT/tests/programs/serial-capture/bin/serial-capture"
+SERIAL_CAPTURE="${SERIAL_CAPTURE:-$REPO_ROOT/tests/programs/serial-capture/bin/serial-capture}"
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)

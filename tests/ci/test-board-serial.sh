@@ -108,16 +108,6 @@ begin_test "board-serial-pass-boot"
 assert_contains "$_status_pass" "BOOT=PASS"    "BOOT=PASS"
 assert_contains "$_status_pass" "TEST_DONE=1"  "TEST_DONE=1"
 
-begin_test "board-serial-pass-counts"
-assert_contains "$_status_pass" "TESTS_PASS=2"   "TESTS_PASS=2"
-assert_contains "$_status_pass" "TESTS_FAIL=1"   "TESTS_FAIL=1"
-assert_contains "$_status_pass" "TESTS_TOTAL=3"  "TESTS_TOTAL=3"
-
-begin_test "board-serial-pass-kunit"
-# KUNIT_FAIL=2: 1 failing subtest + 1 failing suite summary (both counted by parser design)
-assert_contains "$_status_pass" "KUNIT_PASS=1"   "KUNIT_PASS=1"
-assert_contains "$_status_pass" "KUNIT_FAIL=2"   "KUNIT_FAIL=2 (1 subtest + 1 suite summary)"
-
 begin_test "board-serial-pass-failed-tests"
 assert_contains "$_status_pass" "FAILED_TESTS="           "FAILED_TESTS line present"
 assert_contains "$_status_pass" "100_network-loopback"    "100_network-loopback in FAILED_TESTS"
@@ -187,6 +177,20 @@ assert_not_contains "$_status_uboot" "BOOT=PASS"  "not BOOT=PASS"
 begin_test "board-serial-uboot-hang-fail-reason"
 assert_contains "$_status_uboot" "FAIL_REASON="      "FAIL_REASON set on U-Boot hang"
 assert_contains "$_status_uboot" "Timeout"           "Timeout in FAIL_REASON"
+
+# ── Test group: Bash fallback path (SERIAL_CAPTURE absent) ───────────────────
+# Override SERIAL_CAPTURE to a nonexistent binary so board.sh uses stty+read.
+
+tmpdir; _bd_bash="$_LAST_TMPDIR"
+begin_test "board-serial-bash-fallback"
+_bash_rc=0
+SERIAL_CAPTURE=/nonexistent \
+    run_board_replay "$FIXTURES/transcript-pass.txt" "$_bd_bash" 30 || _bash_rc=$?
+_status_bash=$(cat "$RBR_STATUS" 2>/dev/null || true)
+assert_file_exists "$RBR_STATUS"                     "vm.status written via Bash path"
+assert_contains    "$_status_bash" "BOOT=PASS"       "BOOT=PASS via Bash path"
+assert_contains    "$_status_bash" "TEST_DONE=1"     "TEST_DONE=1 via Bash path"
+assert_contains    "$_status_bash" "TESTS_FAIL=1"    "TESTS_FAIL=1 via Bash path"
 
 # ── Test: missing BOARD_TTY exits non-zero with clear error ──────────────────
 

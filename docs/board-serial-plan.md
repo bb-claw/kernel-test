@@ -2,6 +2,7 @@
 
 Branch: `feat/board-serial`
 Start date: 2026-08-07
+Status: **complete**
 
 ---
 
@@ -10,172 +11,146 @@ Start date: 2026-08-07
 `lib/vm.sh` boots kernels in QEMU and captures serial output by telling QEMU to write its
 virtual serial port to a file. Real hardware has a physical UART (`/dev/ttyUSB0`) instead.
 Phase 1 already extracted the serial output parser from `vm.sh` into shared helpers in
-`lib/common.sh`; `lib/board.sh` can call those same helpers and produce identical
+`lib/common.sh`; `lib/board.sh` calls those same helpers and produces identical
 `vm.status` output, making hardware runs drop-in comparable to QEMU runs.
 
 ---
 
-## Problems to Solve
+## Problems Solved
 
-1. **No host-side TTY capture** — nothing opens the USB-UART dongle, reads serial lines
-   with timeout detection, and calls the shared parser.
-2. **No board reset stub** — Phase 6 will add a USB relay; Phase 5 needs the call site to
-   exist so Phase 6 only fills in one function.
-3. **No CI test** — board.sh can only be proven correct by replaying a known transcript
-   through a socat pty pair and checking the resulting `vm.status`.
-4. **No `make board-smoke` / `make board` targets** — no user-facing entry point.
+1. **No host-side TTY capture** — `lib/board.sh` opens `$BOARD_TTY`, captures serial
+   output with a wall-clock deadline, calls shared parser helpers.
+2. **No board reset stub** — `board_reset()` stub exists; Phase 6 fills in the USB relay.
+3. **No CI test** — `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty
+   pairs and verifies the resulting `vm.status` without hardware.
+4. **No `make board-smoke` / `make board` targets** — both wired; `BOARD_CONFIG` and
+   `BOARD_ARCH` parameterize the target (default: `vf2config` / `riscv`).
+5. **KTAP timestamps required** — parser regex made optional; works with and without
+   `CONFIG_PRINTK_TIME=y`.
 
 ---
 
 ## Goals
 
-1. `lib/board.sh` reads from `$BOARD_TTY` (default `/dev/ttyUSB0`), applies 115200 8N1 via
-   `stty`, reads lines with a wall-clock deadline, and produces an identical `vm.status`
-   to a QEMU run.
-2. `board_reset` stub exists, logs "manual action required", does nothing (Phase 6 fills it).
-3. `tests/ci/test-board-serial.sh` passes without hardware by replaying fixtures through
-   socat pty pairs.
-4. `make board-smoke BOARD_TTY=/dev/ttyUSB0` and `make board BOARD_TTY=/dev/ttyUSB0` are
-   documented and wired in the Makefile.
+All met:
+
+1. `lib/board.sh` reads from `$BOARD_TTY`, produces identical `vm.status` to a QEMU run.
+2. `board_reset` stub logs "manual action required", does nothing (Phase 6 fills it).
+3. `tests/ci/test-board-serial.sh` — 42 assertions across 13 test groups, all pass.
+4. `make board-smoke` and `make board BOARD_TTY=/dev/ttyUSB0` wired in Makefile.
 5. `make ci-test` and `make lint` pass.
 
 ---
 
 ## Scope
 
-Files/components changed:
-- `lib/board.sh` — new; hardware equivalent of vm.sh
-- `lib/bootstrap.sh` — add serial-capture host build step
-- `tests/ci/test-board-serial.sh` — new; socat-based CI test (36 assertions)
-- `tests/ci/fixtures/board/transcript-pass.txt` — new; U-Boot + boot + tests + KTAP + TEST_DONE
-- `tests/ci/fixtures/board/transcript-panic.txt` — new; kernel panic transcript
-- `tests/ci/fixtures/board/transcript-boot-hang.txt` — new; BOOT_OK but no TEST_DONE
-- `tests/programs/serial-capture/serial-capture.c` — new; host-side UART capture binary
-- `tests/programs/serial-capture/Makefile` — new; host-only build (no cross-compilation)
-- `Makefile` — add `board-smoke` and `board` targets, `BOARD_TTY` variable
-- `ROADMAP.md` — mark Phase 5 in progress
-- `memory/workflows.md` — document new board workflow variables and targets
+Files changed:
 
-No changes to: `lib/vm.sh`, `lib/common.sh`, `lib/initramfs.sh`, any test scripts in
-`tests/custom/`, the report or diff pipeline.
-
----
-
-## Non-goals
-
-- **Wiring serial-capture.c into board.sh** — the C binary is committed and buildable in
-  this phase (`make bootstrap` builds it) but `board.sh` uses the Bash `stty+read` path.
-  Phase 6 upgrades `board.sh` to use it as the capture backend.
-- **Actual UART communication** — board.sh reads only; no U-Boot command sending in Phase 5.
-  The write fd is opened (`exec 3<>$BOARD_TTY`) so Phase 6 can send U-Boot commands without
-  reopening.
-- **USB relay control** — `board_reset` stub only; Phase 6 wires the relay.
-- **tftp kernel delivery** — Phase 6 concern; Phase 5 assumes the board is already booting
-  a pre-loaded kernel.
-- **Multiple board types** — `BOARD_TTY` variable + config is board-agnostic; the board
-  type (`visionfive2`) is a Phase 6 label concern.
+| File | Change |
+|---|---|
+| `lib/board.sh` | New; prefers serial-capture C binary, Bash read fallback |
+| `lib/bootstrap.sh` | Add serial-capture host build step (warn-only on fail) |
+| `lib/common.sh` | KTAP timestamp regex made optional |
+| `Makefile` | `board-smoke`, `board`, `BOARD_CONFIG`, `BOARD_ARCH`, `TFTP_DIR` |
+| `tests/ci/test-board-serial.sh` | New; 42 assertions, 5 transcript scenarios |
+| `tests/ci/test-vm-parser.sh` | Board transcript parse-count assertions added |
+| `tests/ci/fixtures/board/transcript-pass.txt` | New; U-Boot + full pass + KTAP + TEST_DONE |
+| `tests/ci/fixtures/board/transcript-panic.txt` | New; kernel panic |
+| `tests/ci/fixtures/board/transcript-boot-hang.txt` | New; BOOT_OK but no TEST_DONE |
+| `tests/ci/fixtures/board/transcript-uboot-hang.txt` | New; U-Boot TFTP error, no kernel |
+| `tests/ci/fixtures/parser/transcript-ktap-notimestamp.txt` | New; KTAP without timestamps |
+| `tests/programs/serial-capture/serial-capture.c` | New; host-side UART capture binary |
+| `tests/programs/serial-capture/Makefile` | New; host-only build |
+| `tests/programs/serial-capture/.gitignore` | New |
+| `memory/workflows.md` | New board variables and targets |
+| `ROADMAP.md` | Phase 5 marked complete; Phase 6 marked next milestone |
 
 ---
 
-## Design decisions
+## Design Decisions
 
-### Wall-clock timeout vs per-line timeout
+### C backend: serial-capture vs Bash stty+read
 
-`read -t TIMEOUT` gives a per-line timeout: it fires only when no data arrives for TIMEOUT
-seconds. A boot loop (board alive but stuck, printing continuously) would never time out.
-Using a wall-clock deadline (`DEADLINE=$(( $(date +%s) + TIMEOUT ))`; `remaining` shrunk
-each iteration) ensures total session time is bounded regardless of board behaviour.
+`tests/programs/serial-capture/serial-capture.c` is committed and built by `make bootstrap`.
+`lib/board.sh` prefers it when present:
 
-Per-line timeout still matters as a failsafe: `read -t remaining` where remaining is the
-shrinking remainder of the wall-clock budget.
+- `O_NOCTTY`: prevents capture from acquiring the UART as its controlling terminal
+- `tcflush(TCIOFLUSH)`: drops stale buffered bytes on open — critical after a board reset
+- Binary-safe: captures every byte verbatim (no line-discipline mangling)
+- `fdatasync()` every 8 writes: protects data against host crash
+- `VMIN=0, VTIME=1`: read() returns every 100ms even with no data, so SIGTERM reliably
+  interrupts the loop (SA_RESTART with VMIN=1 caused board.sh's `wait` to hang forever)
 
-### TTY configuration (stty vs termios in C)
+Bash `stty+read` fallback is used when the binary is absent; `SERIAL_CAPTURE` env var can
+force the Bash path in CI.
 
-`stty -F $BOARD_TTY 115200 cs8 -cstopb -parenb -crtscts raw -echo` is sufficient for
-host-side read-only capture. A C binary with POSIX `tcsetattr` would handle binary
-garbage, break signals, and sub-millisecond timing — none of which matter for the kernel
-boot transcript use case. Deferred to Phase 6 if hardware proves otherwise.
+### Poll loop in board.sh (C backend)
 
-In CI (`socat PTY,rawer`), the pty is already in raw mode; `stty` on a pty is a no-op
-for the baud rate (ptys are virtual) but does not error, so the same code path works.
+C backend is spawned in background; board.sh polls `$DMESG_FILE` every 0.5s for `TEST_DONE`.
+Wall-clock deadline (`DEADLINE=$(( epoch + TIMEOUT ))`) bounds total session time regardless
+of board behaviour (a boot loop printing continuously would not cause per-line timeout).
 
-### Write fd open at boot.sh start
+### VMIN=0 vs VMIN=1 — SA_RESTART interaction
 
-`exec 3<>$BOARD_TTY` opens the TTY for both read and write from the start. The current
-Phase 5 implementation only reads; the write fd is unused but present. Phase 6 will send
-U-Boot commands through fd 3 without needing to reopen or reconfigure the TTY.
+Linux's `signal()` sets `SA_RESTART`. With `VMIN=1`, a blocking `read()` waiting for the
+first byte is automatically restarted after SIGTERM — `running=0` is never checked.
+`VMIN=0, VTIME=1` causes `read()` to return every 100ms even with no data, so the
+`while(running)` check fires within 100ms of SIGTERM delivery.
 
-### CI test: socat pty pair
+### socat pty pair in CI
 
-`socat PTY,link=TX,rawer PTY,link=RX,rawer` creates a virtual serial cable. One end
-receives the fixture transcript (`cat transcript.txt > TX`); the other is `BOARD_TTY=RX`
-for board.sh. The CI test does not require any USB hardware. Socat must be installed
-(`make bootstrap` installs it).
+`socat PTY,link=TX,rawer PTY,link=RX,rawer` creates a virtual serial cable. The CI test:
+1. starts `board.sh` in background (`BOARD_TTY=RX`)
+2. polls for `dmesg.txt` to appear (= serial-capture has opened the pty; up to 2s)
+3. opens `exec 4>TX` (keeps TX slave open so socat doesn't exit on EOF)
+4. writes fixture via `cat fixture >&4`
+5. `wait "$board_pid"`; closes TX fd
 
-### serial-capture.c vs Bash stty+read
+The TX-open step (3) is critical: if TX closes before `board.sh` finishes draining the
+buffer, socat exits and serial-capture gets EIO.
 
-A host-side C binary `tests/programs/serial-capture/serial-capture.c` is included in this
-phase and built by `make bootstrap`. It is NOT wired into `board.sh` yet:
+### BOARD_CONFIG / BOARD_ARCH parameterisation
 
-**Why serial-capture.c is valuable (Phase 6 upgrade):**
-- `O_NOCTTY`: prevents capture process from acquiring the board TTY as its controlling terminal
-- `tcflush(TCIOFLUSH)`: drops stale buffered bytes on open — critical on reconnect after a reset
-- Binary-safe: captures every byte verbatim (no line-discipline mangling, no newline requirement)
-- `fdatasync()` every 8 writes: protects captured data against host crash
-- `VMIN=1, VTIME=1`: non-blocking check every 100ms; SIGTERM/SIGINT → clean shutdown with final sync
+`make board` and `make board-smoke` default to `vf2config riscv` but accept any config/arch.
+The tftp copy uses `find arch/ -name Image -o -name bzImage` so it works without
+arch-specific Makefile conditionals.
 
-**Why board.sh stays Bash for Phase 5:**
-- The socat pty CI test works with `read -t` but would require polling a file if serial-capture
-  is used as a background process
-- The Bash path is fully tested and sufficient for the Phase 5 goal (proven CI + basic hardware testing)
-- Wiring serial-capture into board.sh changes the architecture (background spawn + poll loop)
-  and is the natural scope of Phase 6
+### Test organisation
 
-**Phase 6 upgrade path:** board.sh checks for `tests/programs/serial-capture/bin/serial-capture`;
-if present, spawns it in background and polls `$DMESG_FILE` for TEST_DONE; otherwise uses the
-Bash fallback. The CI test `run_board_replay` continues to work in both modes since serial-capture
-correctly reads from a socat pty (EIO on pty close → clean exit).
-
-### `board-smoke` vs `board` Makefile targets
-
-`board-smoke` captures serial from a board that is already running (no build, no reset).
-`board` is the full intended flow: build vf2config + copy to tftp + reset + capture + report.
-For Phase 5, `board` does not trigger tftp delivery or USB relay reset — those are Phase 6.
-Both targets require `BOARD_TTY` to be set to a real device on the host.
+- `test-vm-parser.sh` — unit-tests `parse_serial_output` directly (counts, parse paths)
+- `test-board-serial.sh` — integration-tests the full socat → board.sh → vm.status pipeline
+  (file existence, BOOT=PASS/FAIL, FAILED_TESTS, timing, Bash fallback path)
 
 ---
 
-## Testing strategy
+## Testing Strategy
 
-- **CI (no hardware)** — `tests/ci/test-board-serial.sh`: socat pty pair replays
-  `transcript-pass.txt` (full pass) and `transcript-timeout.txt` (hang); asserts
-  `vm.status` contents match expected values for each scenario.
-- **Lint** — `shellcheck` on `lib/board.sh`; executable bit check.
-- **Manual (with hardware)** — connect USB-UART to VisionFive 2, boot a vf2config kernel,
-  run `BOARD_TTY=/dev/ttyUSB0 TIMEOUT=360 BUILD_DIR=build bash lib/board.sh vf2config riscv`.
-- **No QEMU test needed** — board.sh does not invoke QEMU; the shared parser is already
-  covered by `tests/ci/test-vm-parser.sh`.
+- **CI (no hardware)** — `make ci-test` runs `tests/ci/test-board-serial.sh`;
+  42 assertions, 5 fixtures (pass, panic, mid-test hang, U-Boot hang, Bash fallback).
+- **Lint** — `shellcheck` on `lib/board.sh`; context sizes; inventory coverage.
+- **Manual (with hardware)** — connect USB-UART to VisionFive 2, boot a vf2config kernel:
+  ```sh
+  make board BOARD_TTY=/dev/ttyUSB0
+  ```
+- **Parser isolation** — `test-vm-parser.sh` covers KTAP counts (with/without timestamps).
 
 ---
 
-## Testing commands
+## Testing Commands
 
 ```sh
-# 1. CI test (no hardware needed)
-make ci-test
-# Expected: test-board-serial.sh: N passed, 0 failed
+# CI (no hardware needed)
+make ci-test    # Expected: test-board-serial.sh: 42 passed, 0 failed
 
-# 2. Lint
-make lint
-# Expected: 0 errors, 0 warnings
+# Lint
+make lint       # Expected: all checks passed
 
-# 3. Manual socat replay (without make)
+# Manual socat replay
 socat PTY,link=/tmp/vf2-tx,rawer PTY,link=/tmp/vf2-rx,rawer &
-sleep 0.3
-cat tests/ci/fixtures/board/transcript-pass.txt > /tmp/vf2-tx
+SERIAL_CAPTURE=/nonexistent \                 # force Bash path; remove to use C backend
 BUILD_DIR=/tmp/bs-test TIMEOUT=30 BOARD_TTY=/tmp/vf2-rx \
-    bash lib/board.sh vf2config riscv
-cat /tmp/bs-test/vf2config-riscv/vm.status
+    bash lib/board.sh vf2config riscv &
+cat tests/ci/fixtures/board/transcript-pass.txt > /tmp/vf2-tx
+wait; cat /tmp/bs-test/vf2config-riscv/vm.status
 # Expected: BOOT=PASS, TESTS_PASS=2, TESTS_FAIL=1, KUNIT_PASS=1, KUNIT_FAIL=2
-# (KUNIT_FAIL=2: 1 failing subtest + 1 failing suite summary line — both counted by design)
 ```

@@ -130,6 +130,20 @@ assert_contains "$out" "CANARY_EARLY=reached" "CANARY_EARLY"
 
 # ── log_run_result ────────────────────────────────────────────────────────────
 
+# ── Board transcript (end-to-end parse via fixtures/board/) ───────────────────
+
+begin_test "parse: board transcript-pass — TESTS_PASS=2 TESTS_FAIL=1 KUNIT_PASS=1 KUNIT_FAIL=2"
+parse_serial_output "$REPO/tests/ci/fixtures/board/transcript-pass.txt"
+assert_eq "$PASS_COUNT"  "2" "TESTS_PASS=2"
+assert_eq "$FAIL_COUNT"  "1" "TESTS_FAIL=1"
+assert_eq "$KUNIT_PASS"  "1" "KUNIT_PASS=1"
+assert_eq "$KUNIT_FAIL"  "2" "KUNIT_FAIL=2 (1 subtest + 1 suite summary)"
+assert_eq "$TESTS_TOTAL" "3" "TESTS_TOTAL=3"
+assert_eq "$BOOT_OK"     "1" "BOOT_OK=1"
+assert_eq "$TEST_DONE"   "1" "TEST_DONE=1"
+
+# ── log_run_result ────────────────────────────────────────────────────────────
+
 begin_test "log-result: returns 0 on full PASS"
 parse_serial_output "$FX/transcript-pass.txt"
 determine_boot_status "$FX/transcript-pass.txt" 0 0
