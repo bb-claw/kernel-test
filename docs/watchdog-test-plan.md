@@ -87,16 +87,18 @@ The ROADMAP stated "CONFIG_SOFTDOG=y is present in defconfig by default." Inspec
 `configs/defconfig.config` and appending to `configs/kunitconfig.config` is the correct
 fix. `build.sh` already applies `configs/${CONFIG}.config` when it exists (line 218).
 
-### sysfs enumeration and major:minor correlation
+### sysfs enumeration and name-based correlation
 
 All entries under `/sys/class/watchdog/watchdog*` are enumerated (not just `watchdog0`).
 On VisionFive 2, both softdog and the StarFive hardware watchdog may register, and the
-device that `/dev/watchdog` maps to is whichever registered first — not necessarily
-`watchdog0`. To identify the correct nowayout value for the write test, the script reads
-each sysfs entry's `dev` file (`major:minor` format) and matches against the major:minor
-of `$WD` extracted from `ls -l` output. Fallback: when no sysfs match is found (e.g.,
-CONFIG_WATCHDOG_SYSFS=n, no `dev` file present), nowayout stays at 0 (safe default) and
-the script logs "no major:minor match — nowayout=0 default" to make the fallback visible.
+device that `/dev/watchdog` maps to is whichever registered first. To read the correct
+nowayout before writing, the script derives the sysfs target name from the device path:
+`/dev/watchdog` (misc backward-compat device) always opens the first registered watchdog,
+so it maps to `watchdog0`; `/dev/watchdogN` maps to `watchdogN` directly.
+
+Major:minor matching was considered but rejected: `/dev/watchdog` uses major 10
+(MISC_MAJOR), while `/sys/class/watchdog/watchdogN/dev` reflects the watchdog core's
+dynamically allocated major from `alloc_chrdev_region()` — they never match in practice.
 
 ### /proc/config.gz consistency check
 

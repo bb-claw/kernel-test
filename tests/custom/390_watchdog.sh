@@ -37,11 +37,13 @@ if [ -n "$wd_override" ]; then
     if [ -e "$wd_override" ]; then
         WD="$wd_override"
     fi
-elif [ -e /dev/watchdog ]; then
-    WD=/dev/watchdog
 else
-    if [ -e /dev/watchdog0 ]; then
-        WD=/dev/watchdog0
+    if [ -e /dev/watchdog ]; then
+        WD=/dev/watchdog
+    else
+        if [ -e /dev/watchdog0 ]; then
+            WD=/dev/watchdog0
+        fi
     fi
 fi
 
@@ -56,27 +58,26 @@ else
         fail "device: $WD exists but is not a character device"
     fi
 
-    # ── Determine major:minor of $WD for sysfs correlation ───────────────────
-    # ls -l output for char device: "crw... MAJOR, MINOR DATE TIME NAME"
-    # sed removes comma and collapses spaces so field 5=major, field 6=minor.
-    wd_ls=$(ls -l "$WD" | sed 's/,/ /g;s/  */ /g')
-    wd_major=$(printf '%s\n' "$wd_ls" | cut -d' ' -f5)
-    wd_minor=$(printf '%s\n' "$wd_ls" | cut -d' ' -f6)
-    if [ -z "$wd_major" ] || [ -z "$wd_minor" ]; then
-        WD_DEVNO=""
-        ok "sysfs: ls -l parse failed for $WD — major:minor unknown, nowayout=0 default"
+    # ── Identify sysfs entry for $WD ─────────────────────────────────────────
+    # /dev/watchdog (misc backward-compat) always opens the first registered
+    # watchdog → watchdog0 in sysfs. /dev/watchdogN maps directly to watchdogN.
+    # The kernel watchdog core uses alloc_chrdev_region() so its sysfs dev files
+    # carry a dynamic major, not 10 (MISC_MAJOR) — name matching is the only
+    # reliable correlation.
+    wd_basename=$(basename "$WD")
+    if [ "$wd_basename" = "watchdog" ]; then
+        wd_sysfs_target="watchdog0"
     else
-        WD_DEVNO="${wd_major}:${wd_minor}"
+        wd_sysfs_target="$wd_basename"
     fi
 
     # ── sysfs enumeration (CONFIG_WATCHDOG_SYSFS=y) ───────────────────────────
     # Enumerate all registered watchdog devices. In QEMU: typically only watchdog0
     # (softdog). On VisionFive 2: may include watchdog0=softdog + watchdog1=starfive
-    # (or whichever probes first). Correlate $WD by major:minor to find correct nowayout.
+    # (or whichever probes first). Use name to select nowayout for the target device.
     WD_SYS_DIR=/sys/class/watchdog
     nowayout=0
     found_wd=0
-    wd_matched=0
     if [ -d "$WD_SYS_DIR" ]; then
         for WD_SYS in "$WD_SYS_DIR"/watchdog*; do
             [ -d "$WD_SYS" ] || continue
@@ -98,21 +99,14 @@ else
             if [ -r "$WD_SYS/nowayout" ]; then
                 noa=$(cat "$WD_SYS/nowayout")
                 ok "sysfs: $wdname nowayout=$noa"
-                if [ -r "$WD_SYS/dev" ] && [ -n "$WD_DEVNO" ]; then
-                    sysfs_dev=$(cat "$WD_SYS/dev")
-                    if [ "$sysfs_dev" = "$WD_DEVNO" ]; then
-                        nowayout="$noa"
-                        wd_matched=1
-                        ok "sysfs: $wdname matches $WD (dev=$sysfs_dev)"
-                    fi
+                if [ "$wdname" = "$wd_sysfs_target" ]; then
+                    nowayout="$noa"
+                    ok "sysfs: $wdname is target device for $WD"
                 fi
             fi
         done
         if [ "$found_wd" -gt 0 ]; then
             ok "sysfs: $found_wd watchdog device(s) enumerated"
-            if [ "$wd_matched" -eq 0 ] && [ -n "$WD_DEVNO" ]; then
-                ok "sysfs: no major:minor match for $WD_DEVNO — nowayout=0 default"
-            fi
         else
             skip "sysfs: no entries in $WD_SYS_DIR (CONFIG_WATCHDOG_SYSFS not set)"
         fi
