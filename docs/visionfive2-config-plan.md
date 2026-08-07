@@ -47,12 +47,33 @@ expected and must not produce test failures.
 
 Files changed:
 - `configs/vf2config.config` — new config profile fragment
-- `configs/vf2config-riscv.config` — new riscv arch overlay (pattern consistency)
+- `configs/vf2config-riscv.config` — new riscv arch overlay (pattern consistency; no-op since defconfig already has 8250+FPU)
 - `lib/build.sh` — add vf2config dispatch case + riscv arch guard
-- `tests/ci/test-vf2config.sh` — new Tier 2 CI test
+- `tests/ci/test-vf2config.sh` — new Tier 2 CI test (28 assertions)
 - `Makefile` — add `make vf2` convenience target + help text
 - `memory/config-profiles.md` — add vf2config row
 - `memory/project.md` — update config count
+
+JH7110 drivers promoted (=m → =y) in `configs/vf2config.config`:
+
+| Driver | Config | Use |
+|---|---|---|
+| Ethernet MAC | `STMMAC_ETH`, `STMMAC_PLATFORM` | dep of DWMAC_STARFIVE |
+| StarFive Ethernet | `DWMAC_STARFIVE` | tftp boot (Phase 6) |
+| Cadence USB3 | `USB_CDNS3`, `USB_CDNS3_STARFIVE` | USB host/gadget |
+| PCIe host | `PCIE_STARFIVE_HOST` | M.2 slot |
+| Always-on clocks | `CLK_STARFIVE_JH7110_AON` | Ethernet + USB clock domain |
+| Storage clocks | `CLK_STARFIVE_JH7110_STG` | USB + peripheral clock domain |
+| HDMI clocks | `CLK_STARFIVE_JH7110_VOUT` | display output clock domain |
+| ISP clocks | `CLK_STARFIVE_JH7110_ISP` | camera clock domain |
+| USB 2.0 PHY | `PHY_STARFIVE_JH7110_USB` | USB 2.0 physical layer |
+| PCIe/USB3 PHY | `PHY_STARFIVE_JH7110_PCIE` | shared PCIe 2.0 + USB 3.0 PHY |
+| Hardware TRNG | `HW_RANDOM_JH7110` | hardware entropy source |
+| PL08x DMA | `AMBA_PL08X` | DMA controller; dep of crypto |
+| Hardware crypto | `CRYPTO_DEV_JH7110` | AES/SHA/SM3 accelerator |
+
+Not promoted (already =y in riscv defconfig): `SOC_STARFIVE`, `MMC_DW_STARFIVE`, `PINCTRL_STARFIVE_JH7110*`, `STARFIVE_WATCHDOG`, `RESET_STARFIVE_JH7110`, `CLK_STARFIVE_JH7110_SYS/PLL`, `SERIAL_8250_DW`, `FPU`.
+No JH7110 RTC driver upstream (PMIC-managed); ROADMAP Phase 4 scope item was inaccurate.
 
 No changes to: test scripts, initramfs.sh, bootstrap.sh — vf2config uses the same
 test suite as all other profiles.

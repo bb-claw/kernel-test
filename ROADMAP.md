@@ -110,9 +110,10 @@ make ci-test
 **What:** New config profile `vf2config` for the StarFive JH7110 SoC:
 
 - Base: `riscv defconfig` (already includes most upstream JH7110 drivers)
-- Fragment `configs/vf2config.config`: pin JH7110 SoC, UART (8250 + STARFIVE serial),
-  GPIO, SD/MMC, Ethernet (dwmac-starfive), USB, RTC, StarFive watchdog; disable heavy
-  subsystems that bloat boot time; `CONFIG_LOCALVERSION="-vf2"` for uname identification
+- Fragment `configs/vf2config.config`: pin JH7110 SoC identity (LOCALVERSION=-vf2);
+  promote JH7110 drivers from =m to =y (Ethernet/DWMAC, USB/Cadence, PCIe, CLK AON/STG/VOUT/ISP,
+  PHY USB/PCIe, hardware RNG, DMA/PL08x, hardware crypto/AES); watchdog sysfs;
+  disable DRM/SOUND/MEDIA/STAGING; no JH7110 RTC driver exists upstream (PMIC-managed)
 - Arch overlay `configs/vf2config-riscv.config`: serial console options for VF2 UART
 
 **Why separate from board.sh:** the config profile is independent of the boot mechanism.
