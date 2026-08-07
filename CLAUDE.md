@@ -77,6 +77,7 @@ VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 - **No `awk`** — not in Toybox; use `grep | cut`
 - **No `[[ ]]`** — use `[ ]` (POSIX)
 - **No `elif`** — Toybox 0.8.9 bug: both branches execute; use nested `if/else/fi`
+- **No `$_varname`** — Toybox parses `$_x` as `$_` (last-arg special var) + literal `x`; always use plain names without leading underscores
 - **`$(( ))`** — avoid in while loops (OOM in 512 MB VM); use `for i in 1 2 3 ...`
 - **`/bin/sh`** — always full path when forking a shell; bare `sh` hits Toybox NOFORK and loses stdout
 - See `memory/code-quality.md` for the full pitfall list and pattern template

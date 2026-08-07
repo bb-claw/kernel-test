@@ -4,7 +4,7 @@
 
 | Profile | Boot tested | Base | Fragment | Notes |
 |---|---|---|---|---|
-| `defconfig` | yes | arch default | none | Broad baseline; most subsystems enabled |
+| `defconfig` | yes | arch default | `configs/defconfig.config` | Broad baseline; most subsystems enabled; fragment adds subsystem options not in arch defconfigs (e.g. watchdog) |
 | `tinyconfig` | yes | minimal | `configs/tinyconfig.config` | Near-empty; fragment pins bootability options |
 | `allnoconfig` | yes | all-no | `configs/allnoconfig.config` | Absolute minimum boot path |
 | `kunitconfig` | yes | defconfig | `configs/kunitconfig.config` | KUnit framework + core test suites; KTAP results shown as kunit:N/N |
@@ -47,6 +47,7 @@ cat "configs/$CONFIG.config" >> "$OUT_DIR/.config"
 make olddefconfig   # resolves all dependency conflicts
 ```
 `KCONFIG_ALLCONFIG` is NOT used — `tinyconfig` overrides it internally.
+`configs/defconfig.config` (added for 390_watchdog) enables options absent from all arch defconfigs (e.g. `CONFIG_SOFT_WATCHDOG=y`); NS-variant defconfig-based configs (`defnsconfig` etc.) inherit it via `EFFECTIVE_CONFIG` in `build.sh`.
 
 ---
 
