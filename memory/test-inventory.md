@@ -56,7 +56,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | `350_ns-time` | Time ns timens_offsets; ns-time offset (+100s CLOCK_MONOTONIC) + setns-mt (CVE-2023-23586) |
 | `360_ns-setns` | setns(2) code path via ns-uts setns: self-setns + cross-setns into foreign UTS ns |
 | `370_riscv-isa` | RISC-V ISA string from /proc/cpuinfo: base extensions I M A F D C present; 64-bit confirmed; skip on non-riscv |
-| `380_arm64-features` | ARM64 mandatory features from /proc/cpuinfo Features line: FP, NEON (asimd), LSE (atomics); optional SVE/PAC/MTE reported; skip on non-arm64 |
+| `380_arm64-features` | ARM64 mandatory features from /proc/cpuinfo Features line: FP + NEON (asimd); atomics (LSE) and SVE/PAC/MTE optional (QEMU `-cpu cortex-a57` is ARMv8.0-A — LSE absent is expected, not a regression); skip on non-arm64 |
 | `400_perf-events` | perf_event_open(PERF_TYPE_SOFTWARE/TASK_CLOCK) via C helper; non-zero counter verified; skip if binary absent or CONFIG_PERF_EVENTS=n |
 | `410_arena-memory` | Arena allocator: alloc/reset/destroy correctness; pointer alignment (8-byte on 64-bit, 4-byte on i386); page-size block overflow; 32 MiB write stress; skip if binary absent |
 
