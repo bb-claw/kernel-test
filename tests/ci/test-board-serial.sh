@@ -16,9 +16,10 @@ if [[ -x "$BOARD_SH" ]]; then pass "lib/board.sh executable"
 else fail "lib/board.sh not executable"; fi
 
 begin_test "board-fixtures-present"
-assert_file_exists "$FIXTURES/transcript-pass.txt"      "transcript-pass.txt present"
-assert_file_exists "$FIXTURES/transcript-panic.txt"     "transcript-panic.txt present"
-assert_file_exists "$FIXTURES/transcript-boot-hang.txt" "transcript-boot-hang.txt present"
+assert_file_exists "$FIXTURES/transcript-pass.txt"       "transcript-pass.txt present"
+assert_file_exists "$FIXTURES/transcript-panic.txt"      "transcript-panic.txt present"
+assert_file_exists "$FIXTURES/transcript-boot-hang.txt"  "transcript-boot-hang.txt present"
+assert_file_exists "$FIXTURES/transcript-uboot-hang.txt" "transcript-uboot-hang.txt present"
 
 begin_test "board-socat-available"
 if command -v socat &>/dev/null; then pass "socat available"
@@ -67,9 +68,16 @@ run_board_replay() {
         bash "$BOARD_SH" vf2config riscv &
     board_pid=$!
 
-    # Give the capture backend time to open the pty before sending data.
-    # Both paths need this: C backend (serial-capture spawn) and Bash (exec 3<>).
-    sleep 0.5
+    # Wait for the capture backend to open the pty and create the log file
+    # (serial-capture opens the device before the log file, so log existence
+    # means the pty is open; Bash fallback uses exec 3<> which is synchronous).
+    local dmesg_path="$build_dir/vf2config-riscv/dmesg.txt"
+    wait_count=0
+    while [[ ! -e "$dmesg_path" ]]; do
+        sleep 0.1
+        (( wait_count++ )) || true
+        [[ $wait_count -lt 20 ]] || break  # 2s ceiling
+    done
 
     # Open TX and write transcript; keep TX fd open until board.sh finishes.
     # This prevents socat from exiting on EOF before the capture backend drains the buffer.
@@ -162,6 +170,23 @@ assert_not_contains "$_status_hang" "BOOT=PASS"   "not BOOT=PASS"
 begin_test "board-serial-hang-fail-reason"
 assert_contains "$_status_hang" "FAIL_REASON="       "FAIL_REASON set on hang"
 assert_contains "$_status_hang" "TEST_DONE not reached" "TEST_DONE not reached in reason"
+
+# ── Test group: U-Boot hang (never reaches kernel, no BOOT_OK) ───────────────
+
+tmpdir; _bd_uboot="$_LAST_TMPDIR"
+run_board_replay "$FIXTURES/transcript-uboot-hang.txt" "$_bd_uboot" 5
+_status_uboot=$(cat "$RBR_STATUS" 2>/dev/null || true)
+
+begin_test "board-serial-uboot-hang-status-file"
+assert_file_exists "$RBR_STATUS" "vm.status written on U-Boot hang"
+
+begin_test "board-serial-uboot-hang-boot"
+assert_contains     "$_status_uboot" "BOOT=FAIL"  "BOOT=FAIL when BOOT_OK never seen"
+assert_not_contains "$_status_uboot" "BOOT=PASS"  "not BOOT=PASS"
+
+begin_test "board-serial-uboot-hang-fail-reason"
+assert_contains "$_status_uboot" "FAIL_REASON="      "FAIL_REASON set on U-Boot hang"
+assert_contains "$_status_uboot" "Timeout"           "Timeout in FAIL_REASON"
 
 # ── Test: missing BOARD_TTY exits non-zero with clear error ──────────────────
 

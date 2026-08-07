@@ -131,39 +131,27 @@ make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv   # builds + boots in QEMU ris
 
 ---
 
-### Phase 5 — `feat/board-serial` *(in progress — branch: feat/board-serial)*
+### Phase 5 — `feat/board-serial` *(complete — merged)*
 
-**What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`:
+**What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`. Implemented:
 
-- Open `$BOARD_TTY` (default `/dev/ttyUSB0`) for read+write (`exec 3<>/dev/ttyUSB0`),
-  set 115200 8N1, no hardware flow control
-- Line-by-line read loop with `read -t $TIMEOUT` for input-side timeout detection
-- Call shared parser helpers from `lib/common.sh` (Phase 1) — identical to QEMU path
-- On timeout: write `BOOT=HANG` to `vm.status`, print "manual reset required", exit 1
-- `board_reset` stub: logs the event cleanly, does nothing yet (upgraded in Phase 6)
-- Write fd open from the start: later U-Boot command sending requires no reopen
+- `tests/programs/serial-capture/serial-capture.c` — C host tool: `O_NOCTTY`, `cfmakeraw`,
+  `VMIN=0 VTIME=1` (so SIGTERM reliably interrupts read), `fdatasync` every 8 writes
+- `lib/board.sh`: prefer serial-capture C binary (poll dmesg for TEST_DONE); fall back
+  to Bash `stty`+`read` loop; auto-invoke `lib/report.sh` when env vars present
+- `make board`: copy kernel+initramfs to `TFTP_DIR`, then run board.sh; `BOARD_CONFIG`
+  and `BOARD_ARCH` parameterize the target (default: `vf2config` / `riscv`)
+- `lib/common.sh`: KTAP timestamp prefix made optional (`CONFIG_PRINTK_TIME=n` support)
+- `board_reset` stub: logs warning + asks for manual power-cycle (upgraded in Phase 6)
 
-**CI test fixture** `tests/ci/fixtures/board/transcript-pass.txt` must cover all parser
-paths the real board produces: a U-Boot banner, `BOOT_OK`, at least one `TEST PASS`,
-one `TEST FAIL`, a KTAP block (`KTAP version 1` / `ok 1` / `not ok 2`), and `TEST_DONE`.
-The CI test replays this through a socat pty pair and asserts the resulting `vm.status`
-matches expected `BOOT=PASS`, `TESTS_PASS`, `TESTS_FAIL`, `KUNIT_PASS`, `KUNIT_FAIL`.
-
-**How to test without hardware:**
-```sh
-socat PTY,link=/tmp/vf2-tx,rawer PTY,link=/tmp/vf2-rx,rawer &
-cat tests/ci/fixtures/board/transcript-pass.txt > /tmp/vf2-tx &
-BOARD_TTY=/tmp/vf2-rx bash lib/board.sh
-# verify vm.status content
-```
-
-CI test `tests/ci/test-board-serial.sh` runs this automatically.
+CI test `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty pairs
+(pass, kernel panic, mid-test hang, U-Boot hang) — 43 assertions, no hardware required.
 
 **Dependency:** Phase 1 (shared parser in common.sh).
 
 ---
 
-### Phase 6 — `feat/visionfive2-board`
+### Phase 6 — `feat/visionfive2-board` *(next milestone)*
 
 **What:** Full board integration with tftp-based kernel delivery:
 
