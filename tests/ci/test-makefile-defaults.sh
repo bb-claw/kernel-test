@@ -30,6 +30,8 @@ for cfg in tinyconfig allnoconfig defconfig kunitconfig kunitrandconfig \
            allmodconfig randconfig rand500config randdefconfig; do
     assert_contains "$configs" "$cfg" "CONFIGS default includes $cfg"
 done
+assert_not_contains "$configs" "vf2config"   "vf2config not in default CONFIGS (riscv-only)"
+assert_not_contains "$configs" "localconfig" "localconfig not in default CONFIGS (x86_64-only)"
 
 begin_test "DATA_REPO default is HOME/git/kernel-test-data"
 line=$(grep '^DATA_REPO' "$REPO/Makefile" | head -1)
