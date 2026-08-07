@@ -14,6 +14,10 @@ BUILD_SH="$REPO/lib/build.sh"
 
 begin_test "vf2config-design-doc"
 assert_file_exists "$REPO/docs/visionfive2-config-plan.md" "docs/visionfive2-config-plan.md present"
+doc=$(cat "$REPO/docs/visionfive2-config-plan.md")
+assert_contains "$doc" "vf2config"      "design doc mentions vf2config"
+assert_contains "$doc" "JH7110"         "design doc mentions JH7110 SoC"
+assert_contains "$doc" "DWMAC_STARFIVE" "design doc mentions Ethernet driver"
 
 # ── Config fragment: exists ───────────────────────────────────────────────────
 
@@ -45,6 +49,8 @@ assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_PCIE=y"  "PHY PCIE=y"
 assert_contains "$frag" "CONFIG_HW_RANDOM_JH7110=y"          "HW_RANDOM_JH7110=y (hardware TRNG)"
 assert_contains "$frag" "CONFIG_AMBA_PL08X=y"                "AMBA_PL08X=y (PL08x DMA, dep for crypto)"
 assert_contains "$frag" "CONFIG_CRYPTO_DEV_JH7110=y"         "CRYPTO_DEV_JH7110=y (hardware AES/SHA)"
+assert_contains "$frag" "CONFIG_STARFIVE_STARLINK_PMU=y"     "STARLINK_PMU=y (L3 cache PMU, perf relevance)"
+assert_contains "$frag" "CONFIG_STARFIVE_STARLINK_CACHE=y"   "STARLINK_CACHE=y (cache controller, DMA coherency)"
 
 begin_test "vf2config-heavy-subsystems-off"
 frag=$(cat "$FRAG")
@@ -79,5 +85,11 @@ begin_test "vf2config-makefile-target"
 mk=$(cat "$REPO/Makefile")
 assert_contains "$mk" "vf2config ARCHS=riscv" "Makefile vf2 target uses CONFIGS=vf2config ARCHS=riscv"
 assert_contains "$mk" "vf2config" "Makefile help mentions vf2config"
+
+# ── 400_perf-events.sh: StarLink PMU opportunistic check ─────────────────────
+
+begin_test "vf2config-perf-starlink-pmu-check"
+perf=$(cat "$REPO/tests/custom/400_perf-events.sh")
+assert_contains "$perf" "starfive-starlink-pmu" "400_perf-events.sh has StarLink PMU sysfs check"
 
 finish

@@ -71,6 +71,8 @@ JH7110 drivers promoted (=m → =y) in `configs/vf2config.config`:
 | Hardware TRNG | `HW_RANDOM_JH7110` | hardware entropy source |
 | PL08x DMA | `AMBA_PL08X` | DMA controller; dep of crypto |
 | Hardware crypto | `CRYPTO_DEV_JH7110` | AES/SHA/SM3 accelerator |
+| L3 cache PMU | `STARFIVE_STARLINK_PMU` | L3 cache perf events; relevant to 400_perf-events.sh on real VF2 |
+| Cache controller | `STARFIVE_STARLINK_CACHE` | L2/L3 cache management; DMA cache coherency |
 
 Not promoted (already =y in riscv defconfig): `SOC_STARFIVE`, `MMC_DW_STARFIVE`, `PINCTRL_STARFIVE_JH7110*`, `STARFIVE_WATCHDOG`, `RESET_STARFIVE_JH7110`, `CLK_STARFIVE_JH7110_SYS/PLL`, `SERIAL_8250_DW`, `FPU`.
 No JH7110 RTC driver upstream (PMIC-managed); ROADMAP Phase 4 scope item was inaccurate.

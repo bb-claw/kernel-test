@@ -35,8 +35,8 @@ Note: `localconfig` and `vf2config` are not in the default `CONFIGS` list; `loca
 ```sh
 make build   NO_FETCH=1 CONFIGS=localconfig ARCHS=x86_64 BUILD_TIMEOUT=0
 make install            CONFIGS=localconfig ARCHS=x86_64
+make vf2                # VisionFive 2: CONFIGS=vf2config ARCHS=riscv
 ```
-
 ---
 
 ## Fragment Mechanism

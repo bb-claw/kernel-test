@@ -24,6 +24,13 @@ if [ -r /proc/config.gz ]; then
     fi
 fi
 
+# StarLink PMU: JH7110 L3 cache PMU (real VF2 only; absent in QEMU — skip is correct).
+if [ -d /sys/bus/event_source/devices/starfive-starlink-pmu ]; then
+    ok "starfive-starlink-pmu event source present"
+else
+    skip "starfive-starlink-pmu absent (QEMU or non-VF2 board)"
+fi
+
 # Run helper; redirect to file to avoid if-out=$(...) Toybox pitfall.
 "$PERF_BIN" > /tmp/perf-count.txt 2>/tmp/perf-err.txt
 rc=$?
