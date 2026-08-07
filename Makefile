@@ -513,7 +513,7 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); includes clang+lld+llvm for LLVM=1 (make verify-patch COMPILER=clang|both); activates git hooks
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); builds C test binaries (tests/ns/ ns-uts…ns-time, tests/programs/ perf-event arena-test); downloads Toybox; activates git hooks
   hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
@@ -529,7 +529,7 @@ Targets:
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
-  initramfs        Assemble Toybox cpio initramfs for each arch
+  initramfs        Assemble Toybox cpio initramfs for each arch; injects tests/custom/*.sh, tests/ns/bin/<arch>/ns-*, tests/programs/*/bin/<arch>/*
   test             Boot each (config, arch) in QEMU/KVM and run tests
   report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
   diff             Compare two report dirs for regressions/fixes; auto-detects latest two if OLD=/NEW= omitted
