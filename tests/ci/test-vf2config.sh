@@ -10,6 +10,11 @@ FRAG="$REPO/configs/vf2config.config"
 OVERLAY="$REPO/configs/vf2config-riscv.config"
 BUILD_SH="$REPO/lib/build.sh"
 
+# ── Design doc: exists ───────────────────────────────────────────────────────
+
+begin_test "vf2config-design-doc"
+assert_file_exists "$REPO/docs/visionfive2-config-plan.md" "docs/visionfive2-config-plan.md present"
+
 # ── Config fragment: exists ───────────────────────────────────────────────────
 
 begin_test "vf2config-fragment-exists"
@@ -36,7 +41,8 @@ assert_contains "$frag" "CONFIG_CLK_STARFIVE_JH7110_AON=y" "CLK AON=y"
 assert_contains "$frag" "CONFIG_CLK_STARFIVE_JH7110_STG=y" "CLK STG=y"
 assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_USB=y"  "PHY USB=y"
 assert_contains "$frag" "CONFIG_PCIE_STARFIVE_HOST=y"       "PCIE_STARFIVE_HOST=y (M.2 slot)"
-assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_PCIE=y" "PHY PCIE=y"
+assert_contains "$frag" "CONFIG_PHY_STARFIVE_JH7110_PCIE=y"  "PHY PCIE=y"
+assert_contains "$frag" "CONFIG_HW_RANDOM_JH7110=y"          "HW_RANDOM_JH7110=y (hardware TRNG)"
 
 begin_test "vf2config-heavy-subsystems-off"
 frag=$(cat "$FRAG")

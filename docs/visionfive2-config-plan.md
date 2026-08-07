@@ -95,6 +95,20 @@ riscv defconfig sets `DWMAC_STARFIVE=m`, `USB_CDNS3_STARFIVE=m`, `CLK_STARFIVE_J
 On the real VF2 board in Phase 6, Ethernet and USB must be built-in for tftp boot —
 promoting now makes the fragment forward-compatible without a Phase 6 change.
 
+### Dual watchdog on real VF2: softdog + starfive watchdog
+
+On the real VF2 board with this config, two watchdog devices register:
+`watchdog0` (softdog, from CONFIG_SOFT_WATCHDOG=y) and `watchdog1` (starfive hardware
+watchdog, from CONFIG_STARFIVE_WATCHDOG=y already in riscv defconfig). The `/dev/watchdog`
+misc device opens the first registered (`watchdog0`), and `/dev/watchdog0`/`watchdog1`
+map directly.
+
+`390_watchdog.sh` handles this via sysfs enumeration: it iterates all
+`/sys/class/watchdog/watchdog*` entries, reading identity/timeout/state for each, and
+uses name-based correlation (`/dev/watchdog` → `watchdog0`) to select the correct
+`nowayout` value before the magic-close write. Having two entries is explicitly exercised
+by this design and is correct behavior.
+
 ### CONFIG_SOFT_WATCHDOG=y for QEMU coverage
 
 `CONFIG_STARFIVE_WATCHDOG=y` is already in riscv defconfig, but it does not probe in QEMU
@@ -147,9 +161,9 @@ make ci-test
 make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv
 # Expected: PASS 43/43, uname shows -vf2 suffix in dmesg
 
-# 3. Arch guard smoke test (should fail cleanly)
-make build NO_FETCH=1 CONFIGS=vf2config ARCHS=x86_64
-# Expected: STATUS=FAIL, "vf2config is riscv-only" in build.log
+# 3. Arch guard smoke test (should fail cleanly with a clear error message)
+make build NO_FETCH=1 CONFIGS=vf2config ARCHS=x86_64 2>&1 | grep ERROR
+# Expected: ERROR vf2config is riscv-only (StarFive JH7110 SoC) — use ARCHS=riscv
 
 # 4. Convenience target
 make vf2 NO_FETCH=1

@@ -23,7 +23,7 @@ next phase begins. Dependencies are noted; parallel work is called out explicitl
 
 ---
 
-### Phase 1 — `refactor/common-serial-parser`
+### Phase 1 — `refactor/common-serial-parser` ✓ DONE (branch merged to main)
 
 **What:** Extract the serial output parser and `vm.status` writer from `lib/vm.sh` into
 shared helpers in `lib/common.sh`. `lib/vm.sh` becomes a thin QEMU wrapper that calls
@@ -46,7 +46,7 @@ make ci-test                                                   # all Tier 2 test
 
 ---
 
-### Phase 2 — `feat/arch-tests` *(parallel with Phase 3)*
+### Phase 2 — `feat/arch-tests` *(parallel with Phase 3)* ✓ DONE (branch merged to main)
 
 **What:** Three new VM test scripts covering architecture-specific kernel behaviour:
 
@@ -83,7 +83,7 @@ make ci-test   # CI test verifies skip guards, executable bit, inventory entry
 
 ---
 
-### Phase 3 — `feat/watchdog-test` *(parallel with Phase 2)*
+### Phase 3 — `feat/watchdog-test` *(parallel with Phase 2)* ✓ DONE (branch merged to main)
 
 **What:** `390_watchdog.sh` — verify `/dev/watchdog` node exists and is a character
 device; verify `CONFIG_WATCHDOG=y` via `/proc/config.gz` if available; skip gracefully
@@ -105,7 +105,7 @@ make ci-test
 
 ---
 
-### Phase 4 — `feat/visionfive2-config`
+### Phase 4 — `feat/visionfive2-config` ✓ DONE (branch merged to main)
 
 **What:** New config profile `vf2config` for the StarFive JH7110 SoC:
 
