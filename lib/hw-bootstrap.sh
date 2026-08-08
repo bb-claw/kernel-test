@@ -123,6 +123,9 @@ dhcp-option=option:router
 enable-tftp
 tftp-root=${TFTP_DIR}
 dhcp-boot=Image,,${HW_HOST_IP}
+# Drop to the owner of TFTP_DIR rather than the default dnsmasq/nobody user.
+# Required when TFTP_DIR is inside a home directory (mode 700 blocks traversal).
+user=$(id -un)
 EOF
 }
 
