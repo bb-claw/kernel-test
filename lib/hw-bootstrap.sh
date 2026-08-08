@@ -120,6 +120,7 @@ interface=${HW_IFACE}
 bind-interfaces
 dhcp-range=${HW_DHCP_RANGE},1h
 dhcp-option=option:router
+dhcp-leasefile=${TFTP_DIR}/dnsmasq.leases
 enable-tftp
 tftp-root=${TFTP_DIR}
 dhcp-boot=Image,,${HW_HOST_IP}
@@ -256,6 +257,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
     run_cmd $SUDO networkctl reload
     run_cmd $SUDO networkctl reconfigure "$HW_IFACE"
     run_cmd $SUDO systemctl daemon-reload
+    run_cmd $SUDO systemctl reset-failed dnsmasq 2>/dev/null || true
     run_cmd $SUDO systemctl restart dnsmasq
 fi
 
