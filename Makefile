@@ -70,6 +70,8 @@ HW_IFACE       ?= eno1
 HW_HOST_IP     ?= 192.168.100.1
 HW_DHCP_RANGE  ?= 192.168.100.100,192.168.100.200
 HW_RELAY       ?= /dev/vf2-relay
+# CH340 defaults; override in local.mk for other chips (e.g. CP210x: 10c4/ea60).
+# Find your relay's IDs: udevadm info /dev/ttyUSB0 | grep ID_VENDOR_ID\|ID_MODEL_ID
 HW_RELAY_VID   ?= 1a86
 HW_RELAY_PID   ?= 7523
 
@@ -151,8 +153,11 @@ bootstrap:
 	$(Q)lib/bootstrap.sh "$(ARCHS)" "$(DATA_REPO)"
 
 # hw-bootstrap: set up host infrastructure for hardware board testing.
-# Installs dnsmasq (DHCP+TFTP on HW_IFACE), systemd-networkd static-IP config,
-# USB relay udev rule, and creates TFTP_DIR.  Needs sudo; idempotent.
+# Installs dnsmasq (DHCP+TFTP on HW_IFACE), systemd-networkd static-IP config
+# (ConfigureWithoutCarrier=yes; /24 hardcoded), NetworkManager unmanaged rule
+# (written only when NM is active — prevents NM from stripping the static IP on
+# carrier events), USB relay udev rule (group=dialout on Debian/Fedora, uucp on
+# Arch), and creates TFTP_DIR.  Needs sudo; idempotent.
 # Separate from 'make bootstrap' — QEMU-only machines (Hetzner) never run this.
 # DRY_RUN=1: print what would be done without writing files or installing packages.
 hw-bootstrap:
@@ -259,7 +264,7 @@ vf2:
 # hw-full:   build → test → hw-deploy → hw-test → report  (QEMU + hardware combined pipeline).
 #
 # Requires: BOARD_TTY set to a real USB-UART device (default /dev/ttyUSB0).
-# Phase 6 adds USB relay reset between hw-deploy and hw-test.
+# USB relay reset handled by board_reset() in lib/board.sh (Phase 6a).
 hw-deploy:
 	@bd="$(BUILD_DIR)/$(BOARD_CONFIG)-$(BOARD_ARCH)"; \
 	mkdir -p $(TFTP_DIR) 2>/dev/null || true; \
@@ -275,7 +280,7 @@ hw-deploy:
 	else \
 	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n'; \
 	fi; \
-	printf '[hw-deploy] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
+	printf '[hw-deploy] relay reset via board_reset() in lib/board.sh (HW_RELAY=%s)\n' '$(HW_RELAY)'
 
 hw-test:
 	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \

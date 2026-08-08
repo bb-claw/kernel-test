@@ -38,7 +38,7 @@
 | `HW_HOST_IP` | `192.168.100.1` | Static IP on `HW_IFACE`; TFTP next-server in DHCP reply |
 | `HW_DHCP_RANGE` | `192.168.100.100,192.168.100.200` | DHCP pool for the board |
 | `HW_RELAY` | `/dev/vf2-relay` | Stable udev symlink to USB relay for `board_reset` |
-| `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` |
+| `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`); find with `udevadm info /dev/ttyUSB0 \| grep ID_VENDOR_ID\|ID_MODEL_ID` |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.

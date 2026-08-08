@@ -52,6 +52,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 - **Current kernel (mainline clone):** v7.2-rc6; `make smoke` PASS 43/43 all 8 combos (kunitconfig+tinyconfig × 4 archs, kunit 259/259 x86/arm64/i386 + 28/28 riscv); `make ns-smoke` PASS 43/43 all 8 combos (kunitnsconfig+tinynsconfig × 4 archs)
 - **stable-rc clone (local):** v7.1.8-rc1; `make extended` 19/20 PASS (randdefconfig/arm64 timed out — stochastic: random disable of CONFIG_ARM64_4K_PAGES flips to 16K pages, silent QEMU hang; fixed in PR #46 by pinning 4K pages in configs/randdefconfig-arm64.config); all real config profiles PASS on all 4 archs; Tested-by sent to LKML for v7.1.8-rc1
 - **randdefconfig arm64 page-size fix (PR #46, merged 2026-08-08):** `configs/randdefconfig-arm64.config` now pins `CONFIG_ARM64_4K_PAGES=y`; 16K/64K page kernels silently fail to boot on QEMU virt/cortex-a57
+- **Phase 6a (branch feat/hw-bootstrap, pending PR):** `lib/hw-bootstrap.sh` installs dnsmasq+networkd+udev for hardware board testing; `lib/board.sh` `board_reset()` pulses USB relay; verified on real hardware (Lenovo/Arch, VisionFive 2). Key quirks: Arch uses `uucp` serial group (not `dialout`); NetworkManager must be marked unmanaged for `HW_IFACE` or it strips the static IP on carrier events; `ConfigureWithoutCarrier=yes` must be in `[Network]` section (not `[Link]`); relay may be CP210x (`10c4:ea60`) not CH340 (`1a86:7523`) — set in `local.mk`
 
 ## Directory Structure
 
