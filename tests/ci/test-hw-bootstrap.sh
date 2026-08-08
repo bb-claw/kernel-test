@@ -25,7 +25,9 @@ out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
 assert_contains "$out" "kernel-test-atftpd.service"  "atftpd: service unit written"
 assert_contains "$out" "atftpd"                       "atftpd: binary in ExecStart"
 assert_contains "$out" "Type=simple"                  "atftpd: Type=simple"
-assert_not_contains "$out" "User="                    "atftpd: runs as root (no User= drop)"
+assert_not_contains "$out" "User="                    "atftpd: no systemd User= directive (drops via --user flag)"
+assert_contains "$out" "--bind-address 10.0.0.1"      "atftpd: bound to HW_HOST_IP"
+assert_contains "$out" "--user"                        "atftpd: drops to caller via --user flag"
 
 # ── 3. DRY_RUN=1: systemd-networkd config with DHCPServer ─────────────────────
 

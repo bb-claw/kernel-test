@@ -59,6 +59,22 @@ run_cmd() {
     "$@"
 }
 
+# ── Cleanup: remove stale dnsmasq artifacts from earlier hw-bootstrap ─────────
+
+cleanup_old_dnsmasq() {
+    local f
+    for f in /etc/systemd/system/kernel-test-dnsmasq.service /etc/dnsmasq.d/vf2.conf; do
+        [[ -f "$f" ]] || continue
+        if [[ $DRY_RUN -eq 1 ]]; then
+            dry_info "would remove stale dnsmasq artifact: $f"
+        else
+            $SUDO systemctl disable --now kernel-test-dnsmasq 2>/dev/null || true
+            $SUDO rm -f "$f"
+            info "removed stale artifact: $f"
+        fi
+    done
+}
+
 # ── Package install ────────────────────────────────────────────────────────────
 
 detect_pm() {
@@ -186,6 +202,9 @@ info "  HW_HOST_IP    = $HW_HOST_IP"
 info "  HW_DHCP_RANGE = $HW_DHCP_RANGE"
 info "  TFTP_DIR      = $TFTP_DIR"
 info "  Relay VID:PID = ${HW_RELAY_VID}:${HW_RELAY_PID}"
+
+# 0. Remove stale dnsmasq artifacts from previous hw-bootstrap versions
+cleanup_old_dnsmasq
 
 # 1. Install atftpd
 info "--- [1/6] atftpd package"
