@@ -334,4 +334,57 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
 ---
 
 
+---
+
+## 2026-08-08 — 320_ns-net: false positive when CONFIG_IPV6_SIT=y (built-in)
+
+### Fixed — Test Correctness
+
+- [x] **`ns-net proc-net` false positive: `sit0` appears in new net namespace when CONFIG_IPV6_SIT is built-in** ✅ resolved 2026-08-08
+  Found by `make extended NO_FETCH=1` on stable-rc clone (v7.1.8-rc1, randdefconfig/arm64).
+  All 19 other config/arch combos passed; only randdefconfig/arm64 failed `320_ns-net`.
+
+  **Symptom:** `FAIL: net: ns-net proc-net failed (init_net leak regression?)` — misleading,
+  looked like an init_net namespace isolation regression.
+
+  **Root cause:** `ns-net proc-net` (C binary) called `unshare(CLONE_NEWNET)` then read
+  `/proc/net/dev` and failed if any interface other than `lo` was present. When
+  `CONFIG_IPV6_SIT=y` (built-in), the kernel creates a per-namespace `sit0` admin tunnel
+  device in every new network namespace — this is correct kernel behaviour, not a leak.
+
+  `randdefconfig` with `CONFIG_MODULES=n` (one of the 300 randomly disabled options) forces
+  `CONFIG_IPV6_SIT=m` → `=y` (built-in). `defconfig/arm64` has `=m` so the module is not
+  loaded in the initramfs environment and no `sit0` appears — hence defconfig passed.
+
+  `/proc/net/dev` in the new namespace showed:
+  ```
+      lo:       0       0    0    0    0     0          0         0 ...
+    sit0:       0       0    0    0    0     0          0         0 ...
+  ```
+  `sit0` is a per-namespace SIT tunnel base device, not init_net leaking.
+
+  **Fix:** `tests/ns/ns-net.c` — added a whitelist of per-namespace admin tunnel base
+  devices that built-in drivers create in every new namespace:
+  ```c
+  static const char * const perns_admin_ifaces[] = {
+      "lo:", "sit0:", "ip6tnl0:", "ip_vti0:", "ip6gre0:",
+      "gre0:", "gretap0:", "ip6erspan0:", "erspan0:", NULL,
+  };
+  ```
+  `proc-net` now only reports failure if an interface not in this whitelist appears.
+  The error message was also improved to print the unexpected interface name.
+
+  **Trigger config archived in kernel-test-data:**
+  ```
+  configs/archive_failed/kconfig-randdefconfig-arm64-v7.1.8-rc1-69a125ea...-TEST_FAIL-ns-net-init_net-leak.config
+  ```
+
+  **Reproduce (stable-rc clone, before fix):**
+  ```sh
+  cd ~/git/kernel-test-stable-rc
+  make replay CONFIG_FILE=../kernel-test-data/configs/archive_failed/kconfig-randdefconfig-arm64-v7.1.8-rc1-69a125ea869ae2968ab1b33adb4f6e88818b40e08f35f120f2e25149e9a161e8-TEST_FAIL-ns-net-init_net-leak.config CONFIGS=randdefconfig ARCHS=arm64 NO_FETCH=1
+  ```
+
+  **After fix:** replay of same config → 43/43 PASS.
+
 > Kernel bug findings moved to [kernel-test-data/FINDINGS.md](https://github.com/bb-claw/kernel-test-data/blob/main/FINDINGS.md)
