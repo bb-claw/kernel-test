@@ -126,7 +126,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/dnsmasq --conf-file=/etc/dnsmasq.d/vf2.conf --no-daemon --log-facility=-
+ExecStart=/usr/bin/dnsmasq --conf-file=/etc/dnsmasq.d/vf2.conf --no-daemon --log-facility=- --no-sandbox
 User=$(id -un)
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
