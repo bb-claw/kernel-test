@@ -28,13 +28,11 @@ assert_contains "$out" "10.0.0.100,10.0.0.200"  "dnsmasq: dhcp-range"
 assert_contains "$out" "dhcp-leasefile="         "dnsmasq: lease file in TFTP_DIR"
 assert_contains "$out" "enable-tftp"             "dnsmasq: enable-tftp"
 assert_contains "$out" "tftp-root="              "dnsmasq: tftp-root"
-assert_contains "$out" "dhcp-boot=Image,,10.0.0.1" "dnsmasq: dhcp-boot next-server"
-# conf-dir step: either already enabled or dry-run says it would append
-assert_contains "$out" "conf-dir"                    "dnsmasq: conf.d inclusion handled"
-assert_contains "$out" "dnsmasq.service.d"           "dnsmasq: systemd drop-in path"
-assert_contains "$out" "User=$(id -un)"              "dnsmasq: systemd drop-in User= set to caller"
-assert_contains "$out" "ProtectHome=no"              "dnsmasq: systemd drop-in clears ProtectHome"
-assert_contains "$out" "ProtectSystem=no"            "dnsmasq: systemd drop-in clears ProtectSystem"
+assert_contains "$out" "dhcp-boot=Image,,10.0.0.1"      "dnsmasq: dhcp-boot next-server"
+assert_contains "$out" "kernel-test-dnsmasq.service"    "dnsmasq: own service unit written"
+assert_contains "$out" "Type=simple"                    "dnsmasq: own service Type=simple"
+assert_contains "$out" "User=$(id -un)"                 "dnsmasq: own service User= set to caller"
+assert_contains "$out" "AmbientCapabilities=CAP_NET"    "dnsmasq: own service ambient caps for ports 67/69"
 
 # ── 3. DRY_RUN=1: systemd-networkd config correct ─────────────────────────────
 
