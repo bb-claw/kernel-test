@@ -37,7 +37,7 @@ board_reset() {
         return 0
     fi
     if [[ ! -w "$relay" ]]; then
-        warn "board_reset: $relay not writable — check udev rule and dialout group membership"
+        warn "board_reset: $relay not writable — check udev rule and dialout/uucp group membership"
         warn "  Manual reset required"
         return 0
     fi

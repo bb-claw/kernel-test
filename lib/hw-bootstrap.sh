@@ -25,6 +25,9 @@ DRY_RUN=${DRY_RUN:-0}
 # ── Root vs sudo ───────────────────────────────────────────────────────────────
 if [[ $EUID -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
 
+# ── Serial group: Debian/Ubuntu/Fedora use "dialout"; Arch uses "uucp" ────────
+SERIAL_GROUP=$(getent group dialout &>/dev/null && echo dialout || echo uucp)
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 dry_info() { printf '[hw-bootstrap] (dry-run) %s\n' "$*"; }
@@ -148,7 +151,7 @@ udev_rule() {
 # CH340-based relays enumerate as tty (SUBSYSTEM=="tty", /dev/ttyUSBx).
 # HID-based relays (Ucreatefun etc.) enumerate as hidraw: change SUBSYSTEM=="tty" to SUBSYSTEM=="hidraw".
 # Find your relay's IDs: udevadm info /dev/ttyUSB0 | grep ID_VENDOR_ID\|ID_MODEL_ID
-SUBSYSTEM=="tty", ATTRS{idVendor}=="${HW_RELAY_VID}", ATTRS{idProduct}=="${HW_RELAY_PID}", GROUP="dialout", MODE="0664", SYMLINK+="vf2-relay"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="${HW_RELAY_VID}", ATTRS{idProduct}=="${HW_RELAY_PID}", GROUP="${SERIAL_GROUP}", MODE="0664", SYMLINK+="vf2-relay"
 EOF
 }
 

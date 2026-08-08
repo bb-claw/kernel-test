@@ -63,7 +63,12 @@ assert_contains "$out" 'SUBSYSTEM=="tty"'     "udev: subsystem filter"
 assert_contains "$out" 'idVendor}=="dead"'   "udev: vendor ID"
 assert_contains "$out" 'idProduct}=="beef"'  "udev: product ID"
 assert_contains "$out" 'SYMLINK+="vf2-relay"' "udev: stable symlink"
-assert_contains "$out" 'GROUP="dialout"'      "udev: dialout group"
+# Group is "dialout" on Debian/Fedora, "uucp" on Arch — check either
+if getent group dialout &>/dev/null; then
+    assert_contains "$out" 'GROUP="dialout"' "udev: dialout group"
+else
+    assert_contains "$out" 'GROUP="uucp"'    "udev: uucp group (Arch)"
+fi
 assert_contains "$out" 'MODE="0664"'          "udev: mode bits"
 
 # ── 7. DRY_RUN=1: TFTP dir not created ────────────────────────────────────────
