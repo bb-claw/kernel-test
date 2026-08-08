@@ -1,5 +1,4 @@
 # Workflows & Make Commands
-
 ## Variables
 
 | Variable | Default | Override example |
@@ -33,12 +32,16 @@
 | `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
 | `BOARD_CONFIG` | `vf2config` | Config profile for `make hw*` targets |
 | `BOARD_ARCH` | `riscv` | Arch for `make hw*` targets |
-| `BOARD_TTY` | `/dev/ttyUSB0` | `BOARD_TTY=/dev/ttyUSB1` — USB-UART device for `make hw-test` / `make hw` |
+| `BOARD_TTY` | `/dev/ttyUSB0` | USB-UART device for `make hw-test` / `make hw` |
+| `TFTP_DIR` | `$(CURDIR)/tftp` | Local TFTP root; gitignored; auto-created by `make hw-deploy` |
+| `HW_IFACE` | `eno1` | Ethernet interface for isolated test network (`make hw-bootstrap`) |
+| `HW_HOST_IP` | `192.168.100.1` | Static IP on `HW_IFACE`; TFTP next-server in DHCP reply |
+| `HW_DHCP_RANGE` | `192.168.100.100,192.168.100.200` | DHCP pool for the board |
+| `HW_RELAY` | `/dev/vf2-relay` | Stable udev symlink to USB relay for `board_reset` |
+| `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
-
----
 
 ## Common Workflows
 
@@ -57,9 +60,10 @@ make extended                                         # full then ns-full (10 co
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
-make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR; reset board manually
-make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; no build/deploy (hw equivalent of make test)
-make hw BOARD_TTY=/dev/ttyUSB0                        # full hardware pipeline: build → hw-deploy → hw-test → report
+make hw-bootstrap [DRY_RUN=1]                         # install dnsmasq/networkd/udev for board testing (needs sudo)
+make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR (default: ./tftp/)
+make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
+make hw BOARD_TTY=/dev/ttyUSB0                        # build → hw-deploy → hw-test → report
 make hw-full BOARD_TTY=/dev/ttyUSB0                   # build → test (QEMU) → hw-deploy → hw-test → report
 ```
 
@@ -91,8 +95,7 @@ make config-archive   # scan DATA_REPO/reports/, populate DATA_REPO/configs/arch
 ```
 
 ### Consolidated cross-source index
-
-`make consolidate-index` — merge per-source `archive_failed/index.txt` files → `DATA_REPO/consolidation/index.{txt,html}`. Populate by copying each machine's `archive_failed/index.txt` to `DATA_REPO/consolidation/<label>/archive_failed/index.txt` (labels: `local-mainline`, `hetzner-mainline`, etc.).
+`make consolidate-index` — merge per-source `archive_failed/index.txt` → `DATA_REPO/consolidation/index.{txt,html}`. Copy each machine's index to `DATA_REPO/consolidation/<label>/archive_failed/index.txt`.
 
 ### Replay an archived config
 
@@ -140,7 +143,6 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
 
 ### CI / linting
-
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
 `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
 

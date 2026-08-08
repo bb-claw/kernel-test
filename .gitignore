@@ -1,6 +1,9 @@
 # Build artifacts — kernel out-of-tree builds and initramfs staging/output
 build/
 
+# TFTP root for hardware board testing (make hw-deploy / make hw-bootstrap)
+tftp/
+
 # Compiler cache
 cache/
 
