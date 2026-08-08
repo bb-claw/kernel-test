@@ -16,26 +16,18 @@ assert_file_exists "$HW_BOOTSTRAP" "lib/hw-bootstrap.sh present"
 if [[ -x "$HW_BOOTSTRAP" ]]; then pass "lib/hw-bootstrap.sh executable"
 else fail "lib/hw-bootstrap.sh not executable"; fi
 
-# ── 2. DRY_RUN=1: dnsmasq config contains expected fields ─────────────────────
+# ── 2. DRY_RUN=1: atftpd service contains expected fields ────────────────────
 
-begin_test "hw-bootstrap-dryrun-dnsmasq"
+begin_test "hw-bootstrap-dryrun-atftpd"
 tmpdir
 out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
     "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "1a86" "7523" 2>&1)
-assert_contains "$out" "interface=eth0"          "dnsmasq: interface field"
-assert_contains "$out" "bind-interfaces"         "dnsmasq: bind-interfaces"
-assert_contains "$out" "10.0.0.100,10.0.0.200"  "dnsmasq: dhcp-range"
-assert_contains "$out" "dhcp-leasefile=/run/kernel-test-dnsmasq/"  "dnsmasq: lease file in RuntimeDirectory"
-assert_contains "$out" "enable-tftp"             "dnsmasq: enable-tftp"
-assert_contains "$out" "tftp-root="              "dnsmasq: tftp-root"
-assert_contains "$out" "dhcp-boot=Image,,10.0.0.1"      "dnsmasq: dhcp-boot next-server"
-assert_contains "$out" "kernel-test-dnsmasq.service"    "dnsmasq: own service unit written"
-assert_contains "$out" "Type=simple"                    "dnsmasq: own service Type=simple"
-assert_not_contains "$out" "--no-sandbox"                "dnsmasq: --no-sandbox absent (rejected by this build)"
-assert_contains "$out" "User=$(id -un)"                 "dnsmasq: own service User= set to caller"
-assert_contains "$out" "AmbientCapabilities=CAP_NET"    "dnsmasq: own service ambient caps for ports 67/69"
+assert_contains "$out" "kernel-test-atftpd.service"  "atftpd: service unit written"
+assert_contains "$out" "atftpd"                       "atftpd: binary in ExecStart"
+assert_contains "$out" "Type=simple"                  "atftpd: Type=simple"
+assert_not_contains "$out" "User="                    "atftpd: runs as root (no User= drop)"
 
-# ── 3. DRY_RUN=1: systemd-networkd config correct ─────────────────────────────
+# ── 3. DRY_RUN=1: systemd-networkd config with DHCPServer ─────────────────────
 
 begin_test "hw-bootstrap-dryrun-networkd"
 tmpdir
@@ -45,6 +37,10 @@ assert_contains "$out" "Name=eth1"                   "networkd: interface name"
 assert_contains "$out" "ConfigureWithoutCarrier=yes" "networkd: configure without carrier (Network section)"
 assert_contains "$out" "Address=10.1.0.1/24"         "networkd: static IP"
 assert_not_contains "$out" "[Link]"                  "networkd: no [Link] section (ConfigureWithoutCarrier belongs in [Network])"
+assert_contains "$out" "DHCPServer=yes"              "networkd: built-in DHCP server enabled"
+assert_contains "$out" "BootServerAddress=10.1.0.1"  "networkd: DHCP next-server (option 66)"
+assert_contains "$out" "BootFilename=Image"           "networkd: DHCP boot filename (option 67)"
+assert_contains "$out" "PoolOffset=100"               "networkd: DHCP pool offset from range start"
 
 # ── 4. DRY_RUN=1: NetworkManager unmanaged rule ──────────────────────────────
 
