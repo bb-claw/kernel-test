@@ -70,18 +70,13 @@ assert_contains     "$makefile_line" "CURDIR"     "TFTP_DIR default uses CURDIR"
 # ── 7. board_reset missing-relay graceful fallback ────────────────────────────
 
 begin_test "board-reset-missing-relay"
-tmpdir
-fake_build="$_LAST_TMPDIR/build"
-mkdir -p "$fake_build/vf2config-riscv"
-
-# Source board.sh functions in isolation — we only need board_reset.
-# board.sh uses require_env which checks BUILD_DIR/TIMEOUT; avoid triggering
-# the full script by sourcing only up to the function definition.
+# Extract board_reset via sed (robust to function length changes), source
+# common.sh for warn/info, call with a non-existent relay path.
 board_reset_output=$(
-    HW_RELAY="/dev/this-device-does-not-exist-$$" \
+    HW_RELAY="/dev/vf2-relay-ci-test-nonexistent-$$" \
     bash -c "
         . '$REPO/lib/common.sh'
-        $(grep -A 30 'board_reset()' "$BOARD_SH" | head -20)
+        $(sed -n '/^board_reset()/,/^}/p' "$BOARD_SH")
         board_reset
     " 2>&1 || true
 )

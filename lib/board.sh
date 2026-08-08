@@ -42,9 +42,15 @@ board_reset() {
         return 0
     fi
     info "board_reset: pulsing relay via $relay"
-    printf '\xa0\x01\x01\xa2' > "$relay"
+    if ! printf '\xa0\x01\x01\xa2' > "$relay"; then
+        warn "board_reset: relay ON write failed — board may be stuck; manual reset required"
+        return 0
+    fi
     sleep 0.5
-    printf '\xa0\x01\x00\xa1' > "$relay"
+    if ! printf '\xa0\x01\x00\xa1' > "$relay"; then
+        warn "board_reset: relay OFF write failed — RST pin may still be held; manual toggle required"
+        return 0
+    fi
     info "board_reset: relay pulsed — board is resetting"
 }
 
@@ -52,6 +58,8 @@ board_reset() {
 # Prefer the C binary (proper termios: O_NOCTTY, tcflush, fdatasync, binary-safe).
 # Fall back to Bash stty+read when the binary is absent (e.g. make bootstrap not run).
 SERIAL_CAPTURE="${SERIAL_CAPTURE:-$REPO_ROOT/tests/programs/serial-capture/bin/serial-capture}"
+
+board_reset
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
