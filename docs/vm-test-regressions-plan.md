@@ -71,17 +71,18 @@ Files changed:
 - `tests/custom/390_watchdog.sh` — add marker guard (double-guard pattern)
 - `tests/custom/400_perf-events.sh` — add marker guard
 - `tests/custom/410_arena-memory.sh` — add marker guard
-- `lib/initramfs.sh` — write `/tests/<category>-enabled` marker files per config/binary availability
+- `lib/initramfs.sh` — per-(config,arch); write `/tests/<category>-enabled` marker files per binary/config availability
+- `lib/vm.sh` — update INITRAMFS path to `build/initramfs-$CONFIG-$ARCH.cpio.gz`
+- `lib/report.sh` — Notes column: "N failed" count in table; failed test names in block below
 - `memory/code-quality.md` — document elif bug + line-continuation bug in Toybox pitfalls list
-- `tests/ci/test-ns-*.sh` — update CI tests to reflect marker approach
+- `tests/ci/test-ns-scripts.sh`, `test-ns-initramfs.sh`, `test-watchdog-script.sh` — update CI tests to cover marker approach
 
-No changes to: `lib/build.sh`, `lib/vm.sh`, `lib/common.sh`, `lib/report.sh` (Notes fix deferred).
+No changes to: `lib/build.sh`, `lib/common.sh`.
 
 ---
 
 ## Non-goals
 
-- Report Notes column truncation — deferred to `fix/report-notes` (separate branch).
 - Serial-capture hardening (Phase 7) — separate branch, deferred.
 - Adding new test slots (420+) — separate branch.
 
@@ -96,10 +97,10 @@ Each marker indicates that the corresponding test infrastructure is ready inside
 
 | Marker | Written when |
 |---|---|
-| `/tests/ns-enabled` | config name matches `*ns*` (tinynsconfig, defnsconfig, kunitnsconfig, …) |
+| `/tests/ns-enabled` | ns-* binaries installed (ns_count > 0 after `tests/ns/bin/$ARCH` copy loop) |
 | `/tests/perf-enabled` | `tests/programs/perf-event/bin/perf-event-<arch>` binary is present |
 | `/tests/arena-enabled` | `tests/programs/arena-test/bin/arena-test-<arch>` binary is present |
-| `/tests/watchdog-enabled` | `configs/watchdog.config` applied (TBD — see open question) |
+| `/tests/watchdog-enabled` | `CONFIG_WATCHDOG=y` found in `build/$CONFIG-$ARCH/.config` |
 
 Tests check the marker as their *first* guard:
 ```sh
@@ -152,13 +153,12 @@ file argument to the command preceding the continuation.
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-1. Marker naming: `/tests/ns-enabled` or `/tests/ns-tests-enabled`?
-2. Branch scope: include report Notes fix or defer to separate branch?
-3. How should `initramfs.sh` detect watchdog-enabled? Config-name match, binary check,
-   or `.config` grep for `CONFIG_WATCHDOG=y`?
-4. Document the line-continuation bug in `memory/code-quality.md`?
+1. ✓ Marker naming: `/tests/ns-enabled` (simpler, consistent with others)
+2. ✓ Report Notes fix included in this branch (not deferred)
+3. ✓ watchdog-enabled: `.config` grep for `CONFIG_WATCHDOG=y` in per-(config,arch) build dir
+4. ✓ Line-continuation bug documented in `memory/code-quality.md`
 
 ---
 

@@ -127,6 +127,8 @@ build/$(1)-$(2)/build.status: $$(KERNEL_TREE)/Makefile
 endef
 $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a)))))
 
+# initramfs depends on build.status so it auto-rebuilds after each kernel build.
+# Per-(config,arch) so the watchdog-enabled marker can reflect the actual .config.
 define _initramfs_rule
 build/initramfs-$(1)-$(2).cpio.gz: build/$(1)-$(2)/build.status
 	@printf '[initramfs] %s %s\n' $(1) $(2)
