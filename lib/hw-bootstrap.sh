@@ -237,7 +237,8 @@ if [[ $DRY_RUN -eq 0 ]]; then
     run_cmd $SUDO systemctl restart systemd-networkd
     run_cmd $SUDO networkctl reconfigure "$HW_IFACE"
     run_cmd $SUDO systemctl daemon-reload
-    run_cmd $SUDO systemctl enable --now kernel-test-atftpd
+    run_cmd $SUDO systemctl enable kernel-test-atftpd
+    run_cmd $SUDO systemctl restart kernel-test-atftpd
 fi
 
 if [[ $DRY_RUN -eq 1 ]]; then
