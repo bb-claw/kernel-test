@@ -87,6 +87,26 @@ install_dnsmasq() {
     esac
 }
 
+# ── firejail detection ────────────────────────────────────────────────────────
+# firecfg creates PATH symlinks (e.g. /usr/local/bin/dnsmasq → /usr/bin/firejail).
+# Its dnsmasq profile blacklists /tmp and most writable paths, causing EACCES on
+# the lease file even when running as a non-root user with ambient caps.
+# Detecting the wrapper here lets us fail fast instead of spending time debugging
+# dnsmasq permission errors in journalctl.
+
+check_firejail_wrap() {
+    local dnsmasq_bin resolved
+    dnsmasq_bin=$(command -v dnsmasq 2>/dev/null || true)
+    [[ -n "$dnsmasq_bin" ]] || return 0
+    resolved=$(readlink -f "$dnsmasq_bin" 2>/dev/null || echo "$dnsmasq_bin")
+    if [[ "$resolved" == *firejail* ]]; then
+        warn "dnsmasq ($dnsmasq_bin → $resolved) is intercepted by firejail."
+        warn "firejail's dnsmasq profile blacklists /tmp — kernel-test-dnsmasq.service will fail."
+        warn "Fix: sudo firecfg --clean   (removes all firejail PATH wrapper symlinks)"
+        warn "Then re-run: make hw-bootstrap"
+    fi
+}
+
 # ── dnsmasq config ─────────────────────────────────────────────────────────────
 # bind-interfaces: dnsmasq only listens on HW_IFACE, never touches main LAN DHCP.
 # dhcp-boot: injects next-server (serverip) into DHCP reply → U-Boot dhcp sets
@@ -126,7 +146,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/dnsmasq --conf-file=/etc/dnsmasq.d/vf2.conf --no-daemon --log-facility=- --no-sandbox
+ExecStart=/usr/bin/dnsmasq --conf-file=/etc/dnsmasq.d/vf2.conf --no-daemon --log-facility=-
 User=$(id -un)
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
@@ -203,6 +223,7 @@ info "  Relay VID:PID = ${HW_RELAY_VID}:${HW_RELAY_PID}"
 # 1. Install dnsmasq
 info "--- [1/6] dnsmasq package"
 install_dnsmasq
+check_firejail_wrap
 
 # 2. dnsmasq config + kernel-test-dnsmasq.service
 info "--- [2/6] dnsmasq config → /etc/dnsmasq.d/vf2.conf + kernel-test-dnsmasq.service"

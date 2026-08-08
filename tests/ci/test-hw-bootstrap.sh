@@ -31,7 +31,7 @@ assert_contains "$out" "tftp-root="              "dnsmasq: tftp-root"
 assert_contains "$out" "dhcp-boot=Image,,10.0.0.1"      "dnsmasq: dhcp-boot next-server"
 assert_contains "$out" "kernel-test-dnsmasq.service"    "dnsmasq: own service unit written"
 assert_contains "$out" "Type=simple"                    "dnsmasq: own service Type=simple"
-assert_contains "$out" "--no-sandbox"                    "dnsmasq: Landlock sandbox disabled (custom kernels)"
+assert_not_contains "$out" "--no-sandbox"                "dnsmasq: --no-sandbox absent (rejected by this build)"
 assert_contains "$out" "User=$(id -un)"                 "dnsmasq: own service User= set to caller"
 assert_contains "$out" "AmbientCapabilities=CAP_NET"    "dnsmasq: own service ambient caps for ports 67/69"
 
