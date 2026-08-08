@@ -116,10 +116,8 @@ networkd_conf() {
 [Match]
 Name=${HW_IFACE}
 
-[Link]
-ConfigureWithoutCarrier=yes
-
 [Network]
+ConfigureWithoutCarrier=yes
 Address=${HW_HOST_IP}/24
 EOF
 }
