@@ -270,8 +270,11 @@ if [[ $DRY_RUN -eq 0 ]]; then
     printf '\nNext steps:\n'
     printf '  1. Plug in the USB relay — verify: ls -la /dev/vf2-relay\n'
     printf '  2. Connect Ethernet cable: laptop %s ↔ switch ↔ VF2 board\n' "$HW_IFACE"
-    printf '  3. Run: make hw-deploy  (copies kernel + initramfs to %s/)\n' "$TFTP_DIR"
-    printf '  4. Set U-Boot bootcmd once (see docs/hw-bootstrap-plan.md)\n'
+    printf '  3. Run: make hw-deploy  (copies kernel + initramfs + DTB to %s/)\n' "$TFTP_DIR"
+    printf '  4. Set U-Boot bootcmd once — connect serial and paste at StarFive # prompt:\n'
+    printf '       setenv bootcmd '"'"'dhcp; tftpboot ${kernel_addr_r} Image; tftpboot ${fdt_addr_r} vf2.dtb; tftpboot ${ramdisk_addr_r} initramfs-riscv.cpio.gz; booti ${kernel_addr_r} ${ramdisk_addr_r}:${filesize} ${fdt_addr_r}'"'"'\n'
+    printf '       saveenv\n'
+    printf '       reset\n'
     printf '  5. Run: make hw BOARD_TTY=/dev/ttyUSB0\n'
     printf '  Verify DHCP: journalctl -u systemd-networkd -f\n'
     printf '  Verify TFTP: journalctl -u kernel-test-atftpd -f\n'

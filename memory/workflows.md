@@ -33,12 +33,14 @@
 | `BOARD_CONFIG` | `vf2config` | Config profile for `make hw*` targets |
 | `BOARD_ARCH` | `riscv` | Arch for `make hw*` targets |
 | `BOARD_TTY` | `/dev/ttyUSB0` | USB-UART device for `make hw-test` / `make hw` |
+| `BOARD_DTB` | `jh7110-starfive-visionfive-2-v1.2a` | DTB filename (no .dtb) built from kernel tree and copied to `tftp/vf2.dtb` by `make hw-deploy`; v1.3B users: `jh7110-starfive-visionfive-2-v1.3b` |
 | `TFTP_DIR` | `$(CURDIR)/tftp` | Local TFTP root; gitignored; auto-created by `make hw-deploy` |
+| `HW_TIMEOUT` | `120` | Serial capture timeout for board boot (U-Boot + TFTP + kernel + tests); separate from `TIMEOUT` (QEMU) |
 | `HW_IFACE` | `eno1` | Ethernet interface for isolated test network (`make hw-bootstrap`) |
 | `HW_HOST_IP` | `192.168.100.1` | Static IP on `HW_IFACE`; TFTP next-server in DHCP reply |
 | `HW_DHCP_RANGE` | `192.168.100.100,192.168.100.200` | DHCP pool for the board |
 | `HW_RELAY` | `/dev/vf2-relay` | Stable udev symlink to USB relay for `board_reset` |
-| `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`); find with `udevadm info /dev/ttyUSB0 \| grep ID_VENDOR_ID\|ID_MODEL_ID` |
+| `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -145,5 +147,4 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 ### CI / linting
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
 `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
-
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.

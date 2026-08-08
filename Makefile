@@ -75,6 +75,14 @@ HW_RELAY       ?= /dev/vf2-relay
 HW_RELAY_VID   ?= 1a86
 HW_RELAY_PID   ?= 7523
 
+# ── Hardware board boot (Phase 6b) — U-Boot TFTP boot ─────────────────────────
+# HW_TIMEOUT: serial capture timeout for the board (U-Boot + kernel + tests).
+#   Separate from TIMEOUT (QEMU VM); 120s covers U-Boot (~15s) + TFTP + kernel + tests.
+HW_TIMEOUT     ?= 120
+# BOARD_DTB: DTB filename (without .dtb) built from the kernel tree and served via TFTP.
+#   VF2 v1.2A default; v1.3B users: override to jh7110-starfive-visionfive-2-v1.3b
+BOARD_DTB      ?= jh7110-starfive-visionfive-2-v1.2a
+
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
 CACHE_DIR := cache
@@ -111,7 +119,8 @@ export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
 export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR \
-       HW_IFACE HW_HOST_IP HW_DHCP_RANGE HW_RELAY HW_RELAY_VID HW_RELAY_PID
+       HW_IFACE HW_HOST_IP HW_DHCP_RANGE HW_RELAY HW_RELAY_VID HW_RELAY_PID \
+       HW_TIMEOUT BOARD_DTB
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -280,10 +289,28 @@ hw-deploy:
 	else \
 	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n'; \
 	fi; \
+	dtb_file=$$(find "$$bd/arch" -name "$(BOARD_DTB).dtb" 2>/dev/null | head -1); \
+	if [[ -z "$$dtb_file" ]]; then \
+	    printf '[hw-deploy] building DTBs ($(BOARD_DTB).dtb) ...\n'; \
+	    case "$(BOARD_ARCH)" in \
+	        riscv) cross=riscv64-linux-gnu- ;; \
+	        arm64) cross=aarch64-linux-gnu- ;; \
+	        *)     cross= ;; \
+	    esac; \
+	    $(MAKE) -C $(KERNEL_TREE) O="$(CURDIR)/$$bd" ARCH=$(BOARD_ARCH) \
+	        CROSS_COMPILE="$$cross" dtbs >/dev/null 2>&1 || true; \
+	    dtb_file=$$(find "$$bd/arch" -name "$(BOARD_DTB).dtb" 2>/dev/null | head -1); \
+	fi; \
+	if [[ -n "$$dtb_file" ]]; then \
+	    cp "$$dtb_file" "$(TFTP_DIR)/vf2.dtb"; \
+	    printf '[hw-deploy] dtb      → %s/vf2.dtb\n' '$(TFTP_DIR)'; \
+	else \
+	    printf '[hw-deploy] WARN: DTB $(BOARD_DTB).dtb not found — set BOARD_DTB or copy DTB manually to %s/vf2.dtb\n' '$(TFTP_DIR)'; \
+	fi; \
 	printf '[hw-deploy] relay reset via board_reset() in lib/board.sh (HW_RELAY=%s)\n' '$(HW_RELAY)'
 
 hw-test:
-	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
+	$(Q)TIMEOUT=$(HW_TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
 	    bash lib/board.sh $(BOARD_CONFIG) $(BOARD_ARCH)
 
 hw:
@@ -697,7 +724,9 @@ Variables (current values):
   CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
   BOARD_CONFIG        = $(BOARD_CONFIG)  (config profile for make hw / make hw-test / make hw-deploy; default: vf2config)
   BOARD_ARCH          = $(BOARD_ARCH)  (arch for make hw / make hw-test / make hw-deploy; default: riscv)
+  BOARD_DTB           = $(BOARD_DTB)  (DTB filename without .dtb; built from kernel tree and served via TFTP; v1.3B: jh7110-starfive-visionfive-2-v1.3b)
   TFTP_DIR            = $(TFTP_DIR)  (local TFTP root for make hw-deploy; default: ./tftp/)
+  HW_TIMEOUT          = $(HW_TIMEOUT)  (serial capture timeout for board boot in seconds; default: 120)
   HW_IFACE            = $(HW_IFACE)  (Ethernet interface for isolated test network; default: eno1)
   HW_HOST_IP          = $(HW_HOST_IP)  (static IP assigned to HW_IFACE by hw-bootstrap; default: 192.168.100.1)
   HW_DHCP_RANGE       = $(HW_DHCP_RANGE)  (DHCP pool for board; default: 192.168.100.100,192.168.100.200)
