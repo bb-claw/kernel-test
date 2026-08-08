@@ -76,6 +76,8 @@ Files changed:
 - `lib/report.sh` — Notes column: "N failed" count in table; failed test names in block below
 - `memory/code-quality.md` — document elif bug + line-continuation bug in Toybox pitfalls list
 - `tests/ci/test-ns-scripts.sh`, `test-ns-initramfs.sh`, `test-watchdog-script.sh` — update CI tests to cover marker approach
+- `tests/ns/ns-net.c` — whitelist per-namespace admin tunnel devices (sit0, ip6tnl0, ip_vti0, gre0, …); found by `make extended` on stable-rc: randdefconfig/arm64 fails when CONFIG_IPV6_SIT=y (built-in) because sit0 appears in every new net ns — correct kernel behaviour, not a leak
+- `FINDINGS.md` — document the sit0 false positive and fix
 
 No changes to: `lib/build.sh`, `lib/common.sh`.
 

@@ -50,7 +50,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | `290_ns-uts-ipc` | nsfs inode format for all 8 ns types; `/proc/sys/user` limits; UTS hostname isolation via unshare; ns-uts/ns-ipc C binaries |
 | `300_ns-pid` | PID namespace inode change via unshare -fp; ns-pid clone (PID=1) + init-death cascade SIGKILL |
 | `310_ns-mount` | Mount ns inode + bind visibility; ns-mount: MS_MOVE, mknod SB_I_NODEV, propagate_mnt, pivot_root |
-| `320_ns-net` | Net ns inode + lo-only isolation (no host interface leak); ns-net clone + proc-net |
+| `320_ns-net` | Net ns inode + host interface leak detection (lo + per-namespace admin tunnels allowed; real host iface = fail); ns-net clone + proc-net |
 | `330_ns-user` | User ns inode + uid 0 in ns; ns-user idmap + nested-6 (CVE-2018-18955) |
 | `340_ns-cgroup` | Cgroup ns inode + /sys/fs/cgroup; ns-cgroup scoping + release-agent (CVE-2022-0492) |
 | `350_ns-time` | Time ns timens_offsets; ns-time offset (+100s CLOCK_MONOTONIC) + setns-mt (CVE-2023-23586) |
