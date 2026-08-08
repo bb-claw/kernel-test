@@ -131,39 +131,27 @@ make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv   # builds + boots in QEMU ris
 
 ---
 
-### Phase 5 — `feat/board-serial`
+### Phase 5 — `feat/board-serial` *(complete — merged)*
 
-**What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`:
+**What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`. Implemented:
 
-- Open `$BOARD_TTY` (default `/dev/ttyUSB0`) for read+write (`exec 3<>/dev/ttyUSB0`),
-  set 115200 8N1, no hardware flow control
-- Line-by-line read loop with `read -t $TIMEOUT` for input-side timeout detection
-- Call shared parser helpers from `lib/common.sh` (Phase 1) — identical to QEMU path
-- On timeout: write `BOOT=HANG` to `vm.status`, print "manual reset required", exit 1
-- `board_reset` stub: logs the event cleanly, does nothing yet (upgraded in Phase 6)
-- Write fd open from the start: later U-Boot command sending requires no reopen
+- `tests/programs/serial-capture/serial-capture.c` — C host tool: `O_NOCTTY`, `cfmakeraw`,
+  `VMIN=0 VTIME=1` (so SIGTERM reliably interrupts read), `fdatasync` every 8 writes
+- `lib/board.sh`: prefer serial-capture C binary (poll dmesg for TEST_DONE); fall back
+  to Bash `stty`+`read` loop; produces identical `vm.status` to a QEMU run
+- `make hw-deploy`: copy kernel+initramfs to `TFTP_DIR`; `make hw`: build → hw-deploy
+  → hw-test → report; `make hw-full`: build → QEMU test → hw-deploy → hw-test → report
+- `lib/common.sh`: KTAP timestamp prefix made optional (`CONFIG_PRINTK_TIME=n` support)
+- `board_reset` stub: logs warning + asks for manual power-cycle (upgraded in Phase 6)
 
-**CI test fixture** `tests/ci/fixtures/board/transcript-pass.txt` must cover all parser
-paths the real board produces: a U-Boot banner, `BOOT_OK`, at least one `TEST PASS`,
-one `TEST FAIL`, a KTAP block (`KTAP version 1` / `ok 1` / `not ok 2`), and `TEST_DONE`.
-The CI test replays this through a socat pty pair and asserts the resulting `vm.status`
-matches expected `BOOT=PASS`, `TESTS_PASS`, `TESTS_FAIL`, `KUNIT_PASS`, `KUNIT_FAIL`.
-
-**How to test without hardware:**
-```sh
-socat PTY,link=/tmp/vf2-tx,rawer PTY,link=/tmp/vf2-rx,rawer &
-cat tests/ci/fixtures/board/transcript-pass.txt > /tmp/vf2-tx &
-BOARD_TTY=/tmp/vf2-rx bash lib/board.sh
-# verify vm.status content
-```
-
-CI test `tests/ci/test-board-serial.sh` runs this automatically.
+CI test `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty pairs
+(pass, kernel panic, mid-test hang, U-Boot hang) — 42 assertions, no hardware required.
 
 **Dependency:** Phase 1 (shared parser in common.sh).
 
 ---
 
-### Phase 6 — `feat/visionfive2-board`
+### Phase 6 — `feat/visionfive2-board` *(next milestone)*
 
 **What:** Full board integration with tftp-based kernel delivery:
 
@@ -186,10 +174,10 @@ USB relay module wired to VF2 RST button pads. Host writes to relay device
 press. `board_reset` calls this, then resumes reading serial — the board reboots and
 U-Boot loads the new kernel from tftp.
 
-**`make board-smoke BOARD=visionfive2`:**
-Quick sanity target: build `vf2config`, copy to tftp dir, trigger reset, capture serial,
-write `vm.status`. Analogous to `make smoke` for QEMU. Use this during bring-up
-iteration — faster feedback than a full run before reset + delivery are confirmed working.
+**`make hw-test BOARD_TTY=/dev/ttyUSB0`:**
+Quick sanity capture: open UART, capture serial, write `vm.status`. Analogous to
+`make test` for QEMU. Use this during bring-up iteration once deploy is confirmed working.
+`make hw-deploy` copies kernel+initramfs to `TFTP_DIR`; `make hw` runs the full pipeline.
 
 **QEMU vs hardware diff:**
 Label hardware runs distinctly: `vf2-7.2-<date>-v7.2-rc6`. After a hardware run passes,
@@ -210,9 +198,9 @@ make diff OLD=reports/mainline-7.2-<date>-v7.2-rc6 NEW=reports/vf2-7.2-<date>-v7
 
 **How to test:**
 ```sh
-make board-smoke BOARD=visionfive2         # first: bring-up sanity
-make board BOARD=visionfive2               # full run once smoke passes
-make diff OLD=<qemu-riscv-run> NEW=<vf2-run>  # find QEMU vs hardware divergence
+make hw-test BOARD_TTY=/dev/ttyUSB0              # first: bring-up sanity (after manual hw-deploy)
+make hw BOARD_TTY=/dev/ttyUSB0                   # full run once hw-test passes
+make diff OLD=<qemu-riscv-run> NEW=<vf2-run>     # find QEMU vs hardware divergence
 ```
 
 **Dependency:** Phases 1, 4, 5.
@@ -230,14 +218,40 @@ Phase 1: refactor/common-serial-parser        ← do first, no deps
     │
     └── Phase 5: feat/board-serial            ← requires Phase 1
             │
-            └── Phase 6: feat/visionfive2-board  ← requires Phases 1, 4, 5
+            ├── Phase 6: feat/visionfive2-board  ← requires Phases 1, 4, 5
+            └── Phase 7: serial-capture hardening ← deferred; trigger on need
 ```
 
 Recommended sequence if working serially: **1 → 2 → 3 → 4 → 5 → 6**
 
 ---
 
-## Phase 7 — LKML Submission *(nice to have, post-Phase 6)*
+## Phase 7 — `serial-capture` hardening *(deferred — trigger on concrete need)*
+
+Three improvements identified during Phase 5 review. Deferred because the binary
+already works correctly for the VisionFive 2 use case.
+
+**`sigaction()` + VMIN=1** — do first if the file is touched for any reason.
+Replace `signal()` with `sigaction()` with `SA_RESTART` cleared. With SA_RESTART
+absent, SIGTERM causes `read()` to return EINTR immediately; the existing
+`errno == EINTR → continue` path then checks `running` and exits cleanly within
+one syscall rather than waiting up to 100ms for the VTIME timeout. The VMIN=0
+workaround and its explanatory comment can be removed once this is in place.
+
+**Baud rate table** — trigger: a board that runs above 230400 bps.
+Add `B460800`, `B921600`, `B1000000`, `B1500000` to `baud_to_speed()`.
+Three lines, zero risk. Do not add speculatively — add when there is a real board
+to test against.
+
+**`strtol()` for baud argument** — low priority; caller is always a controlled
+Bash script. Only worth doing alongside the `sigaction` change to keep the diff
+coherent.
+
+**Dependency:** Phase 5.
+
+---
+
+## Phase 8 — LKML Submission *(nice to have, post-Phase 6)*
 
 The `summary.mail.txt` report already contains the right content. A `make send` target
 using `git send-email` or `msmtp` would close the original project goal.

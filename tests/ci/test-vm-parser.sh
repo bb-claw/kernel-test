@@ -41,6 +41,12 @@ assert_eq "$KUNIT_PASS" "3" "KUNIT_PASS"
 assert_eq "$KUNIT_FAIL" "3" "KUNIT_FAIL"
 assert_eq "$BOOT_OK"    "1" "BOOT_OK"
 
+begin_test "parse: KTAP block no timestamps — KUNIT_PASS=2, KUNIT_FAIL=3 (CONFIG_PRINTK_TIME=n)"
+parse_serial_output "$FX/transcript-ktap-notimestamp.txt"
+assert_eq "$KUNIT_PASS" "2" "KUNIT_PASS (no timestamps)"
+assert_eq "$KUNIT_FAIL" "3" "KUNIT_FAIL (2 subtests + 1 suite summary, no timestamps)"
+assert_eq "$BOOT_OK"    "1" "BOOT_OK"
+
 begin_test "parse: CANARY marker present — CANARY_EARLY=reached (no CANARY=1 needed)"
 CANARY=0 parse_serial_output "$FX/transcript-canary.txt"
 assert_eq "$CANARY_EARLY" "reached" "CANARY_EARLY"
@@ -121,6 +127,20 @@ determine_boot_status "$FX/transcript-canary.txt" 0 0
 write_run_status "$_LAST_TMPDIR/vm.status" "2026-08-06T10:00:00Z" 10
 out=$(cat "$_LAST_TMPDIR/vm.status")
 assert_contains "$out" "CANARY_EARLY=reached" "CANARY_EARLY"
+
+# ── log_run_result ────────────────────────────────────────────────────────────
+
+# ── Board transcript (end-to-end parse via fixtures/board/) ───────────────────
+
+begin_test "parse: board transcript-pass — TESTS_PASS=2 TESTS_FAIL=1 KUNIT_PASS=1 KUNIT_FAIL=2"
+parse_serial_output "$REPO/tests/ci/fixtures/board/transcript-pass.txt"
+assert_eq "$PASS_COUNT"  "2" "TESTS_PASS=2"
+assert_eq "$FAIL_COUNT"  "1" "TESTS_FAIL=1"
+assert_eq "$KUNIT_PASS"  "1" "KUNIT_PASS=1"
+assert_eq "$KUNIT_FAIL"  "2" "KUNIT_FAIL=2 (1 subtest + 1 suite summary)"
+assert_eq "$TESTS_TOTAL" "3" "TESTS_TOTAL=3"
+assert_eq "$BOOT_OK"     "1" "BOOT_OK=1"
+assert_eq "$TEST_DONE"   "1" "TEST_DONE=1"
 
 # ── log_run_result ────────────────────────────────────────────────────────────
 

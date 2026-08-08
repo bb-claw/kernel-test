@@ -1,0 +1,11 @@
+U-Boot 2021.10 (Oct 01 2021 - 12:00:00 +0000)
+StarFive VisionFive 2
+CPU:   rv64imafdc
+Hit any key to stop autoboot:  0
+Loading kernel via tftp...
+Starting kernel ...
+
+[    0.000000] Linux version 7.2.0-rc6-vf2 (gcc version 15.0.0) #1 SMP PREEMPT
+[    0.100000] riscv: base ISA extensions acdfim
+[    0.500000] NET: Registered PF_INET protocol family
+[    1.000000] Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)

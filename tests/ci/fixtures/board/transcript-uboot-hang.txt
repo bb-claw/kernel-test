@@ -1,0 +1,11 @@
+U-Boot 2021.10 (Oct 01 2021 - 12:00:00 +0000)
+StarFive VisionFive 2
+CPU:   rv64imafdc
+Board: StarFive VisionFive 2
+Hit any key to stop autoboot:  3
+Hit any key to stop autoboot:  2
+Hit any key to stop autoboot:  1
+Hit any key to stop autoboot:  0
+Loading kernel via tftp...
+TFTP error: 'Access violation' (2)
+Not retrying...

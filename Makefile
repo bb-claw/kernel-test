@@ -60,6 +60,10 @@ BASE           ?=
 COMPILER       ?= both
 VERIFY_ARCHS   ?= $(ARCHS)
 CLEAN          ?= 0
+BOARD_CONFIG   ?= vf2config
+BOARD_ARCH     ?= riscv
+BOARD_TTY      ?= /dev/ttyUSB0
+TFTP_DIR       ?= /srv/tftp
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -96,7 +100,7 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS CLEAN
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -226,6 +230,55 @@ local:
 # VisionFive 2 (StarFive JH7110) QEMU build: vf2config riscv only.
 vf2:
 	+@$(MAKE) all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv
+
+# ── Hardware board targets ─────────────────────────────────────────────────────
+# hw-deploy: copy kernel + initramfs to TFTP_DIR (board picks them up via U-Boot tftpboot).
+# hw-test:   open BOARD_TTY, capture serial, write vm.status  (hardware equivalent of make test).
+# hw:        build → hw-deploy → hw-test → report  (hardware equivalent of make all).
+# hw-full:   build → test → hw-deploy → hw-test → report  (QEMU + hardware combined pipeline).
+#
+# Requires: BOARD_TTY set to a real USB-UART device (default /dev/ttyUSB0).
+# Phase 6 adds USB relay reset between hw-deploy and hw-test.
+hw-deploy:
+	@bd="$(BUILD_DIR)/$(BOARD_CONFIG)-$(BOARD_ARCH)"; \
+	mkdir -p $(TFTP_DIR) 2>/dev/null || true; \
+	img=$$(find "$$bd/arch" -name "Image" -o -name "bzImage" 2>/dev/null | head -1); \
+	if [[ -n "$$img" ]]; then \
+	    cp "$$img" "$(TFTP_DIR)/"; \
+	    printf '[hw-deploy] kernel   → %s/%s\n' '$(TFTP_DIR)' "$$(basename $$img)"; \
+	else \
+	    printf '[hw-deploy] WARN: kernel not found in %s/arch — run: make build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n' "$$bd"; \
+	fi; \
+	if cp "$(BUILD_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" "$(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" 2>/dev/null; then \
+	    printf '[hw-deploy] initramfs → %s/initramfs-$(BOARD_ARCH).cpio.gz\n' '$(TFTP_DIR)'; \
+	else \
+	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs ARCHS=$(BOARD_ARCH) first\n'; \
+	fi; \
+	printf '[hw-deploy] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
+
+hw-test:
+	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
+	    bash lib/board.sh $(BOARD_CONFIG) $(BOARD_ARCH)
+
+hw:
+	+@rc=0; \
+	 $(MAKE) NO_FETCH=1 build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) || rc=1; \
+	 $(MAKE) initramfs ARCHS=$(BOARD_ARCH)                                  || true; \
+	 $(MAKE) hw-deploy                                                        || rc=1; \
+	 $(MAKE) hw-test                                                           || rc=1; \
+	 $(MAKE) report CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH); \
+	 exit $$rc
+
+hw-full:
+	+@$(MAKE) fetch
+	+@rc=0; \
+	 $(MAKE) build     CONFIGS="$(sort $(CONFIGS) $(BOARD_CONFIG))" ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))" || rc=1; \
+	 $(MAKE) initramfs ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))"                                               || true; \
+	 $(MAKE) test                                                                                             || rc=1; \
+	 $(MAKE) hw-deploy                                                                                        || rc=1; \
+	 $(MAKE) hw-test                                                                                          || rc=1; \
+	 $(MAKE) report    CONFIGS="$(sort $(CONFIGS) $(BOARD_CONFIG))" ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))"; \
+	 exit $$rc
 
 # ── Default: full pipeline ────────────────────────────────────────────────────
 # Sub-make calls guarantee sequential execution even under make -j.
@@ -531,6 +584,10 @@ Targets:
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
+  hw-deploy        Copy kernel + initramfs to TFTP_DIR=/srv/tftp (board fetches via U-Boot tftpboot); BOARD_CONFIG/BOARD_ARCH selectable
+  hw-test          Open BOARD_TTY, capture serial, write vm.status — hardware equivalent of make test; requires BOARD_TTY
+  hw               Hardware pipeline: build → hw-deploy → hw-test → report — hardware equivalent of make all
+  hw-full          Combined pipeline: build → test (QEMU) → hw-deploy → hw-test → report
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
@@ -609,6 +666,8 @@ Variables (current values):
   COMPILER            = $(COMPILER)  (gcc|clang|both — compiler selection for make verify-patch; default: both)
   VERIFY_ARCHS        = $(VERIFY_ARCHS)  (architectures for make verify-patch; defaults to ARCHS so ARCHS=x86_64 works as expected)
   CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
+  BOARD_CONFIG        = $(BOARD_CONFIG)  (config profile for make hw / make hw-test / make hw-deploy; default: vf2config)
+  BOARD_ARCH          = $(BOARD_ARCH)  (arch for make hw / make hw-test / make hw-deploy; default: riscv)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report

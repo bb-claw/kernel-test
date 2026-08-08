@@ -81,7 +81,8 @@ install_packages() {
                 clang lld llvm \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
-                bc flex bison libelf-dev
+                bc flex bison libelf-dev \
+                socat
 
             # Cross-compilers in a separate step so a broken pre-existing package
             # state does not abort the rest of bootstrap.
@@ -193,6 +194,21 @@ if [[ -d $ARENA_DIR ]]; then
     fi
 else
     warn "tests/programs/arena-test/ not found — 410_arena-memory will skip in the VM"
+fi
+
+# Build the host-side serial-capture binary.
+# Used by lib/board.sh for robust UART capture in Phase 6+ (not injected into initramfs).
+
+SC_DIR="$(cd "$(dirname "$0")/../tests/programs/serial-capture" && pwd)"
+if [[ -d $SC_DIR ]]; then
+    info "Building serial-capture binary (tests/programs/serial-capture/)..."
+    if make -C "$SC_DIR" all; then
+        info "serial-capture binary built OK (used by make board / make board-smoke)"
+    else
+        warn "serial-capture binary build failed — lib/board.sh will fall back to Bash capture"
+    fi
+else
+    warn "tests/programs/serial-capture/ not found"
 fi
 
 # ── KVM access ────────────────────────────────────────────────────────────────

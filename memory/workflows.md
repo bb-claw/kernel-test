@@ -31,6 +31,9 @@
 | `COMPILER` | `both` | `COMPILER=gcc\|clang\|both` — compiler selection for `make verify-patch` |
 | `VERIFY_ARCHS` | `$(ARCHS)` | Architectures for `make verify-patch`; defaults to `ARCHS` so `ARCHS=x86_64` works as a shorthand |
 | `CLEAN` | `0` | `CLEAN=1` — force clean rebuild of each build dir in `make verify-patch` |
+| `BOARD_CONFIG` | `vf2config` | Config profile for `make hw*` targets |
+| `BOARD_ARCH` | `riscv` | Arch for `make hw*` targets |
+| `BOARD_TTY` | `/dev/ttyUSB0` | `BOARD_TTY=/dev/ttyUSB1` — USB-UART device for `make hw-test` / `make hw` |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -54,6 +57,10 @@ make extended                                         # full then ns-full (10 co
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
+make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR; reset board manually
+make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; no build/deploy (hw equivalent of make test)
+make hw BOARD_TTY=/dev/ttyUSB0                        # full hardware pipeline: build → hw-deploy → hw-test → report
+make hw-full BOARD_TTY=/dev/ttyUSB0                   # build → test (QEMU) → hw-deploy → hw-test → report
 ```
 
 `make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
@@ -85,11 +92,7 @@ make config-archive   # scan DATA_REPO/reports/, populate DATA_REPO/configs/arch
 
 ### Consolidated cross-source index
 
-```sh
-make consolidate-index   # merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}
-```
-
-Populate: copy `archive_failed/index.txt` into `DATA_REPO/consolidation/<source>/archive_failed/index.txt` per machine/clone (labels: `local-mainline`, `hetzner-mainline`, etc.). `consolidation/` gitignored in both repos.
+`make consolidate-index` — merge per-source `archive_failed/index.txt` files → `DATA_REPO/consolidation/index.{txt,html}`. Populate by copying each machine's `archive_failed/index.txt` to `DATA_REPO/consolidation/<label>/archive_failed/index.txt` (labels: `local-mainline`, `hetzner-mainline`, etc.).
 
 ### Replay an archived config
 
@@ -98,8 +101,7 @@ make replay CONFIG_FILE=configs/archive_passed/kconfig-tinyconfig-x86_64-v7.2-rc
 make replay CONFIG_FILE=configs/archive_failed/kconfig-randconfig-x86_64-v7.2-rc2-<sha256>-BUILD_FAIL.config
 ```
 
-Parses `config` and `arch` from filename; copies archived `.config`, runs `olddefconfig`,
-then continues the normal pipeline (initramfs → test → report).
+Parses `config` and `arch` from filename; copies archived `.config`, runs `olddefconfig`, continues normal pipeline.
 
 ### Config bisect
 
@@ -142,8 +144,4 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
 `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
 
-### Operational Notes
-
-- **`make clean` on tree switch** — always run when switching between mainline and stable trees; `build/` headers are tree-specific (e.g. `ucs_width_table.h` format differs between mainline and stable 7.1.x).
-- **GCC for stable** — set `GCC=gcc-15` for stable kernels that predate GCC 16.
-- **Stable-rc is not a tag** — `v7.1.4-rc2` is the tip of the rolling `linux-7.1.y` branch, not a git tag; use `make fetch-stable-rc`, not `make checkout`.
+**Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.

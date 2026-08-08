@@ -14,7 +14,14 @@ fixtures/
 │   ├── transcript-timeout-qemu.txt   Empty (QEMU killed before output)
 │   ├── transcript-timeout-board.txt  Partial output (real hardware timeout)
 │   ├── transcript-ktap.txt     KTAP version block with ok/not ok lines (KUnit)
+│   ├── transcript-ktap-notimestamp.txt  KTAP without CONFIG_PRINTK_TIME timestamps
 │   └── transcript-canary.txt   CANARY_EARLY marker present
+│
+├── board/                      Hardware board transcripts for test-board-serial.sh
+│   ├── transcript-pass.txt     U-Boot + full pass + KTAP block + TEST_DONE
+│   ├── transcript-panic.txt    Kernel panic before BOOT_OK
+│   ├── transcript-boot-hang.txt  BOOT_OK reached but no TEST_DONE (mid-test hang)
+│   └── transcript-uboot-hang.txt  U-Boot TFTP error, kernel never loads
 │
 ├── reports/                    Fake report directories for test-diff.sh / test-report.sh
 │   ├── mainline-7.2-2026-01-01_10-00-00-v7.2-rc1/

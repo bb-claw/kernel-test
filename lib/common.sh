@@ -158,10 +158,12 @@ parse_serial_output() {
     fi
 
     if grep -qE 'KTAP version|# Subtest:' "$dmesg_file" 2>/dev/null; then
+        # Optional timestamp prefix `[  N.NNNNNN] ` — present in QEMU/board dmesg when
+        # CONFIG_PRINTK_TIME=y; absent when =n (bare board output with printk time disabled).
         KUNIT_PASS=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$dmesg_file" \
-            | grep -cE '^\[[ 0-9.]+\] ok [0-9]+'     || true)
+            | grep -cE '^(\[[ 0-9.]+\] )?ok [0-9]+'     || true)
         KUNIT_FAIL=$(sed 's/\x1b\[[0-9;]*m//g; s/\r//' "$dmesg_file" \
-            | grep -cE '^\[[ 0-9.]+\] not ok [0-9]+' || true)
+            | grep -cE '^(\[[ 0-9.]+\] )?not ok [0-9]+' || true)
         KUNIT_PASS=${KUNIT_PASS:-0}
         KUNIT_FAIL=${KUNIT_FAIL:-0}
     fi
