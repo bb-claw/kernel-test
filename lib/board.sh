@@ -23,17 +23,43 @@ rm -f "$DMESG_FILE"
 [[ -c "$BOARD_TTY" ]] \
     || warn "BOARD_TTY=$BOARD_TTY is not a character device — proceeding (may be a socat pty symlink)"
 
-# ── board_reset: stub ─────────────────────────────────────────────────────────
-# Phase 6 replaces this with a USB relay command.
+# ── board_reset: CH340 USB relay pulse ────────────────────────────────────────
+# Pulses the relay connected to the board's RST pin via HW_RELAY device.
+# CH340-based relay protocol: relay-1 ON = 0xa0 0x01 0x01 0xa2
+#                              relay-1 OFF = 0xa0 0x01 0x00 0xa1
+# HW_RELAY defaults to /dev/vf2-relay (stable udev symlink from make hw-bootstrap).
+# Falls back to a manual-reset warning when the device is absent.
 board_reset() {
-    warn "board_reset: stub — no hardware reset wired (Phase 6 adds USB relay)"
-    warn "Manual action required: power-cycle or press RST on the board"
+    local relay="${HW_RELAY:-/dev/vf2-relay}"
+    if [[ ! -e "$relay" ]]; then
+        warn "board_reset: $relay not found — reset the board manually"
+        warn "  Run 'make hw-bootstrap' to install the udev rule, then replug the USB relay"
+        return 0
+    fi
+    if [[ ! -w "$relay" ]]; then
+        warn "board_reset: $relay not writable — check udev rule and dialout/uucp group membership"
+        warn "  Manual reset required"
+        return 0
+    fi
+    info "board_reset: pulsing relay via $relay"
+    if ! printf '\xa0\x01\x01\xa2' > "$relay"; then
+        warn "board_reset: relay ON write failed — board may be stuck; manual reset required"
+        return 0
+    fi
+    sleep 0.5
+    if ! printf '\xa0\x01\x00\xa1' > "$relay"; then
+        warn "board_reset: relay OFF write failed — RST pin may still be held; manual toggle required"
+        return 0
+    fi
+    info "board_reset: relay pulsed — board is resetting"
 }
 
 # ── Capture backend selection ─────────────────────────────────────────────────
 # Prefer the C binary (proper termios: O_NOCTTY, tcflush, fdatasync, binary-safe).
 # Fall back to Bash stty+read when the binary is absent (e.g. make bootstrap not run).
 SERIAL_CAPTURE="${SERIAL_CAPTURE:-$REPO_ROOT/tests/programs/serial-capture/bin/serial-capture}"
+
+board_reset
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)

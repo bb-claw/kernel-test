@@ -63,7 +63,17 @@ CLEAN          ?= 0
 BOARD_CONFIG   ?= vf2config
 BOARD_ARCH     ?= riscv
 BOARD_TTY      ?= /dev/ttyUSB0
-TFTP_DIR       ?= /srv/tftp
+TFTP_DIR       ?= $(CURDIR)/tftp
+
+# ── Hardware bootstrap (Phase 6a) — isolated test network + USB relay ─────────
+HW_IFACE       ?= eno1
+HW_HOST_IP     ?= 192.168.100.1
+HW_DHCP_RANGE  ?= 192.168.100.100,192.168.100.200
+HW_RELAY       ?= /dev/vf2-relay
+# CH340 defaults; override in local.mk for other chips (e.g. CP210x: 10c4/ea60).
+# Find your relay's IDs: udevadm info /dev/ttyUSB0 | grep ID_VENDOR_ID\|ID_MODEL_ID
+HW_RELAY_VID   ?= 1a86
+HW_RELAY_PID   ?= 7523
 
 # ── Internal variables ─────────────────────────────────────────────────────────
 BUILD_DIR := build
@@ -100,7 +110,8 @@ export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
-export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR
+export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR \
+       HW_IFACE HW_HOST_IP HW_DHCP_RANGE HW_RELAY HW_RELAY_VID HW_RELAY_PID
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -113,7 +124,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -140,6 +151,19 @@ $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$
 
 bootstrap:
 	$(Q)lib/bootstrap.sh "$(ARCHS)" "$(DATA_REPO)"
+
+# hw-bootstrap: set up host infrastructure for hardware board testing.
+# Installs dnsmasq (DHCP+TFTP on HW_IFACE), systemd-networkd static-IP config
+# (ConfigureWithoutCarrier=yes; /24 hardcoded), NetworkManager unmanaged rule
+# (written only when NM is active — prevents NM from stripping the static IP on
+# carrier events), USB relay udev rule (group=dialout on Debian/Fedora, uucp on
+# Arch), and creates TFTP_DIR.  Needs sudo; idempotent.
+# Separate from 'make bootstrap' — QEMU-only machines (Hetzner) never run this.
+# DRY_RUN=1: print what would be done without writing files or installing packages.
+hw-bootstrap:
+	$(Q)DRY_RUN=$(DRY_RUN) lib/hw-bootstrap.sh \
+	    "$(TFTP_DIR)" "$(HW_IFACE)" "$(HW_HOST_IP)" "$(HW_DHCP_RANGE)" \
+	    "$(HW_RELAY_VID)" "$(HW_RELAY_PID)"
 
 # Initialise kernel-test-data/ from scratch (one-time; prefer bootstrap which also pulls).
 init-data-repo:
@@ -240,7 +264,7 @@ vf2:
 # hw-full:   build → test → hw-deploy → hw-test → report  (QEMU + hardware combined pipeline).
 #
 # Requires: BOARD_TTY set to a real USB-UART device (default /dev/ttyUSB0).
-# Phase 6 adds USB relay reset between hw-deploy and hw-test.
+# USB relay reset handled by board_reset() in lib/board.sh (Phase 6a).
 hw-deploy:
 	@bd="$(BUILD_DIR)/$(BOARD_CONFIG)-$(BOARD_ARCH)"; \
 	mkdir -p $(TFTP_DIR) 2>/dev/null || true; \
@@ -256,7 +280,7 @@ hw-deploy:
 	else \
 	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n'; \
 	fi; \
-	printf '[hw-deploy] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
+	printf '[hw-deploy] relay reset via board_reset() in lib/board.sh (HW_RELAY=%s)\n' '$(HW_RELAY)'
 
 hw-test:
 	$(Q)TIMEOUT=$(TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \
@@ -575,6 +599,7 @@ kernel-test — Linux -rc kernel test harness
 
 Targets:
   bootstrap        Install all build and test dependencies (distro-aware, needs sudo); builds C test binaries (tests/ns/ ns-uts…ns-time, tests/programs/ perf-event arena-test); downloads Toybox; activates git hooks
+  hw-bootstrap     Install hardware board test infrastructure (needs sudo): dnsmasq DHCP+TFTP on HW_IFACE, systemd-networkd static IP, USB relay udev rule, creates TFTP_DIR; DRY_RUN=1 to preview
   hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
   fetch            Fetch: auto-dispatches by preset — mainline -rc tag / stable vX.Y.* tag / stable-rc branch tip / errors on linux-next (use fetch-next)
@@ -588,7 +613,7 @@ Targets:
   extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
-  hw-deploy        Copy kernel + initramfs to TFTP_DIR=/srv/tftp (board fetches via U-Boot tftpboot); BOARD_CONFIG/BOARD_ARCH selectable
+  hw-deploy        Copy kernel + initramfs to TFTP_DIR (default: ./tftp/); board fetches via U-Boot tftpboot; BOARD_CONFIG/BOARD_ARCH selectable
   hw-test          Open BOARD_TTY, capture serial, write vm.status — hardware equivalent of make test; requires BOARD_TTY
   hw               Hardware pipeline: build → hw-deploy → hw-test → report — hardware equivalent of make all
   hw-full          Combined pipeline: build → test (QEMU) → hw-deploy → hw-test → report
@@ -672,6 +697,13 @@ Variables (current values):
   CLEAN               = $(CLEAN)  (set to 1 to force clean rebuild of each build dir in make verify-patch)
   BOARD_CONFIG        = $(BOARD_CONFIG)  (config profile for make hw / make hw-test / make hw-deploy; default: vf2config)
   BOARD_ARCH          = $(BOARD_ARCH)  (arch for make hw / make hw-test / make hw-deploy; default: riscv)
+  TFTP_DIR            = $(TFTP_DIR)  (local TFTP root for make hw-deploy; default: ./tftp/)
+  HW_IFACE            = $(HW_IFACE)  (Ethernet interface for isolated test network; default: eno1)
+  HW_HOST_IP          = $(HW_HOST_IP)  (static IP assigned to HW_IFACE by hw-bootstrap; default: 192.168.100.1)
+  HW_DHCP_RANGE       = $(HW_DHCP_RANGE)  (DHCP pool for board; default: 192.168.100.100,192.168.100.200)
+  HW_RELAY            = $(HW_RELAY)  (USB relay device symlink for board_reset; default: /dev/vf2-relay)
+  HW_RELAY_VID        = $(HW_RELAY_VID)  (USB vendor ID of relay; CH340 default: 1a86)
+  HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
