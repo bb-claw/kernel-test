@@ -107,7 +107,7 @@ Both are appended to `.config` before one `make olddefconfig` resolves them.
 
 **Arch overlay contents:**
 - `*-x86_64.config` / `*-i386.config`: `CONFIG_SERIAL_8250=y` + `CONFIG_SERIAL_8250_CONSOLE=y`
-- `*-arm64.config`: `CONFIG_SERIAL_AMBA_PL011=y` + `CONFIG_SERIAL_AMBA_PL011_CONSOLE=y`
+- `*-arm64.config`: `CONFIG_SERIAL_AMBA_PL011=y` + `CONFIG_SERIAL_AMBA_PL011_CONSOLE=y`; `randdefconfig-arm64.config` also pins `CONFIG_ARM64_4K_PAGES=y` (16K/64K page kernels silently fail to boot on QEMU virt/cortex-a57)
 - `*-riscv.config`: 8250 + `CONFIG_SERIAL_OF_PLATFORM=y` + `CONFIG_FPU=y`
 
 `localconfig` has no overlay (x86_64-only; 8250 options kept in its base).

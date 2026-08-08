@@ -50,7 +50,8 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 - **Tests:** 43 total (1 smoke + 42 custom; see test-inventory.md); next slot: 420_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
 - **Current kernel (mainline clone):** v7.2-rc6; `make smoke` PASS 43/43 all 8 combos (kunitconfig+tinyconfig × 4 archs, kunit 259/259 x86/arm64/i386 + 28/28 riscv); `make ns-smoke` PASS 43/43 all 8 combos (kunitnsconfig+tinynsconfig × 4 archs)
-- **Hetzner-staging (stable-rc clone):** first full run 2026-07-26, v7.1.5-rc2, PASS 30/30 all 8 combos (tinyconfig+defconfig × 4 archs); TCG timings: i386 ~6 min (slowest), x86_64 ~2.5 min, arm64/riscv ~3–8 s (backports QEMU ≥8.x)
+- **stable-rc clone (local):** v7.1.8-rc1; `make extended` 19/20 PASS (randdefconfig/arm64 timed out — stochastic: random disable of CONFIG_ARM64_4K_PAGES flips to 16K pages, silent QEMU hang; fixed in PR #46 by pinning 4K pages in configs/randdefconfig-arm64.config); all real config profiles PASS on all 4 archs; Tested-by sent to LKML for v7.1.8-rc1
+- **randdefconfig arm64 page-size fix (PR #46, merged 2026-08-08):** `configs/randdefconfig-arm64.config` now pins `CONFIG_ARM64_4K_PAGES=y`; 16K/64K page kernels silently fail to boot on QEMU virt/cortex-a57
 
 ## Directory Structure
 
