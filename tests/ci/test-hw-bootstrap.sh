@@ -29,8 +29,9 @@ assert_contains "$out" "enable-tftp"             "dnsmasq: enable-tftp"
 assert_contains "$out" "tftp-root="              "dnsmasq: tftp-root"
 assert_contains "$out" "dhcp-boot=Image,,10.0.0.1" "dnsmasq: dhcp-boot next-server"
 # conf-dir step: either already enabled or dry-run says it would append
-assert_contains "$out" "conf-dir"                "dnsmasq: conf.d inclusion handled"
-assert_contains "$out" "user=$(id -un)"          "dnsmasq: user= set to TFTP dir owner"
+assert_contains "$out" "conf-dir"                    "dnsmasq: conf.d inclusion handled"
+assert_contains "$out" "dnsmasq.service.d"           "dnsmasq: systemd drop-in path"
+assert_contains "$out" "User=$(id -un)"              "dnsmasq: systemd drop-in User= set to caller"
 
 # ── 3. DRY_RUN=1: systemd-networkd config correct ─────────────────────────────
 
