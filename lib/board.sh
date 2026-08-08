@@ -38,7 +38,18 @@ board_reset() {
     fi
     if [[ ! -w "$relay" ]]; then
         warn "board_reset: $relay not writable — check udev rule and dialout/uucp group membership"
-        warn "  Manual reset required"
+        warn "  Manual power-on required"
+        return 0
+    fi
+    # Bail if relay and BOARD_TTY are the same device: writing CH340 relay bytes to the
+    # UART sends protocol garbage to the board's serial RX and does not cut power.
+    local relay_real tty_real
+    relay_real=$(realpath "$relay" 2>/dev/null || true)
+    tty_real=$(realpath "${BOARD_TTY:-}" 2>/dev/null || true)
+    if [[ -n "$relay_real" && "$relay_real" == "$tty_real" ]]; then
+        warn "board_reset: relay ($relay) is the same device as BOARD_TTY — no separate power relay"
+        warn "  Fix: set HW_RELAY_VID/HW_RELAY_PID in local.mk to match a dedicated relay device"
+        warn "  Until then: power the board on manually before make hw-test"
         return 0
     fi
     info "board_reset: pulsing relay via $relay"
@@ -46,7 +57,7 @@ board_reset() {
         warn "board_reset: relay ON write failed — board may be stuck; manual reset required"
         return 0
     fi
-    sleep 3
+    sleep 0.5
     if ! printf '\xa0\x01\x00\xa1' > "$relay"; then
         warn "board_reset: relay OFF write failed — RST pin may still be held; manual toggle required"
         return 0
@@ -63,11 +74,13 @@ board_reset
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
-DEADLINE=$(( VM_START_EPOCH + TIMEOUT ))
 TIMED_OUT=0
+PRE_BOOT_TIMEOUT=${HW_PRE_BOOT_TIMEOUT:-90}
+DEADLINE=$(( VM_START_EPOCH + TIMEOUT ))  # Bash fallback path uses this directly
 
 if [[ -x "$SERIAL_CAPTURE" ]]; then
-    info "Capturing serial from $BOARD_TTY via serial-capture (timeout: ${TIMEOUT}s) → $DMESG_FILE"
+    info "Capturing serial from $BOARD_TTY via serial-capture → $DMESG_FILE"
+    info "(pre-boot: up to ${PRE_BOOT_TIMEOUT}s for U-Boot; test run: ${TIMEOUT}s)"
 
     CAPTURE_PID=''
     cleanup_capture() { [[ -n ${CAPTURE_PID:-} ]] && kill "$CAPTURE_PID" 2>/dev/null || true; }
@@ -76,13 +89,32 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     "$SERIAL_CAPTURE" "$BOARD_TTY" 115200 "$DMESG_FILE" &
     CAPTURE_PID=$!
 
-    # Poll dmesg file for TEST_DONE; honour wall-clock deadline.
+    # Phase 1: wait for U-Boot banner.  Without a relay the board auto-reboots after
+    # each test run; this lets make hw-test catch the *next* fresh boot even if the
+    # board is currently mid-test-run.  With a working relay, U-Boot appears within
+    # a few seconds of board_reset().
+    PRE_BOOT_DEADLINE=$(( VM_START_EPOCH + PRE_BOOT_TIMEOUT ))
     while true; do
-        remaining=$(( DEADLINE - $(date -u +%s) ))
-        if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
-        grep -qF 'TEST_DONE' "$DMESG_FILE" 2>/dev/null && break
+        if grep -qF 'U-Boot' "$DMESG_FILE" 2>/dev/null; then break; fi
+        remaining=$(( PRE_BOOT_DEADLINE - $(date -u +%s) ))
+        if [[ $remaining -le 0 ]]; then
+            warn "U-Boot not detected within ${PRE_BOOT_TIMEOUT}s — is the board powered on?"
+            TIMED_OUT=1; break
+        fi
         sleep 0.5
     done
+
+    # Phase 2: wait for TEST_DONE within HW_TIMEOUT of U-Boot appearing.
+    if [[ $TIMED_OUT -eq 0 ]]; then
+        DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
+        info "U-Boot detected — test timeout: ${TIMEOUT}s"
+        while true; do
+            remaining=$(( DEADLINE - $(date -u +%s) ))
+            if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
+            grep -qF 'TEST_DONE' "$DMESG_FILE" 2>/dev/null && break
+            sleep 0.5
+        done
+    fi
 
     kill "$CAPTURE_PID" 2>/dev/null || true
     wait "$CAPTURE_PID" 2>/dev/null || true

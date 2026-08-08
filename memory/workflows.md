@@ -35,7 +35,7 @@
 | `BOARD_TTY` | `/dev/ttyUSB0` | USB-UART device for `make hw-test` / `make hw` |
 | `BOARD_DTB` | `jh7110-starfive-visionfive-2-v1.2a` | DTB filename (no .dtb) built from kernel tree and copied to `tftp/vf2.dtb` by `make hw-deploy`; v1.3B users: `jh7110-starfive-visionfive-2-v1.3b` |
 | `TFTP_DIR` | `$(CURDIR)/tftp` | Local TFTP root; gitignored; auto-created by `make hw-deploy` |
-| `HW_TIMEOUT` | `120` | Serial capture timeout for board boot (U-Boot + TFTP + kernel + tests); separate from `TIMEOUT` (QEMU) |
+| `HW_TIMEOUT` / `HW_PRE_BOOT_TIMEOUT` | `120` / `90` | Board capture timeout (U-Boot+TFTP+kernel+tests) and pre-boot U-Boot wait; both separate from `TIMEOUT` (QEMU) |
 | `HW_IFACE` | `eno1` | Ethernet interface for isolated test network (`make hw-bootstrap`) |
 | `HW_HOST_IP` | `192.168.100.1` | Static IP on `HW_IFACE`; TFTP next-server in DHCP reply |
 | `HW_DHCP_RANGE` | `192.168.100.100,192.168.100.200` | DHCP pool for the board |

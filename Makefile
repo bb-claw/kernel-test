@@ -78,7 +78,11 @@ HW_RELAY_PID   ?= 7523
 # ── Hardware board boot (Phase 6b) — U-Boot TFTP boot ─────────────────────────
 # HW_TIMEOUT: serial capture timeout for the board (U-Boot + kernel + tests).
 #   Separate from TIMEOUT (QEMU VM); 120s covers U-Boot (~15s) + TFTP + kernel + tests.
-HW_TIMEOUT     ?= 120
+HW_TIMEOUT         ?= 120
+# HW_PRE_BOOT_TIMEOUT: seconds to wait for U-Boot banner before starting HW_TIMEOUT.
+#   Without a relay, the board auto-reboots after each test run; 90s covers one full
+#   test cycle (~65s) plus headroom so hw-test always catches a fresh boot.
+HW_PRE_BOOT_TIMEOUT ?= 90
 # BOARD_DTB: DTB filename (without .dtb) built from the kernel tree and served via TFTP.
 #   VF2 v1.2A default; v1.3B users: override to jh7110-starfive-visionfive-2-v1.3b
 BOARD_DTB      ?= jh7110-starfive-visionfive-2-v1.2a
@@ -120,7 +124,7 @@ export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
 export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR \
        HW_IFACE HW_HOST_IP HW_DHCP_RANGE HW_RELAY HW_RELAY_VID HW_RELAY_PID \
-       HW_TIMEOUT BOARD_DTB
+       HW_TIMEOUT HW_PRE_BOOT_TIMEOUT BOARD_DTB
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
 SHELL := /bin/bash
@@ -726,6 +730,7 @@ Variables (current values):
   BOARD_DTB           = $(BOARD_DTB)  (DTB filename without .dtb; built from kernel tree and served via TFTP; v1.3B: jh7110-starfive-visionfive-2-v1.3b)
   TFTP_DIR            = $(TFTP_DIR)  (local TFTP root for make hw-deploy; default: ./tftp/)
   HW_TIMEOUT          = $(HW_TIMEOUT)  (serial capture timeout for board boot in seconds; default: 120)
+  HW_PRE_BOOT_TIMEOUT = $(HW_PRE_BOOT_TIMEOUT)  (seconds to wait for U-Boot banner before starting HW_TIMEOUT; default: 90)
   HW_IFACE            = $(HW_IFACE)  (Ethernet interface for isolated test network; default: eno1)
   HW_HOST_IP          = $(HW_HOST_IP)  (static IP assigned to HW_IFACE by hw-bootstrap; default: 192.168.100.1)
   HW_DHCP_RANGE       = $(HW_DHCP_RANGE)  (DHCP pool for board; default: 192.168.100.100,192.168.100.200)

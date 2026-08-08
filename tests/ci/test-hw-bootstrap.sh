@@ -163,7 +163,22 @@ else
     pass "validation: uppercase PID rejected (exited non-zero)"
 fi
 
-# ── 11. HW_RELAY in Makefile export block ─────────────────────────────────────
+# ── 11. board_reset same-device guard ────────────────────────────────────────
+
+begin_test "board-reset-same-device"
+tmpdir
+same_dev="$_LAST_TMPDIR/fake-uart-relay"
+touch "$same_dev"; chmod 644 "$same_dev"
+board_reset_output=$(
+    HW_RELAY="$same_dev" BOARD_TTY="$same_dev" bash -c "
+        . '$REPO/lib/common.sh'
+        $(sed -n '/^board_reset()/,/^}/p' "$BOARD_SH")
+        board_reset
+    " 2>&1 || true
+)
+assert_contains "$board_reset_output" "same device" "board_reset: skips when relay == BOARD_TTY"
+
+# ── 12. HW_RELAY in Makefile export block ─────────────────────────────────────
 
 begin_test "hw-relay-exported"
 # The export line spans two lines via \; grep the block for HW_RELAY presence.
