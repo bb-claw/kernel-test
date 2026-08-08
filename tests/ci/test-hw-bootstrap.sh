@@ -34,7 +34,7 @@ assert_contains "$out" "conf-dir"                    "dnsmasq: conf.d inclusion 
 assert_contains "$out" "dnsmasq.service.d"           "dnsmasq: systemd drop-in path"
 assert_contains "$out" "User=$(id -un)"              "dnsmasq: systemd drop-in User= set to caller"
 assert_contains "$out" "ProtectHome=no"              "dnsmasq: systemd drop-in clears ProtectHome"
-assert_contains "$out" "ReadWritePaths="             "dnsmasq: systemd drop-in grants TFTP_DIR write"
+assert_contains "$out" "ProtectSystem=no"            "dnsmasq: systemd drop-in clears ProtectSystem"
 
 # ── 3. DRY_RUN=1: systemd-networkd config correct ─────────────────────────────
 
