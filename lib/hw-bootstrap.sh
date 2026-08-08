@@ -102,7 +102,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/atftpd --daemon --no-fork --user $(id -un) ${TFTP_DIR}
+ExecStart=/usr/bin/atftpd --daemon --no-fork --user $(id -un).$(id -gn) ${TFTP_DIR}
 Restart=on-failure
 RestartSec=5
 
