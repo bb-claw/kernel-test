@@ -23,8 +23,8 @@ Phase 1 already extracted the serial output parser from `vm.sh` into shared help
 2. **No board reset stub** — `board_reset()` stub exists; Phase 6 fills in the USB relay.
 3. **No CI test** — `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty
    pairs and verifies the resulting `vm.status` without hardware.
-4. **No `make board-smoke` / `make board` targets** — both wired; `BOARD_CONFIG` and
-   `BOARD_ARCH` parameterize the target (default: `vf2config` / `riscv`).
+4. **No `make hw-*` targets** — `hw-deploy`, `hw-test`, `hw`, `hw-full` wired;
+   `BOARD_CONFIG` and `BOARD_ARCH` parameterize the targets (default: `vf2config` / `riscv`).
 5. **KTAP timestamps required** — parser regex made optional; works with and without
    `CONFIG_PRINTK_TIME=y`.
 
@@ -37,7 +37,7 @@ All met:
 1. `lib/board.sh` reads from `$BOARD_TTY`, produces identical `vm.status` to a QEMU run.
 2. `board_reset` stub logs "manual action required", does nothing (Phase 6 fills it).
 3. `tests/ci/test-board-serial.sh` — 42 assertions across 13 test groups, all pass.
-4. `make board-smoke` and `make board BOARD_TTY=/dev/ttyUSB0` wired in Makefile.
+4. `make hw-deploy`, `make hw-test`, `make hw`, `make hw-full` wired in Makefile.
 5. `make ci-test` and `make lint` pass.
 
 ---
@@ -51,7 +51,7 @@ Files changed:
 | `lib/board.sh` | New; prefers serial-capture C binary, Bash read fallback |
 | `lib/bootstrap.sh` | Add serial-capture host build step (warn-only on fail) |
 | `lib/common.sh` | KTAP timestamp regex made optional |
-| `Makefile` | `board-smoke`, `board`, `BOARD_CONFIG`, `BOARD_ARCH`, `TFTP_DIR` |
+| `Makefile` | `hw-deploy`, `hw-test`, `hw`, `hw-full`, `BOARD_CONFIG`, `BOARD_ARCH`, `TFTP_DIR` |
 | `tests/ci/test-board-serial.sh` | New; 42 assertions, 5 transcript scenarios |
 | `tests/ci/test-vm-parser.sh` | Board transcript parse-count assertions added |
 | `tests/ci/fixtures/board/transcript-pass.txt` | New; U-Boot + full pass + KTAP + TEST_DONE |
@@ -111,7 +111,7 @@ buffer, socat exits and serial-capture gets EIO.
 
 ### BOARD_CONFIG / BOARD_ARCH parameterisation
 
-`make board` and `make board-smoke` default to `vf2config riscv` but accept any config/arch.
+`make hw` and `make hw-test` default to `vf2config riscv` but accept any config/arch.
 The tftp copy uses `find arch/ -name Image -o -name bzImage` so it works without
 arch-specific Makefile conditionals.
 
@@ -130,7 +130,7 @@ arch-specific Makefile conditionals.
 - **Lint** — `shellcheck` on `lib/board.sh`; context sizes; inventory coverage.
 - **Manual (with hardware)** — connect USB-UART to VisionFive 2, boot a vf2config kernel:
   ```sh
-  make board BOARD_TTY=/dev/ttyUSB0
+  make hw BOARD_TTY=/dev/ttyUSB0
   ```
 - **Parser isolation** — `test-vm-parser.sh` covers KTAP counts (with/without timestamps).
 

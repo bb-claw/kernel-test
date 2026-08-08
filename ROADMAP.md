@@ -138,14 +138,14 @@ make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv   # builds + boots in QEMU ris
 - `tests/programs/serial-capture/serial-capture.c` — C host tool: `O_NOCTTY`, `cfmakeraw`,
   `VMIN=0 VTIME=1` (so SIGTERM reliably interrupts read), `fdatasync` every 8 writes
 - `lib/board.sh`: prefer serial-capture C binary (poll dmesg for TEST_DONE); fall back
-  to Bash `stty`+`read` loop; auto-invoke `lib/report.sh` when env vars present
-- `make board`: copy kernel+initramfs to `TFTP_DIR`, then run board.sh; `BOARD_CONFIG`
-  and `BOARD_ARCH` parameterize the target (default: `vf2config` / `riscv`)
+  to Bash `stty`+`read` loop; produces identical `vm.status` to a QEMU run
+- `make hw-deploy`: copy kernel+initramfs to `TFTP_DIR`; `make hw`: build → hw-deploy
+  → hw-test → report; `make hw-full`: build → QEMU test → hw-deploy → hw-test → report
 - `lib/common.sh`: KTAP timestamp prefix made optional (`CONFIG_PRINTK_TIME=n` support)
 - `board_reset` stub: logs warning + asks for manual power-cycle (upgraded in Phase 6)
 
 CI test `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty pairs
-(pass, kernel panic, mid-test hang, U-Boot hang) — 43 assertions, no hardware required.
+(pass, kernel panic, mid-test hang, U-Boot hang) — 42 assertions, no hardware required.
 
 **Dependency:** Phase 1 (shared parser in common.sh).
 
@@ -174,10 +174,10 @@ USB relay module wired to VF2 RST button pads. Host writes to relay device
 press. `board_reset` calls this, then resumes reading serial — the board reboots and
 U-Boot loads the new kernel from tftp.
 
-**`make board-smoke BOARD=visionfive2`:**
-Quick sanity target: build `vf2config`, copy to tftp dir, trigger reset, capture serial,
-write `vm.status`. Analogous to `make smoke` for QEMU. Use this during bring-up
-iteration — faster feedback than a full run before reset + delivery are confirmed working.
+**`make hw-test BOARD_TTY=/dev/ttyUSB0`:**
+Quick sanity capture: open UART, capture serial, write `vm.status`. Analogous to
+`make test` for QEMU. Use this during bring-up iteration once deploy is confirmed working.
+`make hw-deploy` copies kernel+initramfs to `TFTP_DIR`; `make hw` runs the full pipeline.
 
 **QEMU vs hardware diff:**
 Label hardware runs distinctly: `vf2-7.2-<date>-v7.2-rc6`. After a hardware run passes,
@@ -198,9 +198,9 @@ make diff OLD=reports/mainline-7.2-<date>-v7.2-rc6 NEW=reports/vf2-7.2-<date>-v7
 
 **How to test:**
 ```sh
-make board-smoke BOARD=visionfive2         # first: bring-up sanity
-make board BOARD=visionfive2               # full run once smoke passes
-make diff OLD=<qemu-riscv-run> NEW=<vf2-run>  # find QEMU vs hardware divergence
+make hw-test BOARD_TTY=/dev/ttyUSB0              # first: bring-up sanity (after manual hw-deploy)
+make hw BOARD_TTY=/dev/ttyUSB0                   # full run once hw-test passes
+make diff OLD=<qemu-riscv-run> NEW=<vf2-run>     # find QEMU vs hardware divergence
 ```
 
 **Dependency:** Phases 1, 4, 5.
