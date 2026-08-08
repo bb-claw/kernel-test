@@ -39,7 +39,20 @@ assert_contains "$out" "Name=eth1"                   "networkd: interface name"
 assert_contains "$out" "ConfigureWithoutCarrier=yes" "networkd: configure without carrier"
 assert_contains "$out" "Address=10.1.0.1/24"         "networkd: static IP"
 
-# ── 4. DRY_RUN=1: udev rule contains VID/PID and symlink ─────────────────────
+# ── 4. DRY_RUN=1: NetworkManager unmanaged rule ──────────────────────────────
+
+begin_test "hw-bootstrap-dryrun-nm-unmanaged"
+tmpdir
+out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
+    "$_LAST_TMPDIR/tftp" "eth2" "10.2.0.1" "10.2.0.100,10.2.0.200" "1a86" "7523" 2>&1)
+# NM step is always shown (either the conf content or "not active")
+assert_contains "$out" "NetworkManager" "NM unmanaged: step shown"
+# If NM is active on this host, verify the unmanaged-devices entry
+if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+    assert_contains "$out" "unmanaged-devices=interface-name:eth2" "NM unmanaged: interface entry"
+fi
+
+# ── 6. DRY_RUN=1: udev rule contains VID/PID and symlink ─────────────────────
 
 begin_test "hw-bootstrap-dryrun-udev"
 tmpdir
@@ -52,7 +65,7 @@ assert_contains "$out" 'SYMLINK+="vf2-relay"' "udev: stable symlink"
 assert_contains "$out" 'GROUP="dialout"'      "udev: dialout group"
 assert_contains "$out" 'MODE="0664"'          "udev: mode bits"
 
-# ── 5. DRY_RUN=1: TFTP dir not created ────────────────────────────────────────
+# ── 7. DRY_RUN=1: TFTP dir not created ────────────────────────────────────────
 
 begin_test "hw-bootstrap-dryrun-no-side-effects"
 tmpdir
