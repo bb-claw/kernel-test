@@ -218,14 +218,40 @@ Phase 1: refactor/common-serial-parser        ← do first, no deps
     │
     └── Phase 5: feat/board-serial            ← requires Phase 1
             │
-            └── Phase 6: feat/visionfive2-board  ← requires Phases 1, 4, 5
+            ├── Phase 6: feat/visionfive2-board  ← requires Phases 1, 4, 5
+            └── Phase 7: serial-capture hardening ← deferred; trigger on need
 ```
 
 Recommended sequence if working serially: **1 → 2 → 3 → 4 → 5 → 6**
 
 ---
 
-## Phase 7 — LKML Submission *(nice to have, post-Phase 6)*
+## Phase 7 — `serial-capture` hardening *(deferred — trigger on concrete need)*
+
+Three improvements identified during Phase 5 review. Deferred because the binary
+already works correctly for the VisionFive 2 use case.
+
+**`sigaction()` + VMIN=1** — do first if the file is touched for any reason.
+Replace `signal()` with `sigaction()` with `SA_RESTART` cleared. With SA_RESTART
+absent, SIGTERM causes `read()` to return EINTR immediately; the existing
+`errno == EINTR → continue` path then checks `running` and exits cleanly within
+one syscall rather than waiting up to 100ms for the VTIME timeout. The VMIN=0
+workaround and its explanatory comment can be removed once this is in place.
+
+**Baud rate table** — trigger: a board that runs above 230400 bps.
+Add `B460800`, `B921600`, `B1000000`, `B1500000` to `baud_to_speed()`.
+Three lines, zero risk. Do not add speculatively — add when there is a real board
+to test against.
+
+**`strtol()` for baud argument** — low priority; caller is always a controlled
+Bash script. Only worth doing alongside the `sigaction` change to keep the diff
+coherent.
+
+**Dependency:** Phase 5.
+
+---
+
+## Phase 8 — LKML Submission *(nice to have, post-Phase 6)*
 
 The `summary.mail.txt` report already contains the right content. A `make send` target
 using `git send-email` or `msmtp` would close the original project goal.
