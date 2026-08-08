@@ -23,7 +23,11 @@ assert_file_exists "$FIXTURES/transcript-uboot-hang.txt" "transcript-uboot-hang.
 
 begin_test "board-socat-available"
 if command -v socat &>/dev/null; then pass "socat available"
-else fail "socat not installed (run: make bootstrap)"; fi
+else
+    printf '  skip  socat not installed — skipping board serial replay tests\n'
+    printf '        (install: sudo apt-get install socat  or: make bootstrap)\n'
+    finish
+fi
 
 begin_test "board-serial-capture-backend"
 SC_BIN="$REPO/tests/programs/serial-capture/bin/serial-capture"
