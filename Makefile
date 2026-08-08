@@ -306,8 +306,7 @@ hw-deploy:
 	    printf '[hw-deploy] dtb      → %s/vf2.dtb\n' '$(TFTP_DIR)'; \
 	else \
 	    printf '[hw-deploy] WARN: DTB $(BOARD_DTB).dtb not found — set BOARD_DTB or copy DTB manually to %s/vf2.dtb\n' '$(TFTP_DIR)'; \
-	fi; \
-	printf '[hw-deploy] relay reset via board_reset() in lib/board.sh (HW_RELAY=%s)\n' '$(HW_RELAY)'
+	fi
 
 hw-test:
 	$(Q)TIMEOUT=$(HW_TIMEOUT) BUILD_DIR=$(BUILD_DIR) BOARD_TTY=$(BOARD_TTY) \

@@ -46,7 +46,7 @@ board_reset() {
         warn "board_reset: relay ON write failed — board may be stuck; manual reset required"
         return 0
     fi
-    sleep 0.5
+    sleep 3
     if ! printf '\xa0\x01\x00\xa1' > "$relay"; then
         warn "board_reset: relay OFF write failed — RST pin may still be held; manual toggle required"
         return 0
