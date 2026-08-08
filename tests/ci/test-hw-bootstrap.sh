@@ -82,7 +82,22 @@ board_reset_output=$(
 )
 assert_contains "$board_reset_output" "not found" "board_reset warns on missing relay"
 
-# ── 8. HW_RELAY in Makefile export block ──────────────────────────────────────
+# ── 8. board_reset not-writable relay graceful fallback ──────────────────────
+
+begin_test "board-reset-not-writable"
+tmpdir
+relay_file="$_LAST_TMPDIR/fake-relay"
+touch "$relay_file"; chmod 444 "$relay_file"
+board_reset_output=$(
+    HW_RELAY="$relay_file" bash -c "
+        . '$REPO/lib/common.sh'
+        $(sed -n '/^board_reset()/,/^}/p' "$BOARD_SH")
+        board_reset
+    " 2>&1 || true
+)
+assert_contains "$board_reset_output" "not writable" "board_reset warns on non-writable relay"
+
+# ── 9. HW_RELAY in Makefile export block ──────────────────────────────────────
 
 begin_test "hw-relay-exported"
 # The export line spans two lines via \; grep the block for HW_RELAY presence.

@@ -168,7 +168,7 @@ fi
 if [[ $DRY_RUN -eq 0 ]]; then
     info "--- activating services"
     run_cmd $SUDO udevadm control --reload-rules
-    run_cmd $SUDO udevadm trigger --subsystem-match=tty
+    run_cmd $SUDO udevadm trigger --subsystem-match=tty --subsystem-match=hidraw
     run_cmd $SUDO systemctl enable --now systemd-networkd
     run_cmd $SUDO systemctl restart dnsmasq
 fi
