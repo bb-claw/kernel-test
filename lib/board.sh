@@ -97,14 +97,6 @@ write_run_status      "$STATUS_FILE" "$VM_START_TIME" "$VM_DURATION"
 
 log_run_result "$CONFIG / $ARCH (board: $BOARD_TTY)" || true
 
-# Auto-report when invoked via make (env vars set by Makefile exports).
-if [[ -n ${REPORT_DIR:-} && -n ${DATA_REPO:-} && -n ${KERNEL_TREE:-} ]]; then
-    CONFIGS="${CONFIGS:-$CONFIG}" ARCHS="${ARCHS:-$ARCH}" \
-    BUILD_ONLY_CONFIGS="${BUILD_ONLY_CONFIGS:-}" \
-    RUN_STAMP="${RUN_STAMP:-$VM_START_TIME}" \
-        bash "$REPO_ROOT/lib/report.sh"
-fi
-
 # Mirror vm.sh exit behavior: non-zero on any boot/test failure.
 if [[ "$BOOT_STATUS" != PASS ]] || [[ $(( FAIL_COUNT + KUNIT_FAIL )) -gt 0 ]]; then
     exit 1
