@@ -105,6 +105,7 @@ EOF
 
 # ── systemd-networkd config ────────────────────────────────────────────────────
 # Assigns HW_HOST_IP/24 to HW_IFACE as a static address.
+# Prefix length is hardcoded to /24; HW_HOST_IP and HW_DHCP_RANGE must be in the same /24.
 # Only active on machines running systemd-networkd (not Hetzner).
 
 networkd_conf() {

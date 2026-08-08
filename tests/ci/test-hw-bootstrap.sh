@@ -118,9 +118,26 @@ assert_contains "$board_reset_output" "relay pulsed" "board_reset: success path"
 
 begin_test "hw-bootstrap-vid-pid-validation"
 tmpdir
+# Verify exit non-zero (not just that "1A86" appears in the banner output)
+if DRY_RUN=1 "$HW_BOOTSTRAP" \
+    "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "1A86" "7523" \
+    >/dev/null 2>&1; then
+    fail "validation: uppercase VID should have exited non-zero"
+else
+    pass "validation: uppercase VID rejected (exited non-zero)"
+fi
+# Verify error message names the constraint, not just echoes the raw argument
 out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
     "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "1A86" "7523" 2>&1 || true)
-assert_contains "$out" "1A86" "validation: uppercase VID rejected"
+assert_contains "$out" "lowercase hex" "validation: error message mentions lowercase hex"
+# Verify PID validation also rejects uppercase
+if DRY_RUN=1 "$HW_BOOTSTRAP" \
+    "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "1a86" "75AB" \
+    >/dev/null 2>&1; then
+    fail "validation: uppercase PID should have exited non-zero"
+else
+    pass "validation: uppercase PID rejected (exited non-zero)"
+fi
 
 # ── 11. HW_RELAY in Makefile export block ─────────────────────────────────────
 
