@@ -47,12 +47,28 @@ for s in "${NS_SCRIPTS[@]}"; do
     assert_contains "$content" 'fails=$((fails + 1))' "$s increments fails counter"
 done
 
+# ── Marker guard at top ──────────────────────────────────────────────────────
+
+begin_test "ns-scripts-marker-guard"
+for s in "${NS_SCRIPTS[@]}"; do
+    content=$(cat "$REPO/tests/custom/$s")
+    assert_contains "$content" "/tests/ns-enabled" "$s has /tests/ns-enabled marker guard"
+done
+
 # ── Namespace availability guard at top ───────────────────────────────────────
 
 begin_test "ns-scripts-guard"
 for s in "${NS_SCRIPTS[@]}"; do
     content=$(cat "$REPO/tests/custom/$s")
     assert_contains "$content" "/proc/self/ns/" "$s has /proc/self/ns/ guard"
+done
+
+# ── No elif (Toybox sh 0.8.9 elif bug) ───────────────────────────────────────
+
+begin_test "ns-scripts-no-elif"
+for s in "${NS_SCRIPTS[@]}"; do
+    content=$(cat "$REPO/tests/custom/$s")
+    assert_not_contains "$content" $'\nelif' "$s has no elif"
 done
 
 # ── Exit pattern: [ $fails -eq 0 ] || exit 1 ─────────────────────────────────

@@ -19,12 +19,18 @@ ok "Features line present"
 fp=" $features "
 
 # AArch64 FP — mandatory on ARMv8-A
-printf '%s' "$fp" | grep -q ' fp ' \
-    && ok "FP present" || fail "FP absent (ARMv8-A regression)"
+if printf '%s' "$fp" | grep -q ' fp '; then
+    ok "FP present"
+else
+    fail "FP absent (ARMv8-A regression)"
+fi
 
 # NEON (Advanced SIMD) — mandatory on ARMv8-A
-printf '%s' "$fp" | grep -q ' asimd ' \
-    && ok "NEON (asimd) present" || fail "NEON (asimd) absent (ARMv8-A regression)"
+if printf '%s' "$fp" | grep -q ' asimd '; then
+    ok "NEON (asimd) present"
+else
+    fail "NEON (asimd) absent (ARMv8-A regression)"
+fi
 
 # Optional extensions — report presence, skip if absent.
 # atomics (LSE) requires ARMv8.1-A; QEMU uses -cpu cortex-a57 (ARMv8.0-A) so it is not

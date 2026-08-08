@@ -8,6 +8,8 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/watchdog-enabled ] || { skip "watchdog not enabled for this config (no /tests/watchdog-enabled)"; exit 0; }
+
 # ── Softlockup watchdog (opportunistic) ──────────────────────────────────────
 # CONFIG_SOFTLOCKUP_DETECTOR=n in all tested defconfigs; absent is not a failure.
 wdog_sysctl=/proc/sys/kernel/watchdog

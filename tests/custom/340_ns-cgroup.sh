@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/cgroup ] || { skip "CONFIG_CGROUP_NS=n (no /proc/self/ns/cgroup)"; exit 0; }
 
 NS_CGROUP=/usr/bin/ns-cgroup

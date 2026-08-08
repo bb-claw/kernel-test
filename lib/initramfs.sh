@@ -1,16 +1,17 @@
 #!/bin/bash
-# Build a minimal Toybox cpio initramfs for one architecture.
-# Usage: initramfs.sh <arch>
-# Output: build/initramfs-<arch>.cpio.gz
+# Build a minimal Toybox cpio initramfs for one (config, arch) pair.
+# Usage: initramfs.sh <config> <arch>
+# Output: build/initramfs-<config>-<arch>.cpio.gz
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
-ARCH=${1:?usage: initramfs.sh <arch>}
+CONFIG=${1:?usage: initramfs.sh <config> <arch>}
+ARCH=${2:?usage: initramfs.sh <config> <arch>}
 
 require_env BUILD_DIR CACHE_DIR
 
-STAGE="$BUILD_DIR/initramfs-$ARCH"
-OUTPUT="$BUILD_DIR/initramfs-$ARCH.cpio.gz"
+STAGE="$BUILD_DIR/initramfs-$CONFIG-$ARCH"
+OUTPUT="$BUILD_DIR/initramfs-$CONFIG-$ARCH.cpio.gz"
 
 # ── Locate Toybox binary for this arch ───────────────────────────────────────
 
@@ -22,7 +23,7 @@ TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
 
 # ── Build staging tree ────────────────────────────────────────────────────────
 
-info "Building initramfs for $ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
+info "Building initramfs for $CONFIG/$ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests}
 
@@ -133,6 +134,33 @@ if [[ -x "$ARENA_BIN" ]]; then
     info "arena-test binary installed → $STAGE/usr/bin/"
 else
     warn "arena-test binary not found ($ARENA_BIN) — run: make bootstrap  (410_arena-memory will skip)"
+fi
+
+# ── Write capability markers under /tests/ ───────────────────────────────────
+# Each marker is an empty file; tests check it as the first guard before doing
+# runtime probes (double-guard pattern: infrastructure ready + kernel feature present).
+
+# ns-enabled: written when ns-* binaries are installed (make bootstrap was run)
+if [[ $ns_count -gt 0 ]]; then
+    touch "$STAGE/tests/ns-enabled"
+    info "ns-enabled marker written → /tests/ns-enabled"
+fi
+
+# perf-enabled: written when perf-event binary is installed
+if [[ -x "$PERF_BIN" ]]; then
+    touch "$STAGE/tests/perf-enabled"
+fi
+
+# arena-enabled: written when arena-test binary is installed
+if [[ -x "$ARENA_BIN" ]]; then
+    touch "$STAGE/tests/arena-enabled"
+fi
+
+# watchdog-enabled: written when CONFIG_WATCHDOG=y in the per-(config,arch) .config
+CONFIG_FILE="$BUILD_DIR/$CONFIG-$ARCH/.config"
+if [[ -f "$CONFIG_FILE" ]] && grep -q '^CONFIG_WATCHDOG=y' "$CONFIG_FILE"; then
+    touch "$STAGE/tests/watchdog-enabled"
+    info "watchdog-enabled marker written → /tests/watchdog-enabled"
 fi
 
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────

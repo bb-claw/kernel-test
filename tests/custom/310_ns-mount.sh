@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/mnt ] || { skip "CONFIG_NAMESPACES=n (no /proc/self/ns/mnt)"; exit 0; }
 
 NS_MOUNT=/usr/bin/ns-mount

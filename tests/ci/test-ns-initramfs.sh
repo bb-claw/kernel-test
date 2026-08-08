@@ -11,6 +11,13 @@ begin_test "initramfs-usr-bin-mkdir"
 initramfs_sh=$(cat "$REPO/lib/initramfs.sh")
 assert_contains "$initramfs_sh" "usr/bin" "usr/bin in mkdir line"
 
+# ── initramfs.sh: per-(config,arch) args ─────────────────────────────────────
+
+begin_test "initramfs-config-arg"
+assert_contains "$initramfs_sh" 'CONFIG=${1:?'  "CONFIG is first required arg"
+assert_contains "$initramfs_sh" 'ARCH=${2:?'    "ARCH is second required arg"
+assert_contains "$initramfs_sh" 'initramfs-$CONFIG-$ARCH'  "output filename includes config and arch"
+
 # ── initramfs.sh: NS_BIN_DIR copy loop ───────────────────────────────────────
 
 begin_test "initramfs-ns-bin-dir"
@@ -18,6 +25,15 @@ assert_contains "$initramfs_sh" "NS_BIN_DIR"          "NS_BIN_DIR variable defin
 assert_contains "$initramfs_sh" 'tests/ns/bin/$ARCH'  "arch-specific ns bin path"
 assert_contains "$initramfs_sh" "usr/bin/"            "copy destination is usr/bin/"
 assert_contains "$initramfs_sh" "make bootstrap"      "skip message mentions bootstrap"
+
+# ── initramfs.sh: capability marker files ────────────────────────────────────
+
+begin_test "initramfs-markers"
+assert_contains "$initramfs_sh" "ns-enabled"       "ns-enabled marker present"
+assert_contains "$initramfs_sh" "perf-enabled"     "perf-enabled marker present"
+assert_contains "$initramfs_sh" "arena-enabled"    "arena-enabled marker present"
+assert_contains "$initramfs_sh" "watchdog-enabled" "watchdog-enabled marker present"
+assert_contains "$initramfs_sh" "CONFIG_WATCHDOG=y" "watchdog marker greps .config"
 
 # ── build.sh: EFFECTIVE_CONFIG and NS_BASE ────────────────────────────────────
 

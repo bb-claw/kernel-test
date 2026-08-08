@@ -13,7 +13,7 @@ Goal: systematic community verification of each -rc kernel.
 make all
   └─ lib/fetch.sh / lib/fetch-stable-rc.sh   auto-dispatch by preset: mainline rc tag / stable vX.Y.* tag / stable-rc branch tip
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
-  └─ lib/initramfs.sh    Toybox cpio initramfs; inject tests/custom/*.sh + ns-* binaries (tests/ns/) + perf-event + arena-test (tests/programs/)
+  └─ lib/initramfs.sh    Toybox cpio initramfs per (config, arch); inject tests/custom/*.sh + ns-* binaries (tests/ns/) + perf-event + arena-test (tests/programs/); write capability markers (/tests/ns-enabled, perf-enabled, arena-enabled, watchdog-enabled)
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
   └─ lib/report.sh       aggregate status files → summary.html + summary.txt; copies vm.status; auto-diffs vs prev run + baseline; calls warnings.sh
   └─ lib/warnings.sh     extract ': warning:' lines from build logs (PASS builds only); per-combo files + summary (counts, NEW/FIXED since prev, cross-arch divergence vs x86_64); make warnings standalone
@@ -41,14 +41,15 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | report.sh prefers kernel Makefile for version | git describe fails on untagged trees (stable-rc); read_kernel_makefile_version always authoritative |
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 | preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in mainline/stable/stable-rc clones; directory name selects presets/kernel-test-*.mk; `kernel-test-next` preset sets `LINUX_NEXT=1`, causing `make fetch` to error and redirect to `make fetch-next` |
+| Per-(config,arch) initramfs | watchdog marker requires grepping per-build `.config` for `CONFIG_WATCHDOG=y`; one `initramfs-$CONFIG-$ARCH.cpio.gz` per pair → markers reflect actual config state; `build.status` prerequisite auto-rebuilds initramfs after kernel build |
 
-## Current State (2026-07-26)
+## Current State (2026-08-08)
 
 - **Architectures:** x86_64 + i386 + arm64 + riscv (all default); x86 uses KVM when `/dev/kvm` is accessible, falls back to TCG (2× timeout) on non-KVM hosts (e.g. Hetzner); arm64/riscv always use TCG (riscv requires `riscv64-linux-gnu-gcc`, `qemu-system-riscv64 ≥8.x` — bookworm-backports for QEMU B-extension support); arm64 QEMU uses `-cpu cortex-a57` (ARMv8.0-A) — LSE atomics (ARMv8.1-A mandatory) are absent from `/proc/cpuinfo Features`, which is expected, not a regression; Toybox mapping: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64; Clang builds (`LLVM=1`) require `clang` + `lld` + `llvm` — all three packages installed by `make bootstrap` (clang does not pull in llvm on Arch or Debian)
 - **Config profiles:** 9 default + 2 extra (localconfig x86_64-only; vf2config riscv-only JH7110 VisionFive 2); each uses two-layer fragments: arch-neutral base (`configs/<profile>.config`) + arch overlay (`configs/<profile>-<arch>.config` — serial driver, FPU; absent = silently skipped)
 - **Tests:** 43 total (1 smoke + 42 custom; see test-inventory.md); next slot: 420_
 - **Fetch strategy:** four clones (`kernel-test`, `kernel-test-stable`, `kernel-test-stable-rc`, `kernel-test-next`), each auto-loads preset by directory name; `make fetch` dispatches correctly in the first three; `kernel-test-next` uses `make fetch-next` (linux-next has no rc tags); `~/git/linux-next` is the kernel tree for `kernel-test-next`
-- **Current kernel (mainline clone):** v7.2-rc6
+- **Current kernel (mainline clone):** v7.2-rc6; `make smoke` PASS 43/43 all 8 combos (kunitconfig+tinyconfig × 4 archs, kunit 259/259 x86/arm64/i386 + 28/28 riscv); `make ns-smoke` PASS 43/43 all 8 combos (kunitnsconfig+tinynsconfig × 4 archs)
 - **Hetzner-staging (stable-rc clone):** first full run 2026-07-26, v7.1.5-rc2, PASS 30/30 all 8 combos (tinyconfig+defconfig × 4 archs); TCG timings: i386 ~6 min (slowest), x86_64 ~2.5 min, arm64/riscv ~3–8 s (backports QEMU ≥8.x)
 
 ## Directory Structure

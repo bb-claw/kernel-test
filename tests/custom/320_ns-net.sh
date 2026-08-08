@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/net ] || { skip "CONFIG_NET_NS=n (no /proc/self/ns/net)"; exit 0; }
 
 NS_NET=/usr/bin/ns-net
@@ -29,10 +30,12 @@ self_inode=$(readlink /proc/self/ns/net 2>/dev/null)
 child_inode=$(unshare -n sh -c 'readlink /proc/self/ns/net' 2>/dev/null)
 if [ -n "$child_inode" ] && [ "$child_inode" != "$self_inode" ]; then
     ok "net: inode changes in new net ns (unshare -n)"
-elif [ -z "$child_inode" ]; then
-    skip "net: unshare -n not functional (C binary tests cover it)"
 else
-    fail "net: inode unchanged after unshare -n (got '$child_inode')"
+    if [ -z "$child_inode" ]; then
+        skip "net: unshare -n not functional (C binary tests cover it)"
+    else
+        fail "net: inode unchanged after unshare -n (got '$child_inode')"
+    fi
 fi
 
 # ── C binary: inode change + /proc/net isolation ─────────────────────────

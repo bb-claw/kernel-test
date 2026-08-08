@@ -50,7 +50,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | `290_ns-uts-ipc` | nsfs inode format for all 8 ns types; `/proc/sys/user` limits; UTS hostname isolation via unshare; ns-uts/ns-ipc C binaries |
 | `300_ns-pid` | PID namespace inode change via unshare -fp; ns-pid clone (PID=1) + init-death cascade SIGKILL |
 | `310_ns-mount` | Mount ns inode + bind visibility; ns-mount: MS_MOVE, mknod SB_I_NODEV, propagate_mnt, pivot_root |
-| `320_ns-net` | Net ns inode + lo-only isolation (no host interface leak); ns-net clone + proc-net |
+| `320_ns-net` | Net ns inode + host interface leak detection (lo + per-namespace admin tunnels allowed; real host iface = fail); ns-net clone + proc-net |
 | `330_ns-user` | User ns inode + uid 0 in ns; ns-user idmap + nested-6 (CVE-2018-18955) |
 | `340_ns-cgroup` | Cgroup ns inode + /sys/fs/cgroup; ns-cgroup scoping + release-agent (CVE-2022-0492) |
 | `350_ns-time` | Time ns timens_offsets; ns-time offset (+100s CLOCK_MONOTONIC) + setns-mt (CVE-2023-23586) |
@@ -86,16 +86,17 @@ Next available slot: **420_** — 43 total (tests/001_smoke.sh + tests/custom/*.
 | 410 arena-memory | PASS | PASS | PASS | PASS | PASS |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
-290–360 require ns-variant configs (tinynsconfig/defnsconfig); all skip on tinyconfig/allnoconfig.
+290–360 require an ns-variant config (*nsconfig); skip via `/tests/ns-enabled` marker on tinyconfig/allnoconfig/defconfig/kunitconfig etc.
 370/380 skip on all non-riscv/non-arm64 arches (x86_64, i386 runs always skip).
-390 watchdog: PASS on defconfig/kunitconfig (watchdog config fragments applied); skip on tinyconfig/allnoconfig/randdefconfig (no watchdog fragment for those profiles).
-400 requires CONFIG_PERF_EVENTS=y (present in defconfig/randdef, absent in tinyconfig/allnoconfig).
+390 watchdog: guarded by `/tests/watchdog-enabled` marker (written when CONFIG_WATCHDOG=y in .config); PASS on defconfig/kunitconfig; skip on tinyconfig/allnoconfig/randdefconfig.
+400 guarded by `/tests/perf-enabled` marker (written when perf-event binary present); requires CONFIG_PERF_EVENTS=y (present in defconfig/randdef, absent in tinyconfig/allnoconfig).
+410 guarded by `/tests/arena-enabled` marker (written when arena-test binary present).
 
 ---
 
 ## How to Add a Test
 
-1. Create `tests/custom/200_name.sh` (next slot) — make executable: `chmod +x`
+1. Create `tests/custom/420_name.sh` (next slot) — make executable: `chmod +x`
 2. Pattern:
 ```sh
 #!/bin/sh
@@ -109,4 +110,5 @@ skip() { printf 'skip: %s\n' "$*"; }
 [ $fails -eq 0 ] || exit 1
 ```
 3. Avoid Toybox sh pitfalls — see `memory/code-quality.md`
-4. Update this file and `CLAUDE.md` Key files table
+4. If the test depends on a config capability (ns, watchdog, perf, arena): check the matching `/tests/<feature>-enabled` marker as the *first* guard; runtime probing follows as the second guard (double-guard pattern)
+5. Update this file and `CLAUDE.md` Key files table

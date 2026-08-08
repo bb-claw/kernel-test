@@ -8,6 +8,7 @@ fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 ARENA_BIN=/usr/bin/arena-test
+[ -f /tests/arena-enabled ] || { skip "arena not enabled for this config (no /tests/arena-enabled)"; exit 0; }
 [ -x "$ARENA_BIN" ] || { skip "arena-test binary absent (run: make bootstrap)"; exit 0; }
 
 # Run binary; redirect to avoid Toybox if-out=$() pitfall.

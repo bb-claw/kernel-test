@@ -37,6 +37,12 @@ inv="$REPO/memory/test-inventory.md"
 assert_file_exists "$inv" "test-inventory.md exists"
 assert_contains "$(cat "$inv")" "390_" "slot 390_ in inventory"
 
+# ── Marker guard ─────────────────────────────────────────────────────────────
+
+begin_test "watchdog-script-marker-guard"
+content=$(cat "$SCRIPT")
+assert_contains "$content" "/tests/watchdog-enabled" "has /tests/watchdog-enabled marker guard"
+
 # ── Skip guard: absent device ─────────────────────────────────────────────────
 # WATCHDOG_DEV=/nonexistent forces the device-absent skip path.
 # Do NOT omit WATCHDOG_DEV here: writing to an actual /dev/watchdog on the CI host

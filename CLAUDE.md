@@ -80,6 +80,7 @@ VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 - **No `$_varname`** — Toybox parses `$_x` as `$_` (last-arg special var) + literal `x`; always use plain names without leading underscores
 - **`$(( ))`** — avoid in while loops (OOM in 512 MB VM); use `for i in 1 2 3 ...`
 - **`/bin/sh`** — always full path when forking a shell; bare `sh` hits Toybox NOFORK and loses stdout
+- **No `\<newline>` inside pipelines** — Toybox sh bug: `cmd | grep -q 'pat' \` + newline passes the next line's leading whitespace as a filename to grep; use `if cmd | grep -q 'pat'; then ok; else fail; fi`
 - See `memory/code-quality.md` for the full pitfall list and pattern template
 
 ---
@@ -90,7 +91,8 @@ VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 2. `exit 0` = pass; non-zero = fail; print `ok: msg` / `FAIL: msg` / `skip: msg`
 3. Harness injects all `tests/custom/*.sh` into the initramfs and runs them sequentially in the VM
 4. Stage both the script and the updated `memory/test-inventory.md` — pre-commit enforces this
-5. If the test needs C code: add a subdir under `tests/programs/` (see `perf-event/` or `arena-test/` as patterns); add build + copy steps to `lib/bootstrap.sh` and `lib/initramfs.sh`; add a skip guard in the shell script for the absent-binary case
+5. If the test gates on a config capability (ns, watchdog, perf, arena): check the matching `/tests/<feature>-enabled` marker as the *first* guard (written by `lib/initramfs.sh` at build time); runtime probing is the second guard (double-guard pattern)
+6. If the test needs C code: add a subdir under `tests/programs/` (see `perf-event/` or `arena-test/` as patterns); add build + copy steps to `lib/bootstrap.sh` and `lib/initramfs.sh`; add a skip guard in the shell script for the absent-binary case
 
 ---
 
