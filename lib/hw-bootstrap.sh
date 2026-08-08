@@ -101,7 +101,7 @@ interface=${HW_IFACE}
 bind-interfaces
 dhcp-range=${HW_DHCP_RANGE},1h
 dhcp-option=option:router
-dhcp-leasefile=${TFTP_DIR}/dnsmasq.leases
+dhcp-leasefile=/tmp/kernel-test-dnsmasq.leases
 enable-tftp
 tftp-root=${TFTP_DIR}
 dhcp-boot=Image,,${HW_HOST_IP}

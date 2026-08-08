@@ -25,7 +25,7 @@ out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
 assert_contains "$out" "interface=eth0"          "dnsmasq: interface field"
 assert_contains "$out" "bind-interfaces"         "dnsmasq: bind-interfaces"
 assert_contains "$out" "10.0.0.100,10.0.0.200"  "dnsmasq: dhcp-range"
-assert_contains "$out" "dhcp-leasefile="         "dnsmasq: lease file in TFTP_DIR"
+assert_contains "$out" "dhcp-leasefile=/tmp/"    "dnsmasq: lease file in /tmp (world-writable)"
 assert_contains "$out" "enable-tftp"             "dnsmasq: enable-tftp"
 assert_contains "$out" "tftp-root="              "dnsmasq: tftp-root"
 assert_contains "$out" "dhcp-boot=Image,,10.0.0.1"      "dnsmasq: dhcp-boot next-server"
