@@ -44,10 +44,12 @@ begin_test "hw-bootstrap-dryrun-udev"
 tmpdir
 out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
     "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "dead" "beef" 2>&1)
+assert_contains "$out" 'SUBSYSTEM=="tty"'     "udev: subsystem filter"
 assert_contains "$out" 'idVendor}=="dead"'   "udev: vendor ID"
 assert_contains "$out" 'idProduct}=="beef"'  "udev: product ID"
 assert_contains "$out" 'SYMLINK+="vf2-relay"' "udev: stable symlink"
 assert_contains "$out" 'GROUP="dialout"'      "udev: dialout group"
+assert_contains "$out" 'MODE="0664"'          "udev: mode bits"
 
 # ── 5. DRY_RUN=1: TFTP dir not created ────────────────────────────────────────
 
@@ -97,7 +99,30 @@ board_reset_output=$(
 )
 assert_contains "$board_reset_output" "not writable" "board_reset warns on non-writable relay"
 
-# ── 9. HW_RELAY in Makefile export block ──────────────────────────────────────
+# ── 9. board_reset success path ──────────────────────────────────────────────
+
+begin_test "board-reset-success"
+tmpdir
+relay_file="$_LAST_TMPDIR/fake-relay-writable"
+touch "$relay_file"; chmod 644 "$relay_file"
+board_reset_output=$(
+    HW_RELAY="$relay_file" bash -c "
+        . '$REPO/lib/common.sh'
+        $(sed -n '/^board_reset()/,/^}/p' "$BOARD_SH")
+        board_reset
+    " 2>&1 || true
+)
+assert_contains "$board_reset_output" "relay pulsed" "board_reset: success path"
+
+# ── 10. VID/PID validation rejects uppercase ──────────────────────────────────
+
+begin_test "hw-bootstrap-vid-pid-validation"
+tmpdir
+out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
+    "$_LAST_TMPDIR/tftp" "eth0" "10.0.0.1" "10.0.0.100,10.0.0.200" "1A86" "7523" 2>&1 || true)
+assert_contains "$out" "1A86" "validation: uppercase VID rejected"
+
+# ── 11. HW_RELAY in Makefile export block ─────────────────────────────────────
 
 begin_test "hw-relay-exported"
 # The export line spans two lines via \; grep the block for HW_RELAY presence.

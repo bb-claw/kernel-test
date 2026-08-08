@@ -15,6 +15,11 @@ HW_DHCP_RANGE="${4:?}"
 HW_RELAY_VID="${5:?}"
 HW_RELAY_PID="${6:?}"
 
+[[ "$HW_RELAY_VID" =~ ^[0-9a-f]{4}$ ]] \
+    || die "HW_RELAY_VID='$HW_RELAY_VID' must be 4 lowercase hex digits (e.g. 1a86)"
+[[ "$HW_RELAY_PID" =~ ^[0-9a-f]{4}$ ]] \
+    || die "HW_RELAY_PID='$HW_RELAY_PID' must be 4 lowercase hex digits (e.g. 7523)"
+
 DRY_RUN=${DRY_RUN:-0}
 
 # ── Root vs sudo ───────────────────────────────────────────────────────────────
