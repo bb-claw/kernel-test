@@ -121,7 +121,7 @@ interface=${HW_IFACE}
 bind-interfaces
 dhcp-range=${HW_DHCP_RANGE},1h
 dhcp-option=option:router
-dhcp-leasefile=/tmp/kernel-test-dnsmasq.leases
+dhcp-leasefile=/run/kernel-test-dnsmasq/dnsmasq.leases
 enable-tftp
 tftp-root=${TFTP_DIR}
 dhcp-boot=Image,,${HW_HOST_IP}
@@ -150,6 +150,8 @@ ExecStart=/usr/bin/dnsmasq --conf-file=/etc/dnsmasq.d/vf2.conf --no-daemon --log
 User=$(id -un)
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+RuntimeDirectory=kernel-test-dnsmasq
+RuntimeDirectoryMode=0755
 Restart=on-failure
 RestartSec=5
 
