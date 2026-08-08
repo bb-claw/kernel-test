@@ -35,8 +35,9 @@ begin_test "hw-bootstrap-dryrun-networkd"
 tmpdir
 out=$(DRY_RUN=1 "$HW_BOOTSTRAP" \
     "$_LAST_TMPDIR/tftp" "eth1" "10.1.0.1" "10.1.0.100,10.1.0.200" "1a86" "7523" 2>&1)
-assert_contains "$out" "Name=eth1"       "networkd: interface name"
-assert_contains "$out" "Address=10.1.0.1/24" "networkd: static IP"
+assert_contains "$out" "Name=eth1"                   "networkd: interface name"
+assert_contains "$out" "ConfigureWithoutCarrier=yes" "networkd: configure without carrier"
+assert_contains "$out" "Address=10.1.0.1/24"         "networkd: static IP"
 
 # ── 4. DRY_RUN=1: udev rule contains VID/PID and symlink ─────────────────────
 
