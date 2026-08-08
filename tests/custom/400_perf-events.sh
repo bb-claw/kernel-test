@@ -8,6 +8,7 @@ skip() { printf 'skip: %s\n' "$*"; }
 
 PERF_BIN=/usr/bin/perf-event
 
+[ -f /tests/perf-enabled ] || { skip "perf not enabled for this config (no /tests/perf-enabled)"; exit 0; }
 [ -x "$PERF_BIN" ] || { skip "perf-event binary absent (run: make bootstrap)"; exit 0; }
 
 [ -r /proc/sys/kernel/perf_event_paranoid ] || {

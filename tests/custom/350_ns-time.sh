@@ -6,6 +6,7 @@ fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
 # Time namespace is optional; skip silently if not built
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/time ] || { skip "CONFIG_TIME_NS=n (no /proc/self/ns/time)"; exit 0; }
 
 NS_TIME=/usr/bin/ns-time

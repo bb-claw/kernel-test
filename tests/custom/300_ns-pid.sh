@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/pid ] || { skip "CONFIG_PID_NS=n (no /proc/self/ns/pid)"; exit 0; }
 
 NS_PID=/usr/bin/ns-pid
@@ -29,10 +30,12 @@ self_inode=$(readlink /proc/self/ns/pid 2>/dev/null)
 child_inode=$(unshare -fp sh -c 'readlink /proc/self/ns/pid' 2>/dev/null)
 if [ -n "$child_inode" ] && [ "$child_inode" != "$self_inode" ]; then
     ok "PID: inode changes in new pid ns (unshare -fp)"
-elif [ -z "$child_inode" ]; then
-    skip "PID: unshare -fp not functional (C binary tests cover it)"
 else
-    fail "PID: inode unchanged after unshare -fp (got '$child_inode')"
+    if [ -z "$child_inode" ]; then
+        skip "PID: unshare -fp not functional (C binary tests cover it)"
+    else
+        fail "PID: inode unchanged after unshare -fp (got '$child_inode')"
+    fi
 fi
 
 # ── C binary: PID=1 and NSpid verification ───────────────────────────────

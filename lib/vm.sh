@@ -12,7 +12,7 @@ ARCH=${2:?usage: vm.sh <config> <arch>}
 require_env BUILD_DIR TIMEOUT
 
 OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
-INITRAMFS="$BUILD_DIR/initramfs-$ARCH.cpio.gz"
+INITRAMFS="$BUILD_DIR/initramfs-$CONFIG-$ARCH.cpio.gz"
 DMESG_FILE="$OUT_DIR/dmesg.txt"
 QEMU_LOG="$OUT_DIR/qemu.log"
 STATUS_FILE="$OUT_DIR/vm.status"

@@ -128,11 +128,11 @@ endef
 $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a)))))
 
 define _initramfs_rule
-build/initramfs-$(1).cpio.gz:
-	@printf '[initramfs] %s\n' $(1)
-	$$(Q)lib/initramfs.sh $(1)
+build/initramfs-$(1)-$(2).cpio.gz: build/$(1)-$(2)/build.status
+	@printf '[initramfs] %s %s\n' $(1) $(2)
+	$$(Q)lib/initramfs.sh $(1) $(2)
 endef
-$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(a))))
+$(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(c),$(a)))))
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -249,10 +249,10 @@ hw-deploy:
 	else \
 	    printf '[hw-deploy] WARN: kernel not found in %s/arch — run: make build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n' "$$bd"; \
 	fi; \
-	if cp "$(BUILD_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" "$(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" 2>/dev/null; then \
+	if cp "$(BUILD_DIR)/initramfs-$(BOARD_CONFIG)-$(BOARD_ARCH).cpio.gz" "$(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" 2>/dev/null; then \
 	    printf '[hw-deploy] initramfs → %s/initramfs-$(BOARD_ARCH).cpio.gz\n' '$(TFTP_DIR)'; \
 	else \
-	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs ARCHS=$(BOARD_ARCH) first\n'; \
+	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n'; \
 	fi; \
 	printf '[hw-deploy] Phase 5: reset the board manually (Phase 6 adds USB relay reset)\n'
 
@@ -263,8 +263,8 @@ hw-test:
 hw:
 	+@rc=0; \
 	 $(MAKE) NO_FETCH=1 build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) || rc=1; \
-	 $(MAKE) initramfs ARCHS=$(BOARD_ARCH)                                  || true; \
-	 $(MAKE) hw-deploy                                                        || rc=1; \
+	 $(MAKE) initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH)             || true; \
+	 $(MAKE) hw-deploy                                                         || rc=1; \
 	 $(MAKE) hw-test                                                           || rc=1; \
 	 $(MAKE) report CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH); \
 	 exit $$rc
@@ -273,7 +273,7 @@ hw-full:
 	+@$(MAKE) fetch
 	+@rc=0; \
 	 $(MAKE) build     CONFIGS="$(sort $(CONFIGS) $(BOARD_CONFIG))" ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))" || rc=1; \
-	 $(MAKE) initramfs ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))"                                               || true; \
+	 $(MAKE) initramfs CONFIGS="$(sort $(CONFIGS) $(BOARD_CONFIG))" ARCHS="$(sort $(ARCHS) $(BOARD_ARCH))"  || true; \
 	 $(MAKE) test                                                                                             || rc=1; \
 	 $(MAKE) hw-deploy                                                                                        || rc=1; \
 	 $(MAKE) hw-test                                                                                          || rc=1; \
@@ -364,13 +364,15 @@ else
 	exit $$rc
 endif
 
-# Build one initramfs per arch (shared across config variants).
+# Build one initramfs per (config, arch) pair so each can include config-specific markers.
 initramfs:
-	@echo "[initramfs] Archs: $(ARCHS)"
+	@echo "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
-	for arch in $(ARCHS); do \
-		printf '[initramfs] %s\n' "$$arch"; \
-		lib/initramfs.sh "$$arch" || rc=1; \
+	for config in $(BOOT_CONFIGS); do \
+		for arch in $(ARCHS); do \
+			printf '[initramfs] %s %s\n' "$$config" "$$arch"; \
+			lib/initramfs.sh "$$config" "$$arch" || rc=1; \
+		done; \
 	done; \
 	exit $$rc
 
@@ -378,7 +380,7 @@ initramfs:
 # BUILD_ONLY_CONFIGS are excluded (allmodconfig, randconfig).
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
-     $(foreach a,$(ARCHS),build/initramfs-$(a).cpio.gz)
+     $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
 	@echo "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
 	$(Q)rc=0; \
 	for config in $(BOOT_CONFIGS); do \

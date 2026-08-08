@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/uts ] || { skip "CONFIG_NAMESPACES=n (no /proc/self/ns/uts)"; exit 0; }
 
 NS_UTS=/usr/bin/ns-uts

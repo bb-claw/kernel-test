@@ -5,6 +5,7 @@ ok()   { printf 'ok: %s\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*"; fails=$((fails + 1)); }
 skip() { printf 'skip: %s\n' "$*"; }
 
+[ -f /tests/ns-enabled ] || { skip "ns not enabled for this config (no /tests/ns-enabled)"; exit 0; }
 [ -e /proc/self/ns/uts ] || { skip "CONFIG_NAMESPACES=n (no /proc/self/ns/uts)"; exit 0; }
 
 NS_UTS=/usr/bin/ns-uts
@@ -53,10 +54,12 @@ orig=$(hostname)
 result=$(unshare -u sh -c 'hostname ns-test-290; hostname' 2>/dev/null)
 if [ "$result" = "ns-test-290" ]; then
     ok "UTS: hostname isolated in unshare -u"
-elif [ -z "$result" ]; then
-    skip "UTS: unshare -u not functional (C binary tests cover it)"
 else
-    fail "UTS: hostname not isolated (got '$result')"
+    if [ -z "$result" ]; then
+        skip "UTS: unshare -u not functional (C binary tests cover it)"
+    else
+        fail "UTS: hostname not isolated (got '$result')"
+    fi
 fi
 
 # Host hostname must be unchanged after child exited

@@ -224,10 +224,25 @@ TXT="$RUN_DIR/summary.txt"
             fi
         fi
         notes="${fr}"
-        [[ -n $ftests ]] && notes="${notes:+$notes | }failed: ${ftests// /, }"
+        fail_count=${tests_fail:-0}
+        [[ $fail_count -gt 0 ]] 2>/dev/null && notes="${notes:+$notes | }${fail_count} failed" || true
         [[ ${corr:-} == 1 ]] && notes="${notes:+$notes | }cfg-fixed"
         printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
             "$cfg" "$arc" "$bld" "$bt" "$tests_col" "$ts" "$dur" "$notes"
+    done
+
+    # List individual failed test names below the table (avoids line-wrap in Notes column)
+    _any_failed=0
+    for row in "${ROWS[@]}"; do
+        IFS='|' read -r cfg arc bld bt tp tt kp kf ts dur fr ftests corr <<< "$row"
+        [[ -n $ftests ]] || continue
+        if [[ $_any_failed -eq 0 ]]; then
+            printf '\nFailed tests:\n'
+            _any_failed=1
+        fi
+        for t in $ftests; do
+            printf '  %-16s %-8s %s\n' "$cfg" "$arc" "$t"
+        done
     done
 
     printf '\nConfig fingerprints (sha256):\n'
