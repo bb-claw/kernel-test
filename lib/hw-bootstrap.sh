@@ -87,6 +87,26 @@ install_dnsmasq() {
     esac
 }
 
+# ── dnsmasq conf.d inclusion ──────────────────────────────────────────────────
+# Debian/Ubuntu enable conf-dir=/etc/dnsmasq.d/,*.conf by default; Arch does not.
+# Append the directive when absent so vf2.conf is actually loaded.
+
+ensure_dnsmasq_confd() {
+    local conf="/etc/dnsmasq.conf"
+    [[ -f "$conf" ]] || return 0
+    if grep -q '^conf-dir=.*/etc/dnsmasq.d' "$conf" 2>/dev/null; then
+        info "dnsmasq: conf-dir already enabled"
+        return
+    fi
+    if [[ $DRY_RUN -eq 1 ]]; then
+        dry_info "would append: conf-dir=/etc/dnsmasq.d/,*.conf to $conf"
+        return
+    fi
+    printf '\n# kernel-test: load per-service configs\nconf-dir=/etc/dnsmasq.d/,*.conf\n' \
+        | $SUDO tee -a "$conf" > /dev/null
+    info "enabled: conf-dir=/etc/dnsmasq.d/,*.conf in $conf"
+}
+
 # ── dnsmasq config ─────────────────────────────────────────────────────────────
 # bind-interfaces: dnsmasq only listens on HW_IFACE, never touches main LAN DHCP.
 # dhcp-boot: injects next-server (serverip) into DHCP reply → U-Boot dhcp sets
@@ -174,6 +194,7 @@ install_dnsmasq
 
 # 2. dnsmasq config
 info "--- [2/6] dnsmasq config → /etc/dnsmasq.d/vf2.conf"
+ensure_dnsmasq_confd
 write_file /etc/dnsmasq.d/vf2.conf "$(dnsmasq_conf)"
 
 # 3. systemd-networkd config
