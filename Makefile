@@ -629,7 +629,7 @@ define HELP_TEXT
 kernel-test — Linux -rc kernel test harness
 
 Targets:
-  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); builds C test binaries (tests/ns/ ns-uts…ns-time, tests/programs/ perf-event arena-test); downloads Toybox; activates git hooks
+  bootstrap        Install all build and test dependencies (distro-aware, needs sudo); installs musl-tools; builds C test binaries (tests/ns/ ns-uts…ns-time, tests/programs/ perf-event arena-test serial-capture); downloads Toybox; activates git hooks
   hw-bootstrap     Install hardware board test infrastructure (needs sudo): dnsmasq DHCP+TFTP on HW_IFACE, systemd-networkd static IP, USB relay udev rule, creates TFTP_DIR; DRY_RUN=1 to preview
   hooks            Activate git hooks only (no package install)
   all              Full pipeline: fetch → build → initramfs → test → report  [default]
