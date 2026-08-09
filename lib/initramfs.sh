@@ -141,44 +141,35 @@ else
     warn "Namespace test binaries not found ($NS_BIN_DIR) — run: make bootstrap  (ns-* tests will skip)"
 fi
 
-# ── Copy perf-event binary ────────────────────────────────────────────────────
-
-PERF_BIN="$SCRIPT_DIR/tests/programs/perf-event/bin/$ARCH/perf-event"
-if [[ -x "$PERF_BIN" ]]; then
-    cp "$PERF_BIN" "$STAGE/usr/bin/"
-    info "perf-event binary installed → $STAGE/usr/bin/"
-else
-    warn "perf-event binary not found ($PERF_BIN) — run: make bootstrap  (400_perf-events will skip)"
-fi
-
-# ── Copy arena-test binary ────────────────────────────────────────────────────
-
-ARENA_BIN="$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test"
-if [[ -x "$ARENA_BIN" ]]; then
-    cp "$ARENA_BIN" "$STAGE/usr/bin/"
-    info "arena-test binary installed → $STAGE/usr/bin/"
-else
-    warn "arena-test binary not found ($ARENA_BIN) — run: make bootstrap  (410_arena-memory will skip)"
-fi
-
-# ── Write capability markers under /tests/ ───────────────────────────────────
+# ── Copy single-binary test programs + write capability markers ───────────────
 # Each marker is an empty file; tests check it as the first guard before doing
 # runtime probes (double-guard pattern: infrastructure ready + kernel feature present).
+
+install_program_binary() {
+    local name="$1" bin="$2" marker="$3" test_slot="$4"
+    if [[ -x "$bin" ]]; then
+        cp "$bin" "$STAGE/usr/bin/"
+        info "$name binary installed → $STAGE/usr/bin/"
+        touch "$STAGE/tests/$marker"
+    else
+        warn "$name binary not found ($bin) — run: make bootstrap  ($test_slot will skip)"
+    fi
+}
+
+install_program_binary "perf-event" \
+    "$SCRIPT_DIR/tests/programs/perf-event/bin/$ARCH/perf-event" \
+    "perf-enabled" "400_perf-events"
+
+install_program_binary "arena-test" \
+    "$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test" \
+    "arena-enabled" "410_arena-memory"
+
+# ── Write ns-enabled marker ───────────────────────────────────────────────────
 
 # ns-enabled: written when ns-* binaries are installed (make bootstrap was run)
 if [[ $ns_count -gt 0 ]]; then
     touch "$STAGE/tests/ns-enabled"
     info "ns-enabled marker written → /tests/ns-enabled"
-fi
-
-# perf-enabled: written when perf-event binary is installed
-if [[ -x "$PERF_BIN" ]]; then
-    touch "$STAGE/tests/perf-enabled"
-fi
-
-# arena-enabled: written when arena-test binary is installed
-if [[ -x "$ARENA_BIN" ]]; then
-    touch "$STAGE/tests/arena-enabled"
 fi
 
 # watchdog-enabled: written when CONFIG_WATCHDOG=y in the per-(config,arch) .config

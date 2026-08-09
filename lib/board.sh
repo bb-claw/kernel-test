@@ -132,16 +132,18 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
         info "U-Boot detected (line ${UBOOT_LINE}) — test timeout: ${TIMEOUT}s"
         ANNOUNCED_START=0
         PHASE2_REBOOTS=0
+        TAIL_FROM=$(( UBOOT_LINE + 1 ))
         while true; do
             remaining=$(( DEADLINE - $(date -u +%s) ))
             if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
-            if tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null | grep -qF 'TEST_DONE'; then
+            # Read once from the anchor; reuse for all three pattern checks below.
+            tail_out=$(tail -n +"$TAIL_FROM" "$DMESG_FILE" 2>/dev/null || true)
+            if grep -qF 'TEST_DONE' <<< "$tail_out"; then
                 break
             fi
             # Relay board-side "kernel-test: starting N tests" to host stdout (once per boot)
             if [[ $ANNOUNCED_START -eq 0 ]]; then
-                START_MSG=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null \
-                    | grep -m 1 'kernel-test: starting' || true)
+                START_MSG=$(grep -m 1 'kernel-test: starting' <<< "$tail_out" || true)
                 if [[ -n "$START_MSG" ]]; then
                     info "board: $START_MSG"
                     ANNOUNCED_START=1
@@ -155,10 +157,11 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
             #     "U-Boot ..." 5 lines later) both match the pattern; the line threshold
             #     distinguishes a genuine new boot (hundreds of lines away) from SPL→main.
             if [[ $PHASE2_REBOOTS -lt 3 && $ANNOUNCED_START -eq 0 ]]; then
-                NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null \
-                    | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
+                NEXT_UBOOT=$(grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' <<< "$tail_out" \
+                    | cut -d: -f1 || true)
                 if [[ -n "$NEXT_UBOOT" && $NEXT_UBOOT -gt 50 ]]; then
                     UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
+                    TAIL_FROM=$(( UBOOT_LINE + 1 ))
                     warn "board: reboot detected before tests started — re-anchoring to line ${UBOOT_LINE}; timeout reset"
                     DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
                     PHASE2_REBOOTS=$(( PHASE2_REBOOTS + 1 ))
