@@ -46,8 +46,8 @@ board_reset() {
     # Compare kernel major:minor (stat %t:%T) rather than realpath — two device nodes
     # can have different canonical paths yet refer to the same underlying char device.
     local relay_devno tty_devno
-    relay_devno=$(stat -c '%t:%T' "$relay"          2>/dev/null || true)
-    tty_devno=$(stat   -c '%t:%T' "${BOARD_TTY:-}"  2>/dev/null || true)
+    relay_devno=$(stat -L -c '%t:%T' "$relay"          2>/dev/null || true)
+    tty_devno=$(stat   -L -c '%t:%T' "${BOARD_TTY:-}"  2>/dev/null || true)
     if [[ -n "$relay_devno" && -n "$tty_devno" && "$relay_devno" == "$tty_devno" ]]; then
         warn "board_reset: relay ($relay) is the same device as BOARD_TTY — no separate power relay"
         warn "  Fix: set HW_RELAY_VID/HW_RELAY_PID in local.mk to match a dedicated relay device"
@@ -146,17 +146,21 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
                     ANNOUNCED_START=1
                 fi
             fi
-            # Detect board reboot before TEST_DONE (TFTP failure retry, kernel panic, etc.)
-            # Re-anchor to the new U-Boot and reset the timeout (up to 3 times).
-            if [[ $PHASE2_REBOOTS -lt 3 ]]; then
+            # Detect board reboot before tests start (TFTP failure retry, early panic, etc.).
+            # Guards:
+            #   ANNOUNCED_START=0 — once tests start, the next U-Boot is the normal
+            #     post-test reboot; TEST_DONE check above should catch it first.
+            #   NEXT_UBOOT > 50 lines — the SPL→main transition ("U-Boot SPL ..." then
+            #     "U-Boot ..." 5 lines later) both match the pattern; the line threshold
+            #     distinguishes a genuine new boot (hundreds of lines away) from SPL→main.
+            if [[ $PHASE2_REBOOTS -lt 3 && $ANNOUNCED_START -eq 0 ]]; then
                 NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null \
                     | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
-                if [[ -n "$NEXT_UBOOT" ]]; then
+                if [[ -n "$NEXT_UBOOT" && $NEXT_UBOOT -gt 50 ]]; then
                     UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
-                    warn "board: reboot detected before TEST_DONE — re-anchoring to line ${UBOOT_LINE}; timeout reset"
+                    warn "board: reboot detected before tests started — re-anchoring to line ${UBOOT_LINE}; timeout reset"
                     DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
                     PHASE2_REBOOTS=$(( PHASE2_REBOOTS + 1 ))
-                    ANNOUNCED_START=0
                 fi
             fi
             sleep 0.5

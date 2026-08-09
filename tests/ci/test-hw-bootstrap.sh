@@ -347,7 +347,7 @@ assert_not_contains "$m" "##" "tftp-pattern: does not match progress bar lines"
 # ── 19. board.sh: reboot detection and start-message relay ────────────────────
 
 begin_test "board-reboot-detection"
-# Verify Phase 2 variables are present in board.sh
+# Verify Phase 2 variables and guards are present in board.sh
 assert_contains "$(grep 'PHASE2_REBOOTS' "$REPO/lib/board.sh")" "PHASE2_REBOOTS" \
     "board.sh: PHASE2_REBOOTS variable present"
 assert_contains "$(grep 'ANNOUNCED_START' "$REPO/lib/board.sh")" "ANNOUNCED_START" \
@@ -356,32 +356,64 @@ assert_contains "$(grep 'kernel-test: starting' "$REPO/lib/board.sh")" "kernel-t
     "board.sh: relays 'kernel-test: starting' from board"
 assert_contains "$(grep 'NEXT_UBOOT' "$REPO/lib/board.sh")" "NEXT_UBOOT" \
     "board.sh: NEXT_UBOOT detection present"
-# Simulate re-anchor arithmetic: verify UBOOT_LINE + NEXT_UBOOT calculation
+# Guard 1: ANNOUNCED_START=0 required (after tests start, next U-Boot is normal reboot)
+assert_contains "$(grep 'ANNOUNCED_START.*-eq 0' "$REPO/lib/board.sh")" "ANNOUNCED_START" \
+    "board.sh: re-anchor gated on ANNOUNCED_START=0"
+# Guard 2: minimum 50-line threshold (filters SPL→main false positive)
+assert_contains "$(grep 'NEXT_UBOOT.*-gt 50' "$REPO/lib/board.sh")" "50" \
+    "board.sh: re-anchor requires NEXT_UBOOT > 50 lines"
+# stat -L: symlinks are followed so /dev/vf2-relay (symlink) resolves to target device
+assert_contains "$(grep 'stat -L' "$REPO/lib/board.sh")" "stat -L" \
+    "board.sh: stat -L used for symlink-safe device comparison"
+
+# SPL→main false-positive: second U-Boot < 50 lines away should NOT trigger re-anchor
 tmpdir
 dmesg="$_LAST_TMPDIR/dmesg.txt"
-printf '%s\n' \
-    "U-Boot SPL 2025.01-3 (Apr 08 2025)"    \
-    "Aborting! No FDT memory configured"     \
-    "riscv: resetting"                       \
-    "U-Boot SPL 2025.01-3 (Apr 08 2025)"    \
-    "TFTP from server 192.168.100.1"         \
-    "Bytes transferred = 5000000"            \
-    "BOOT_OK: kernel reached init"           \
-    "kernel-test: starting 43 tests"         \
-    "< TEST PASS: 001_smoke"                 \
-    "TEST_DONE" > "$dmesg"
+{   printf '%s\n' "U-Boot SPL 2025.01-3 (Apr 08 2025)"
+    printf '%s\n' "DDR version: dc2e84f0."
+    printf '%s\n' "Trying to boot from SPI"
+    printf '%s\n' "U-Boot 2025.01-3 (Apr 08 2025)"     # main U-Boot, 3 lines after SPL
+    printf '%s\n' "BOOT_OK: kernel reached init"
+    printf '%s\n' "kernel-test: starting 43 tests"
+    printf '%s\n' "< TEST PASS: 001_smoke"
+    printf '%s\n' "TEST_DONE"
+} > "$dmesg"
 UBOOT_LINE=1
-# Simulate second-U-Boot detection (same pipeline as board.sh)
 NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$dmesg" \
     | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
-assert_eq "$NEXT_UBOOT" "3" "reboot-detection: relative line of second U-Boot is 3"
+assert_eq "$NEXT_UBOOT" "3" "reboot-detection: SPL→main is 3 relative lines"
+if [[ -n "$NEXT_UBOOT" && $NEXT_UBOOT -gt 50 ]]; then
+    fail "reboot-detection: SPL→main (line 3) incorrectly triggers re-anchor (threshold=50)"
+else
+    pass "reboot-detection: SPL→main (line 3) correctly ignored by 50-line threshold"
+fi
+
+# Genuine reboot: second U-Boot > 50 lines away SHOULD trigger re-anchor
+tmpdir
+dmesg="$_LAST_TMPDIR/dmesg.txt"
+{   printf '%s\n' "U-Boot SPL 2025.01-3 (Apr 08 2025)"
+    printf '%s\n' "Aborting! No FDT memory configured"
+    # 60 lines of failed boot output
+    for _ in $(seq 1 60); do printf '%s\n' "riscv: init..."; done
+    printf '%s\n' "U-Boot SPL 2025.01-3 (Apr 08 2025)"   # second boot, 62 lines away
+    printf '%s\n' "TFTP from server 192.168.100.1"
+    printf '%s\n' "BOOT_OK: kernel reached init"
+    printf '%s\n' "kernel-test: starting 43 tests"
+    printf '%s\n' "< TEST PASS: 001_smoke"
+    printf '%s\n' "TEST_DONE"
+} > "$dmesg"
+UBOOT_LINE=1
+NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$dmesg" \
+    | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
+if [[ -n "$NEXT_UBOOT" && $NEXT_UBOOT -gt 50 ]]; then
+    pass "reboot-detection: genuine reboot (line ${NEXT_UBOOT} > 50) correctly triggers re-anchor"
+else
+    fail "reboot-detection: genuine reboot at line ${NEXT_UBOOT:-?} should trigger re-anchor (threshold=50)"
+fi
 NEW_UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
-assert_eq "$NEW_UBOOT_LINE" "4" "reboot-detection: absolute re-anchor line is 4"
-# After re-anchor, TEST_DONE should be visible after new anchor
 found=$(tail -n +"$(( NEW_UBOOT_LINE + 1 ))" "$dmesg" | grep -F 'TEST_DONE' || true)
-assert_contains "$found" "TEST_DONE" "reboot-detection: TEST_DONE visible after re-anchor"
-# Relay: start message visible after new anchor
+assert_contains "$found" "TEST_DONE" "reboot-detection: TEST_DONE visible after genuine re-anchor"
 start=$(tail -n +"$(( NEW_UBOOT_LINE + 1 ))" "$dmesg" | grep -m 1 'kernel-test: starting' || true)
-assert_contains "$start" "starting 43 tests" "reboot-detection: start message visible after re-anchor"
+assert_contains "$start" "starting 43 tests" "reboot-detection: start message visible after genuine re-anchor"
 
 finish
