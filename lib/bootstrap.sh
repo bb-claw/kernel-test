@@ -46,7 +46,7 @@ install_packages() {
             fi
             $SUDO pacman -S --needed --noconfirm \
                 gcc-multilib aarch64-linux-gnu-gcc riscv64-linux-gnu-gcc make ccache \
-                clang lld llvm \
+                clang lld llvm musl \
                 qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
                 bc flex bison libelf pahole
@@ -78,7 +78,7 @@ install_packages() {
             # Base packages from main; qemu-system-misc provides qemu-system-riscv64
             $SUDO apt-get install -y \
                 gcc gcc-multilib make ccache \
-                clang lld llvm \
+                clang lld llvm musl-tools \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev \
@@ -312,7 +312,7 @@ check_pahole_version
 # Core tools always checked; arch-specific QEMU binaries and cross-compilers
 # gated on the ARCHS passed to bootstrap so a partial-arch setup is valid.
 
-REQUIRED=(gcc make ccache cpio git bc flex bison lzop clang llvm-ar)
+REQUIRED=(gcc make ccache cpio git bc flex bison lzop clang llvm-ar musl-gcc musl-clang)
 for a in ${ARCH}; do
     case "$a" in
         x86_64) REQUIRED+=(qemu-system-x86_64) ;;

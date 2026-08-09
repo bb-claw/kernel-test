@@ -9,18 +9,21 @@
  *   - Puts the tty into raw mode (no line discipline, no echo, no
  *     signal-generating control chars) so every byte the board sends
  *     — including partial lines, binary garbage during a crash, etc.
- *     — is captured verbatim. Cooked mode would mangle or drop this.
+ *     — is captured verbatim.
+ *   - VMIN=1, VTIME=0: read() blocks until at least one byte arrives.
+ *     sigaction() with SA_RESTART cleared ensures SIGTERM interrupts
+ *     read() with EINTR immediately, so the capture loop exits without
+ *     any polling delay.
  *   - Writes go straight to the file descriptor (no stdio buffering)
  *     so bytes land on disk as soon as the kernel accepts the write;
- *     fdatasync() is called periodically so a crash/power-cycle of
- *     the *capture host* can't lose data sitting in the page cache.
- *   - Truncates the logfile on start: this is meant to be run fresh
- *     per test run (one logfile per run), not appended across runs.
- *     Change the open() flags below if you want append semantics.
+ *     fdatasync() is called periodically and on exit so a crash of the
+ *     capture host can't lose data sitting in the page cache.
+ *   - Truncates the logfile on start: one logfile per run, not appended.
  */
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,106 +43,135 @@ static void handle_sigterm(int sig) {
 
 static speed_t baud_to_speed(int baud) {
     switch (baud) {
-        case 9600:   return B9600;
-        case 19200:  return B19200;
-        case 38400:  return B38400;
-        case 57600:  return B57600;
-        case 115200: return B115200;
-        case 230400: return B230400;
-        default:     return 0;
+        case 9600:    return B9600;
+        case 19200:   return B19200;
+        case 38400:   return B38400;
+        case 57600:   return B57600;
+        case 115200:  return B115200;
+        case 230400:  return B230400;
+        case 460800:  return B460800;
+        case 921600:  return B921600;
+        case 1000000: return B1000000;
+        case 1500000: return B1500000;
+        default:      return 0;
     }
 }
 
 static int open_serial(const char *device, int baud) {
+    int fd;
+    struct termios tty;
     speed_t speed = baud_to_speed(baud);
+
     if (speed == 0) {
-        fprintf(stderr, "unsupported baud rate: %d\n", baud);
+        fprintf(stderr, "serial-capture: unsupported baud rate: %d\n", baud);
         return -1;
     }
 
     /* O_NOCTTY: don't let this become our controlling terminal.
-     * O_RDWR: needed even though we only read, some USB-serial
-     * adapters misbehave when opened read-only. */
-    int fd = open(device, O_RDWR | O_NOCTTY);
+     * O_RDWR: needed even though we only read; some USB-serial adapters
+     * misbehave when opened read-only. */
+    fd = open(device, O_RDWR | O_NOCTTY);
     if (fd < 0) {
-        perror("open serial device");
+        perror("serial-capture: open serial device");
         return -1;
     }
 
-    struct termios tty;
     if (tcgetattr(fd, &tty) < 0) {
-        perror("tcgetattr");
+        perror("serial-capture: tcgetattr");
         close(fd);
         return -1;
     }
 
-    cfmakeraw(&tty);              /* no echo, no line editing, no signal chars */
+    cfmakeraw(&tty);
     cfsetispeed(&tty, speed);
     cfsetospeed(&tty, speed);
 
-    tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem control lines, enable receiver */
-    tty.c_cflag &= ~CSTOPB;          /* 1 stop bit */
-    tty.c_cflag &= ~CRTSCTS;         /* no hardware flow control */
+    /* (tcflag_t) casts: termios constants are int; c_cflag is tcflag_t (unsigned). */
+    tty.c_cflag |= (tcflag_t)(CLOCAL | CREAD);
+    tty.c_cflag &= (tcflag_t)~CSTOPB;
+    tty.c_cflag &= (tcflag_t)~CRTSCTS;
 
-    /* Pure timeout read: return after 1 decisecond even with no data.
-     * VMIN=0 ensures SIGTERM can wake us — with VMIN=1, Linux signal()
-     * sets SA_RESTART and the blocked read() is automatically restarted,
-     * so the signal handler's running=0 is never checked until data arrives. */
-    tty.c_cc[VMIN]  = 0;
-    tty.c_cc[VTIME] = 1;
+    /* Block until at least one byte arrives. SIGTERM interrupts read() with
+     * EINTR immediately because sigaction() below clears SA_RESTART. */
+    tty.c_cc[VMIN]  = 1;
+    tty.c_cc[VTIME] = 0;
 
     if (tcsetattr(fd, TCSANOW, &tty) < 0) {
-        perror("tcsetattr");
+        perror("serial-capture: tcsetattr");
         close(fd);
         return -1;
     }
 
-    tcflush(fd, TCIOFLUSH); /* drop any stale buffered bytes from before we opened */
+    tcflush(fd, TCIOFLUSH);
     return fd;
 }
 
 int main(int argc, char *argv[]) {
+    const char *device;
+    const char *logpath;
+    int baud;
+    int serial_fd;
+    int log_fd;
+    char buf[BUF_SIZE];
+    int writes_since_sync;
+    struct sigaction sa;
+    char *end;
+    long baud_l;
+
     if (argc != 4) {
         fprintf(stderr, "usage: %s <device> <baud> <logfile>\n", argv[0]);
         return 1;
     }
-    const char *device = argv[1];
-    int baud = atoi(argv[2]);
-    const char *logpath = argv[3];
 
-    signal(SIGTERM, handle_sigterm);
-    signal(SIGINT, handle_sigterm);
+    device  = argv[1];
+    logpath = argv[3];
 
-    int serial_fd = open_serial(device, baud);
-    if (serial_fd < 0) return 1;
+    errno  = 0;
+    baud_l = strtol(argv[2], &end, 10);
+    if (errno != 0 || end == argv[2] || *end != '\0' || baud_l <= 0 || baud_l > INT_MAX) {
+        fprintf(stderr, "serial-capture: invalid baud rate: %s\n", argv[2]);
+        return 1;
+    }
+    baud = (int)baud_l;
 
-    int log_fd = open(logpath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    /* SA_RESTART intentionally absent: SIGTERM/SIGINT interrupts read() with EINTR. */
+    sa.sa_handler = handle_sigterm;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags   = 0;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT,  &sa, NULL);
+
+    serial_fd = open_serial(device, baud);
+    if (serial_fd < 0)
+        return 1;
+
+    log_fd = open(logpath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (log_fd < 0) {
-        perror("open logfile");
+        perror("serial-capture: open logfile");
         close(serial_fd);
         return 1;
     }
 
     fprintf(stderr, "serial-capture: %s @ %d -> %s\n", device, baud, logpath);
 
-    char buf[BUF_SIZE];
-    int writes_since_sync = 0;
+    writes_since_sync = 0;
 
     while (running) {
-        ssize_t n = read(serial_fd, buf, sizeof(buf));
+        ssize_t n = read(serial_fd, buf, BUF_SIZE);
         if (n < 0) {
             if (errno == EINTR) continue;
-            perror("read");
+            perror("serial-capture: read");
             break;
         }
-        if (n == 0) continue; /* VTIME timeout, no data — loop and check `running` */
+        if (n == 0)
+            break; /* EOF: peer closed or device disconnected */
 
         ssize_t off = 0;
         while (off < n) {
             ssize_t w = write(log_fd, buf + off, (size_t)(n - off));
             if (w < 0) {
                 if (errno == EINTR) continue;
-                perror("write");
+                perror("serial-capture: write");
                 goto done;
             }
             off += w;
