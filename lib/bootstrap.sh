@@ -122,6 +122,36 @@ install_packages() {
             else
                 $SUDO apt-get install -y dwarves
             fi
+
+            # musl-tools only provides musl-gcc on Debian/Ubuntu; musl-clang does not
+            # exist as a package. On Arch the musl package provides both.
+            # Create a thin wrapper that adds musl headers to the front of the search
+            # path and redirects startup files and the static libc to the musl dirs:
+            #   -isystem /usr/include/x86_64-linux-musl   musl C headers (before glibc)
+            #   -B/-L   /usr/lib/x86_64-linux-musl        startup files + libc.a
+            # We do NOT use -nostdinc because the kernel UAPI headers
+            # (<linux/perf_event.h> etc.) live in /usr/include/linux/ alongside the
+            # glibc headers; we still need them reachable. The -isystem ordering
+            # ensures musl's stdio.h/stdlib.h/… are found before glibc's copies.
+            if ! command -v musl-clang &>/dev/null; then
+                if [[ -d /usr/include/x86_64-linux-musl && -d /usr/lib/x86_64-linux-musl ]]; then
+                    info "Creating /usr/local/bin/musl-clang (not provided by musl-tools)"
+                    $SUDO tee /usr/local/bin/musl-clang > /dev/null << 'MUSL_CLANG_WRAPPER'
+#!/bin/sh
+exec clang \
+    --target=x86_64-unknown-linux-musl \
+    -isystem /usr/include/x86_64-linux-musl \
+    -B/usr/lib/x86_64-linux-musl \
+    -L/usr/lib/x86_64-linux-musl \
+    -static-libgcc \
+    "$@"
+MUSL_CLANG_WRAPPER
+                    $SUDO chmod +x /usr/local/bin/musl-clang
+                else
+                    warn "musl headers not found in /usr/include/x86_64-linux-musl — musl-clang wrapper skipped"
+                    warn "On Debian: sudo apt-get install musl-tools; then re-run make bootstrap"
+                fi
+            fi
             ;;
 
         dnf)
