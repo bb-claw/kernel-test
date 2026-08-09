@@ -74,6 +74,15 @@ install_packages() {
                 fi
             fi
 
+            # Enable i386 foreign architecture before update so apt can resolve
+            # linux-libc-dev:i386 (provides asm/errno.h for gcc -m32 builds).
+            # Without this, gcc-multilib installs but 32-bit builds fail with
+            # "asm/errno.h: No such file or directory" on Ubuntu cloud images.
+            if ! $SUDO dpkg --print-foreign-architectures | grep -q i386; then
+                info "Adding i386 dpkg architecture for gcc -m32 support"
+                $SUDO dpkg --add-architecture i386
+            fi
+
             $SUDO apt-get update -qq
             # Base packages from main; qemu-system-misc provides qemu-system-riscv64
             $SUDO apt-get install -y \
