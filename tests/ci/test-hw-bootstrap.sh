@@ -185,4 +185,102 @@ begin_test "hw-relay-exported"
 export_block=$(grep -A2 '^export.*TFTP_DIR' "$REPO/Makefile" || true)
 assert_contains "$export_block" "HW_RELAY" "HW_RELAY in Makefile export block"
 
+# ── 13. U-Boot version-string grep pattern ────────────────────────────────────
+
+begin_test "board-capture-uboot-pattern"
+PATTERN='U-Boot (SPL )?20[0-9]{2}\.'
+# Positive: SPL version banner (VF2 primary U-Boot message)
+m=$(printf 'U-Boot SPL 2025.01-3 (Apr 08 2025 - 23:07:41 +0000)\n' | grep -E "$PATTERN" || true)
+assert_contains "$m" "U-Boot SPL" "pattern: matches SPL version banner"
+# Positive: non-SPL version banner (boards without SPL stage)
+m=$(printf 'U-Boot 2025.01-3 (Apr 08 2025 - 23:07:41 +0000)\n' | grep -E "$PATTERN" || true)
+assert_contains "$m" "U-Boot 2025" "pattern: matches non-SPL version banner"
+# Negative: generic U-Boot reference in kernel log
+m=$(printf '[    2.345678] U-Boot environment: parsed variables\n' | grep -E "$PATTERN" || true)
+assert_not_contains "$m" "environment" "pattern: rejects 'U-Boot environment' in kernel log"
+# Negative: U-Boot command string in bootcmd (no version number with dot)
+m=$(printf "setenv bootcmd 'dhcp; tftpboot \${kernel_addr_r} Image'\n" | grep -E "$PATTERN" || true)
+assert_not_contains "$m" "bootcmd" "pattern: rejects setenv bootcmd line"
+# Verify it reports correct line number using the same pipeline as board.sh
+tmpdir
+dmesg="$_LAST_TMPDIR/dmesg.txt"
+printf '%s\n' \
+    "some prior content" \
+    "U-Boot SPL 2025.01-3 (Apr 08 2025 - 23:07:41 +0000)" \
+    "U-Boot 2025.01-3 (Apr 08 2025 - 23:07:41 +0000)" \
+    "starting kernel..." > "$dmesg"
+uboot_line=$(grep -m 1 -n -E "$PATTERN" "$dmesg" | cut -d: -f1)
+assert_eq "$uboot_line" "2" "pattern: -m 1 returns line number 2 (SPL is first match)"
+
+# ── 14. Pre-anchor trim: removes prior run content from dmesg ──────────────────
+
+begin_test "board-capture-pre-anchor-trim"
+tmpdir
+dmesg="$_LAST_TMPDIR/dmesg.txt"
+# Build a capture file simulating two cycles: prior run ends at TEST_DONE line 3,
+# then U-Boot appears at line 5, current run produces 3 passes.
+printf '%s\n' \
+    "< TEST PASS: 001_smoke" \
+    "< TEST PASS: 010_check-proc" \
+    "TEST_DONE" \
+    "garbage-between-cycles" \
+    "U-Boot SPL 2025.01-3 (Apr 08 2025)" \
+    "U-Boot 2025.01-3 (Apr 08 2025)" \
+    "< TEST PASS: 001_smoke" \
+    "< TEST PASS: 010_check-proc" \
+    "< TEST PASS: 020_check-sysfs" \
+    "kernel-test: 3/3 tests passed" \
+    "TEST_DONE" > "$dmesg"
+UBOOT_LINE=5
+# Apply the same trim logic as board.sh
+if [[ -n "$UBOOT_LINE" && "$UBOOT_LINE" -gt 1 ]]; then
+    tail -n +"$UBOOT_LINE" "$dmesg" > "${dmesg}.trimmed" \
+        && mv "${dmesg}.trimmed" "$dmesg"
+fi
+first_line=$(head -1 "$dmesg")
+assert_contains "$first_line" "U-Boot SPL" "trim: file starts at U-Boot line"
+pass_count=$(grep -c '^< TEST PASS:' "$dmesg")
+assert_eq "$pass_count" "3" "trim: only current run's 3 passes counted (was 5)"
+done_count=$(grep -c 'TEST_DONE' "$dmesg")
+assert_eq "$done_count" "1" "trim: prior TEST_DONE removed, only current run's remains"
+# Edge case: UBOOT_LINE=1 — no trim should happen
+printf '%s\n' \
+    "U-Boot SPL 2025.01-3" \
+    "< TEST PASS: 001_smoke" \
+    "TEST_DONE" > "$dmesg"
+original_lines=$(wc -l < "$dmesg")
+UBOOT_LINE=1
+if [[ -n "$UBOOT_LINE" && "$UBOOT_LINE" -gt 1 ]]; then
+    tail -n +"$UBOOT_LINE" "$dmesg" > "${dmesg}.trimmed" \
+        && mv "${dmesg}.trimmed" "$dmesg"
+fi
+trimmed_lines=$(wc -l < "$dmesg")
+assert_eq "$trimmed_lines" "$original_lines" "trim: UBOOT_LINE=1 leaves file unchanged"
+
+# ── 15. initramfs.sh init script: board-side summary and counters ─────────────
+
+begin_test "initramfs-board-summary"
+assert_contains "$(grep 'pass_count=0'          "$REPO/lib/initramfs.sh")" "pass_count=0" \
+    "init: pass_count initialized to 0"
+assert_contains "$(grep 'fail_count=0'          "$REPO/lib/initramfs.sh")" "fail_count=0" \
+    "init: fail_count initialized to 0"
+assert_contains "$(grep 'pass_count=' "$REPO/lib/initramfs.sh" | grep '+ 1')" "pass_count" \
+    "init: pass_count incremented on PASS"
+assert_contains "$(grep 'fail_count=' "$REPO/lib/initramfs.sh" | grep '+ 1')" "fail_count" \
+    "init: fail_count incremented on FAIL"
+assert_contains "$(grep 'kernel-test:'           "$REPO/lib/initramfs.sh")" "kernel-test:" \
+    "init: board-side summary line present"
+assert_contains "$(grep 'kernel-test:'           "$REPO/lib/initramfs.sh")" 'pass_count' \
+    "init: summary references pass_count"
+assert_contains "$(grep 'sleep 5'                "$REPO/lib/initramfs.sh")" "sleep 5" \
+    "init: 5s drain sleep before reboot"
+# Verify ordering: summary must appear before TEST_DONE in the template
+summary_line=$(grep -n 'kernel-test:' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+testdone_line=$(grep -n '"TEST_DONE"' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+if [[ -n "$summary_line" && -n "$testdone_line" && "$summary_line" -lt "$testdone_line" ]]; then
+    pass "init: summary line appears before TEST_DONE"
+else
+    fail "init: summary must appear before TEST_DONE (summary=$summary_line, TEST_DONE=$testdone_line)"
+fi
+
 finish
