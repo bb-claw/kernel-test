@@ -84,9 +84,12 @@ install_packages() {
             fi
 
             $SUDO apt-get update -qq
-            # Base packages from main; qemu-system-misc provides qemu-system-riscv64
+            # Base packages from main; qemu-system-misc provides qemu-system-riscv64.
+            # linux-libc-dev:i386 provides asm/errno.h + asm/types.h for gcc -m32;
+            # listed explicitly so it is installed even when gcc-multilib was already
+            # present before the i386 arch was registered.
             $SUDO apt-get install -y \
-                gcc gcc-multilib make ccache \
+                gcc gcc-multilib linux-libc-dev:i386 make ccache \
                 clang lld llvm musl-tools \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
