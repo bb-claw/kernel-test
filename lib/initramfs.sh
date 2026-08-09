@@ -25,7 +25,7 @@ TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
 
 info "Building initramfs for $CONFIG/$ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
 rm -rf "$STAGE"
-mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests}
+mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests,etc,root}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -33,6 +33,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 cp "$TOYBOX" "$STAGE/bin/toybox"
 chmod +x "$STAGE/bin/toybox"
+
+# ── Write /etc/passwd and /etc/group ─────────────────────────────────────────
+# Toybox sh calls getpwuid(0) in setup_env() to populate HOME/USER/SHELL.
+# Without /etc/passwd it falls back to a BSS struct that is corrupted by NOFORK
+# TT-union aliasing on SMP hardware (SIGSEGV observed on VisionFive 2 / riscv).
+printf 'root:x:0:0:root:/root:/bin/sh\n' > "$STAGE/etc/passwd"
+printf 'root:x:0:\n'                      > "$STAGE/etc/group"
 
 # Symlinks for all Toybox applets.
 # Cross-arch binaries (arm64, riscv) cannot execute on the x86_64 build host;
@@ -67,6 +74,12 @@ mount -t devtmpfs none /dev       2>/dev/null || {
 }
 
 echo "BOOT_OK: kernel reached init"
+
+test_count=0
+for t in $(ls /tests/*.sh 2>/dev/null | sort); do
+    [ -f "$t" ] && test_count=$((test_count + 1))
+done
+echo "kernel-test: starting ${test_count} tests"
 
 pass_count=0
 fail_count=0
@@ -110,9 +123,9 @@ fi
 
 # ── Copy ns-* test binaries ───────────────────────────────────────────────────
 
+ns_count=0
 NS_BIN_DIR="$SCRIPT_DIR/tests/ns/bin/$ARCH"
 if [[ -d "$NS_BIN_DIR" ]]; then
-    ns_count=0
     for bin in "$NS_BIN_DIR"/ns-*; do
         [[ -f $bin && -x $bin ]] || continue
         cp "$bin" "$STAGE/usr/bin/"

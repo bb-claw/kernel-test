@@ -283,4 +283,105 @@ else
     fail "init: summary must appear before TEST_DONE (summary=$summary_line, TEST_DONE=$testdone_line)"
 fi
 
+# ── 16. initramfs.sh: /etc/passwd and /etc/group written ─────────────────────
+
+begin_test "initramfs-etc-passwd"
+assert_contains "$(grep 'etc/passwd' "$REPO/lib/initramfs.sh")" "etc/passwd" \
+    "initramfs: /etc/passwd write present"
+assert_contains "$(grep 'etc/group'  "$REPO/lib/initramfs.sh")" "etc/group" \
+    "initramfs: /etc/group write present"
+assert_contains "$(grep 'etc/passwd' "$REPO/lib/initramfs.sh")" "root:x:0:0" \
+    "initramfs: /etc/passwd root entry has correct format"
+# mkdir must include 'etc' and 'root' dirs
+mkdir_line=$(grep 'mkdir -p' "$REPO/lib/initramfs.sh" | grep STAGE)
+assert_contains "$mkdir_line" "etc"  "initramfs: mkdir includes etc"
+assert_contains "$mkdir_line" "root" "initramfs: mkdir includes root"
+
+# ── 17. initramfs.sh init script: test-count start message ───────────────────
+
+begin_test "initramfs-start-count"
+assert_contains "$(grep 'test_count' "$REPO/lib/initramfs.sh")" "test_count" \
+    "init: test_count variable present"
+assert_contains "$(grep 'kernel-test: starting' "$REPO/lib/initramfs.sh")" "starting" \
+    "init: 'kernel-test: starting' message present"
+assert_contains "$(grep 'kernel-test: starting' "$REPO/lib/initramfs.sh")" "test_count" \
+    "init: start message references test_count"
+# start message must appear before the test loop (pass_count=0)
+start_line=$(grep -n 'kernel-test: starting' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+loop_line=$(grep -n 'pass_count=0' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+if [[ -n "$start_line" && -n "$loop_line" && "$start_line" -lt "$loop_line" ]]; then
+    pass "init: start message appears before test loop"
+else
+    fail "init: start message must appear before test loop (start=$start_line, loop=$loop_line)"
+fi
+
+# ── 18. board.sh: TFTP/PXE progress and failure detection patterns ────────────
+
+begin_test "board-tftp-progress"
+# Verify board.sh Phase 1 monitoring uses MONITOR_LINE
+assert_contains "$(grep 'MONITOR_LINE' "$REPO/lib/board.sh")" "MONITOR_LINE" \
+    "board.sh: MONITOR_LINE tracking present"
+# Positive: TFTP progress lines should match info pattern
+TFTP_PAT="TFTP from server|Filename '|Bytes transferred|DHCP client bound|PXE:"
+m=$(printf 'TFTP from server 192.168.100.1; our IP address is 192.168.100.107\n' \
+    | grep -E "$TFTP_PAT" || true)
+assert_contains "$m" "TFTP from server" "tftp-pattern: matches TFTP start line"
+m=$(printf "Filename 'vf2/Image'.\n" | grep -E "$TFTP_PAT" || true)
+assert_contains "$m" "Filename" "tftp-pattern: matches Filename line"
+m=$(printf 'Bytes transferred = 24616448 (178c00 hex)\n' | grep -E "$TFTP_PAT" || true)
+assert_contains "$m" "Bytes transferred" "tftp-pattern: matches Bytes transferred line"
+m=$(printf 'DHCP client bound to address 192.168.100.107 (123 ms)\n' | grep -E "$TFTP_PAT" || true)
+assert_contains "$m" "DHCP client bound" "tftp-pattern: matches DHCP bound line"
+# Positive: failure lines should match warn pattern
+FAIL_PAT='Retry count exceeded|Aborting!|No FDT'
+m=$(printf 'Retry count exceeded, starting again\n' | grep -E "$FAIL_PAT" || true)
+assert_contains "$m" "Retry count exceeded" "tftp-fail-pattern: matches retry failure"
+m=$(printf 'Aborting!\n' | grep -E "$FAIL_PAT" || true)
+assert_contains "$m" "Aborting!" "tftp-fail-pattern: matches abort"
+m=$(printf 'No FDT memory address configured.\n' | grep -E "$FAIL_PAT" || true)
+assert_contains "$m" "No FDT" "tftp-fail-pattern: matches No FDT"
+# Negative: progress bars should not match either pattern
+m=$(printf '####################  100%% 11.7 MiB/s\n' | grep -E "$TFTP_PAT" || true)
+assert_not_contains "$m" "##" "tftp-pattern: does not match progress bar lines"
+
+# ── 19. board.sh: reboot detection and start-message relay ────────────────────
+
+begin_test "board-reboot-detection"
+# Verify Phase 2 variables are present in board.sh
+assert_contains "$(grep 'PHASE2_REBOOTS' "$REPO/lib/board.sh")" "PHASE2_REBOOTS" \
+    "board.sh: PHASE2_REBOOTS variable present"
+assert_contains "$(grep 'ANNOUNCED_START' "$REPO/lib/board.sh")" "ANNOUNCED_START" \
+    "board.sh: ANNOUNCED_START variable present"
+assert_contains "$(grep 'kernel-test: starting' "$REPO/lib/board.sh")" "kernel-test: starting" \
+    "board.sh: relays 'kernel-test: starting' from board"
+assert_contains "$(grep 'NEXT_UBOOT' "$REPO/lib/board.sh")" "NEXT_UBOOT" \
+    "board.sh: NEXT_UBOOT detection present"
+# Simulate re-anchor arithmetic: verify UBOOT_LINE + NEXT_UBOOT calculation
+tmpdir
+dmesg="$_LAST_TMPDIR/dmesg.txt"
+printf '%s\n' \
+    "U-Boot SPL 2025.01-3 (Apr 08 2025)"    \
+    "Aborting! No FDT memory configured"     \
+    "riscv: resetting"                       \
+    "U-Boot SPL 2025.01-3 (Apr 08 2025)"    \
+    "TFTP from server 192.168.100.1"         \
+    "Bytes transferred = 5000000"            \
+    "BOOT_OK: kernel reached init"           \
+    "kernel-test: starting 43 tests"         \
+    "< TEST PASS: 001_smoke"                 \
+    "TEST_DONE" > "$dmesg"
+UBOOT_LINE=1
+# Simulate second-U-Boot detection (same pipeline as board.sh)
+NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$dmesg" \
+    | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
+assert_eq "$NEXT_UBOOT" "3" "reboot-detection: relative line of second U-Boot is 3"
+NEW_UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
+assert_eq "$NEW_UBOOT_LINE" "4" "reboot-detection: absolute re-anchor line is 4"
+# After re-anchor, TEST_DONE should be visible after new anchor
+found=$(tail -n +"$(( NEW_UBOOT_LINE + 1 ))" "$dmesg" | grep -F 'TEST_DONE' || true)
+assert_contains "$found" "TEST_DONE" "reboot-detection: TEST_DONE visible after re-anchor"
+# Relay: start message visible after new anchor
+start=$(tail -n +"$(( NEW_UBOOT_LINE + 1 ))" "$dmesg" | grep -m 1 'kernel-test: starting' || true)
+assert_contains "$start" "starting 43 tests" "reboot-detection: start message visible after re-anchor"
+
 finish

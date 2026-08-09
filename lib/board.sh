@@ -96,9 +96,24 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     # but not generic "U-Boot" strings that can appear in kernel log messages.
     PRE_BOOT_DEADLINE=$(( VM_START_EPOCH + PRE_BOOT_TIMEOUT ))
     UBOOT_LINE=''
+    MONITOR_LINE=0
     while true; do
         UBOOT_LINE=$(grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' "$DMESG_FILE" 2>/dev/null | cut -d: -f1 || true)
         [[ -n "$UBOOT_LINE" ]] && break
+
+        # Show TFTP/PXE download progress and detect boot failures
+        current_line=$(wc -l < "$DMESG_FILE" 2>/dev/null || echo 0)
+        if [[ $current_line -gt $MONITOR_LINE ]]; then
+            while IFS= read -r bline; do
+                if grep -qE 'Retry count exceeded|Aborting!|No FDT' <<< "$bline"; then
+                    warn "board: $bline"
+                elif grep -qE "TFTP from server|Filename '|Bytes transferred|DHCP client bound|PXE:" <<< "$bline"; then
+                    info "board: $bline"
+                fi
+            done < <(sed -n "$((MONITOR_LINE + 1)),${current_line}p" "$DMESG_FILE" 2>/dev/null || true)
+            MONITOR_LINE=$current_line
+        fi
+
         remaining=$(( PRE_BOOT_DEADLINE - $(date -u +%s) ))
         if [[ $remaining -le 0 ]]; then
             warn "U-Boot not detected within ${PRE_BOOT_TIMEOUT}s — is the board powered on?"
@@ -112,11 +127,35 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     if [[ $TIMED_OUT -eq 0 ]]; then
         DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
         info "U-Boot detected (line ${UBOOT_LINE}) — test timeout: ${TIMEOUT}s"
+        ANNOUNCED_START=0
+        PHASE2_REBOOTS=0
         while true; do
             remaining=$(( DEADLINE - $(date -u +%s) ))
             if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
             if tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null | grep -qF 'TEST_DONE'; then
                 break
+            fi
+            # Relay board-side "kernel-test: starting N tests" to host stdout (once per boot)
+            if [[ $ANNOUNCED_START -eq 0 ]]; then
+                START_MSG=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null \
+                    | grep -m 1 'kernel-test: starting' || true)
+                if [[ -n "$START_MSG" ]]; then
+                    info "board: $START_MSG"
+                    ANNOUNCED_START=1
+                fi
+            fi
+            # Detect board reboot before TEST_DONE (TFTP failure retry, kernel panic, etc.)
+            # Re-anchor to the new U-Boot and reset the timeout (up to 3 times).
+            if [[ $PHASE2_REBOOTS -lt 3 ]]; then
+                NEXT_UBOOT=$(tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null \
+                    | grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' | cut -d: -f1 || true)
+                if [[ -n "$NEXT_UBOOT" ]]; then
+                    UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
+                    warn "board: reboot detected before TEST_DONE — re-anchoring to line ${UBOOT_LINE}; timeout reset"
+                    DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
+                    PHASE2_REBOOTS=$(( PHASE2_REBOOTS + 1 ))
+                    ANNOUNCED_START=0
+                fi
             fi
             sleep 0.5
         done

@@ -388,3 +388,138 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
   **After fix:** replay of same config → 43/43 PASS.
 
 > Kernel bug findings moved to [kernel-test-data/FINDINGS.md](https://github.com/bb-claw/kernel-test-data/blob/main/FINDINGS.md)
+
+---
+
+## 2026-08-09 — VisionFive 2 hw-test: Toybox sh SIGSEGV in subprocesses
+
+### Low — Benign crash noise during VF2 hardware test runs
+
+- [~] **Toybox 0.8.14 sh subprocesses SIGSEGV during hw-test on VF2 (multi-core RISC-V)** — primary fix applied (see next-steps #1); root cause not fully confirmed; monitor on next hw-test run
+
+  **Environment:**
+  - Board: StarFive VisionFive 2 v1.2A (JH7110 SoC, 4-core RISC-V rv64imafdcsu)
+  - Kernel: 7.2.0-rc6-vf2 (vf2config, riscv arch)
+  - Toybox: 0.8.14 — statically linked `toybox-riscv64` from Toybox project
+  - Initramfs: standard kernel-test initramfs built by `lib/initramfs.sh`
+
+  **Symptom:**
+  The serial capture (`dmesg.txt`) contains 6+ entries of the form:
+  ```
+  sh[230]: unhandled signal 11 code 0x1 at 0x000000732a2e2a27 in toybox[21312,10000+ad000]
+  sh[379]: unhandled signal 11 code 0x1 at 0x000000732a2e2727 in toybox[21312,10000+ad000]
+  ```
+  The crashes interleave with test output mid-line (e.g. `ok: bind mount: entry presen[CRASH DUMP]t in /proc/mounts`),
+  confirming the crashing process was running concurrently on a different CPU core. Despite the
+  crashes, **all tests PASS or FAIL correctly** — the test count and outcomes are not affected.
+
+  Observed crashing PIDs in one run: 230, 379, 394, 417, 428, 430 (all `comm: sh`).
+  Tests whose output is interleaved with a crash: 040, 210, 230, 260, 270, 280.
+
+  **Impact:** None on test correctness. The crash dump lines are cosmetic noise in the serial
+  log. The `parse_serial_output` function looks for `^< TEST PASS:` / `^< TEST FAIL:` markers
+  which are unambiguous; crash dump lines don't match those patterns.
+
+  **Crash site analysis (binary: `cache/toybox-riscv64`, text segment VMA 0x10000):**
+
+  | Register | Value | Meaning |
+  |---|---|---|
+  | `epc` | `0x31312` | Faulting instruction: `lbu a5, 0(a1)` — load first byte of string |
+  | `ra` | `0x33950` | Return address inside `setup_env`: just after call at `0x3394c` |
+  | `a0` | `0x719f0` | .rodata constant: `"USER"` (the env var name being set) |
+  | `a1` | `0x000000732a2e2a27` | Should be `pw->pw_name` — contains an invalid pointer |
+  | `a2` | `0xcbee8` | Fallback buffer (512 bytes past the struct passwd) |
+
+  The crash is in a small helper called by `setup_env` (starting near `0x337f4`):
+  ```asm
+  ; helper at 0x31310 — setenv with NULL/empty guard
+  31310:  beqz a1, 0x3131a     ; if pw_name == NULL, use fallback
+  31312:  lbu  a5, 0(a1)       ; ← CRASH: a1 is a non-NULL invalid pointer
+  31316:  beqz a5, 0x3131a     ; if pw_name is empty string, use fallback
+  31318:  mv   a2, a1          ; use pw_name as the env value
+  3131a:  mv   a1, a2
+  3131c:  j    0x2e76c         ; call setenv
+  ```
+
+  The caller at `0x3393c–0x3394c` loads `a1 = *(s2 + 0)` where `s2` points to the fallback
+  `struct passwd` at VMA `0xcbae8` (BSS section, offset `0x1058` from BSS base `0xcaa90`).
+  The struct is zero-initialised in a freshly exec'd process, so `pw_name` starts as `NULL`;
+  the NULL guard at `0x31310` handles that case correctly.
+
+  The crash only occurs when `pw_name` holds a **non-NULL invalid pointer** — meaning something
+  has written a non-zero value to BSS address `0xcbae8` before `setup_env` runs its USER step.
+
+  **Root cause hypothesis:**
+  Toybox's NOFORK execution model runs many applets (grep, cat, wc, head, …) directly inside
+  the calling sh process without fork/exec. All applets share the same BSS. Toybox's global
+  applet state is a large union (`TT`) also in BSS. If a field of `TT` for some specific applet
+  overlaps with BSS+`0x1058` (i.e. `pw_name` of the fallback passwd struct), running that
+  applet NOFORK writes a non-zero value there. The next time a **new sh process is exec'd**
+  (fork+exec, running fresh `setup_env`) it finds the global struct pre-corrupted because the
+  kernel BSS-zeroing applies only at the first exec — shared read-only pages in the Toybox
+  binary's BSS are COW-zeroed per-exec, so the new process *should* start clean.
+
+  **Revised hypothesis (multi-core race):** Because the crashes appear mid-line and concurrent
+  with another sh process, and because the fault address itself (`0x000000732a2e2a27`) decodes
+  as the byte string `'*.*s\0\0\0` in little-endian — which looks like a shell glob token — the
+  corruption may arise from a **Toybox sh tokeniser or glob-expansion buffer** that spills into
+  the BSS region containing the passwd struct. This would be a memory-safety bug in Toybox's sh
+  applet state rather than in the NOFORK dispatch itself. Exact identification requires
+  cross-referencing BSS+`0x1058` with Toybox 0.8.14 symbol tables (not available in the stripped
+  binary).
+
+  **What has been verified:**
+  - All 6 crash instances in one run share the same `epc=0x31312`, `ra=0x33950`, `a0=0x719f0`.
+  - The fault address is always outside the valid sv39 userspace range (> `0x3fffffffffff`).
+  - Crasher PIDs are `comm: sh` (Toybox sh processes, not an external command).
+  - Tests that immediately surround a crash still exit with correct pass/fail status.
+  - The init loop uses `/bin/sh "$t"` (full path → always fork+exec, never NOFORK) so each
+    test's sh exits with the true exit code; the crash is in a concurrent subprocess, not in
+    the test's own sh.
+  - Three consecutive `make hw-test` runs all showed the same crash pattern (PIDs differ
+    but addresses and epc are identical), confirming reproducibility.
+  - The serial count inconsistency bug (38/42/72 TEST PASS counts in 3 runs) was a **separate
+    issue** — pre-anchor contamination from a prior boot cycle in the capture file — **resolved**
+    by the `tail -n +"$UBOOT_LINE"` trim added to `lib/board.sh` (PR #48).
+
+  **How to reproduce:**
+  ```sh
+  # Build and deploy vf2config to the board's TFTP directory
+  make hw-deploy BOARD_CONFIG=vf2config BOARD_ARCH=riscv NO_FETCH=1
+
+  # Capture serial output; hardware auto-resets via USB relay
+  make hw-test BOARD_TTY=/dev/ttyUSB0
+
+  # Inspect the capture file:
+  grep "unhandled signal 11" build/vf2config-riscv/dmesg.txt
+  # Expect: several lines matching:
+  #   sh[NNN]: unhandled signal 11 code 0x1 at 0x000000732a2e2[a2]727 in toybox[...]
+  ```
+  The crashes appear reliably within the first ~7 s of test execution, before the 43-test suite
+  completes (~10 s total). All tests pass despite the crashes.
+
+  **What's next / potential fixes:**
+
+  1. **Add `/etc/passwd` to the initramfs** (minimal single-line root entry).
+     `setup_env` reads `/etc/passwd` to populate HOME/SHELL/USER/LOGNAME. With the file absent,
+     Toybox falls back to the zero-initialised BSS struct. If the BSS struct is ever corrupted,
+     a real `/etc/passwd` entry would provide a valid pointer from the heap/rodata instead.
+     This is low-risk and may eliminate the crash without touching any test logic.
+     ```sh
+     # Add to lib/initramfs.sh, just before "Pack cpio + gzip":
+     printf 'root:x:0:0:root:/root:/bin/sh\n' > "$STAGE/etc/passwd"
+     mkdir -p "$STAGE/etc"
+     ```
+
+  2. **Upgrade Toybox** beyond 0.8.14 and check if the crash disappears.
+     The `TOYBOX_VERSION` pin in the Makefile currently locks to `0.8.14`. The upstream Toybox
+     project may have fixed BSS aliasing between applet state and the passwd struct.
+
+  3. **Identify the overlapping BSS symbol** using Toybox 0.8.14 source.
+     BSS base `0xcaa90` + `0x1058` = VMA `0xcbae8`. With a debug build (`-g`) of Toybox 0.8.14
+     for riscv64, `nm toybox | awk '$1 == "0xcbae8"'` (or nearby) would name the conflicting
+     field. That would confirm whether this is a known alignment/layout bug.
+
+  4. **Accept as won't-fix** if 1 and 2 don't pan out.
+     The crashes are in throwaway subprocesses; all test outcomes remain correct.
+     No harness change is required to maintain accurate test reporting.
