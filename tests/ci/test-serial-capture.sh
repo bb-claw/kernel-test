@@ -41,11 +41,11 @@ begin_test "sc-socat-available"
 if ! command -v socat &>/dev/null; then
     printf '  skip  socat not installed — skipping behavioral tests\n'
     printf '        (install: sudo apt-get install socat  or: make bootstrap)\n'
-    finish
+    exit 0
 fi
 if [[ ! -x "$SC_BIN" ]]; then
     printf '  skip  serial-capture binary absent — run: make bootstrap\n'
-    finish
+    exit 0
 fi
 pass "socat and serial-capture binary available"
 
