@@ -73,6 +73,11 @@ mount -t devtmpfs none /dev       2>/dev/null || {
     mknod -m 666 /dev/null    c 1 3 2>/dev/null || true
 }
 
+# Silence console during tests: deferred kernel printk messages (e.g. mmc probe
+# errors) are flushed asynchronously and can split "< TEST PASS:" mid-write,
+# breaking parse_serial_output's grep anchor. The ring buffer is unaffected.
+dmesg -n 1 2>/dev/null || true
+
 echo "BOOT_OK: kernel reached init"
 
 test_count=0

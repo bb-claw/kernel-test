@@ -416,4 +416,20 @@ assert_contains "$found" "TEST_DONE" "reboot-detection: TEST_DONE visible after 
 start=$(tail -n +"$(( NEW_UBOOT_LINE + 1 ))" "$dmesg" | grep -m 1 'kernel-test: starting' || true)
 assert_contains "$start" "starting 43 tests" "reboot-detection: start message visible after genuine re-anchor"
 
+# ── 20. initramfs.sh init script: kernel console silenced before tests ─────────
+
+begin_test "initramfs-dmesg-silence"
+# dmesg -n 1 must appear in the init heredoc (before BOOT_OK) to prevent deferred
+# kernel printk messages from splitting "< TEST PASS:" lines mid-write on real hardware
+assert_contains "$(grep 'dmesg -n 1' "$REPO/lib/initramfs.sh")" "dmesg -n 1" \
+    "init: dmesg -n 1 present to silence console during tests"
+# Must appear before BOOT_OK so it catches messages deferred from before /init starts
+dmesg_line=$(grep -n 'dmesg -n 1'  "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+bootok_line=$(grep -n '"BOOT_OK:'   "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+if [[ -n "$dmesg_line" && -n "$bootok_line" && "$dmesg_line" -lt "$bootok_line" ]]; then
+    pass "init: dmesg -n 1 appears before BOOT_OK"
+else
+    fail "init: dmesg -n 1 must appear before BOOT_OK (dmesg=$dmesg_line, BOOT_OK=$bootok_line)"
+fi
+
 finish
