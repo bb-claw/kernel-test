@@ -53,7 +53,7 @@ Examples:
 
 ## C Program Compilation Baseline (tests/programs/)
 
-Reference: `tests/programs/serial-capture/Makefile` · `docs/serial-capture-hardening-plan.md`
+Reference: each program's `Makefile` under `tests/programs/`; `docs/programs-quality-plan.md`
 
 ```
 CFLAGS_COMMON       -std=c11 -O2 -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration
@@ -61,9 +61,9 @@ CFLAGS_COMMON_GCC   -Wall -Wextra -Wpedantic -Werror
 CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-disabled-macro-expansion -Wno-unsafe-buffer-usage
 ```
 
-- **Two binaries per host-only program**: `bin/<name>-gcc` (musl-gcc, quality gate) + `bin/<name>` (musl-clang, shipped). Cross-compiled programs (arena-test, perf-event) use GCC cross-compilers only.
-- **musl hard-required**: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian); build errors if absent.
-- **Clang suppressions**: `-Wno-disabled-macro-expansion` — musl's `#define stderr (stderr)` self-referential macro; `-Wno-unsafe-buffer-usage` — `argv[]` indexing and `buf+off` arithmetic are bounds-correct.
+- **serial-capture (host-only)**: `bin/serial-capture-gcc` (musl-gcc, quality gate) + `bin/serial-capture` (musl-clang, shipped).
+- **arena-test / perf-event (cross-compiled)**: `bin/<arch>/<name>` (GCC, 4 arches, shipped) + `bin/x86_64/<name>-clang` (musl-clang, quality gate; Clang cross for arm64/riscv needs sysroot not in bootstrap). `make -C tests/programs` builds all three.
+- **musl hard-required**: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian); build errors if absent. Clang suppressions: `-Wno-disabled-macro-expansion` — musl `stderr` macro; `-Wno-unsafe-buffer-usage` — pointer arithmetic is bounds-correct.
 - **Sign-conversion on `tcflag_t`**: cast explicitly: `tty.c_cflag &= (tcflag_t)~CSTOPB;` — code fix, not a suppression.
 
 ---
