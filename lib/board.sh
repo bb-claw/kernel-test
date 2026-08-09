@@ -89,13 +89,14 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     "$SERIAL_CAPTURE" "$BOARD_TTY" 115200 "$DMESG_FILE" &
     CAPTURE_PID=$!
 
-    # Phase 1: wait for U-Boot banner.  Without a relay the board auto-reboots after
-    # each test run; this lets make hw-test catch the *next* fresh boot even if the
-    # board is currently mid-test-run.  With a working relay, U-Boot appears within
-    # a few seconds of board_reset().
+    # Phase 1: wait for U-Boot banner; record its line number in the capture file.
+    # The boot sequence is: tests → TEST_DONE → reboot → U-Boot → kernel → tests.
+    # So U-Boot may appear AFTER a TEST_DONE from a partial capture already in the file.
     PRE_BOOT_DEADLINE=$(( VM_START_EPOCH + PRE_BOOT_TIMEOUT ))
+    UBOOT_LINE=''
     while true; do
-        if grep -qF 'U-Boot' "$DMESG_FILE" 2>/dev/null; then break; fi
+        UBOOT_LINE=$(grep -m 1 -n 'U-Boot' "$DMESG_FILE" 2>/dev/null | cut -d: -f1 || true)
+        [[ -n "$UBOOT_LINE" ]] && break
         remaining=$(( PRE_BOOT_DEADLINE - $(date -u +%s) ))
         if [[ $remaining -le 0 ]]; then
             warn "U-Boot not detected within ${PRE_BOOT_TIMEOUT}s — is the board powered on?"
@@ -104,14 +105,17 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
         sleep 0.5
     done
 
-    # Phase 2: wait for TEST_DONE within HW_TIMEOUT of U-Boot appearing.
+    # Phase 2: wait for TEST_DONE that appears AFTER the U-Boot line.
+    # A TEST_DONE before UBOOT_LINE belongs to a prior partial run and must be ignored.
     if [[ $TIMED_OUT -eq 0 ]]; then
         DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
-        info "U-Boot detected — test timeout: ${TIMEOUT}s"
+        info "U-Boot detected (line ${UBOOT_LINE}) — test timeout: ${TIMEOUT}s"
         while true; do
             remaining=$(( DEADLINE - $(date -u +%s) ))
             if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
-            grep -qF 'TEST_DONE' "$DMESG_FILE" 2>/dev/null && break
+            if tail -n +"$(( UBOOT_LINE + 1 ))" "$DMESG_FILE" 2>/dev/null | grep -qF 'TEST_DONE'; then
+                break
+            fi
             sleep 0.5
         done
     fi
