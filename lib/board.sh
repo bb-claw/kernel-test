@@ -92,10 +92,12 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     # Phase 1: wait for U-Boot banner; record its line number in the capture file.
     # The boot sequence is: tests → TEST_DONE → reboot → U-Boot → kernel → tests.
     # So U-Boot may appear AFTER a TEST_DONE from a partial capture already in the file.
+    # Pattern 'U-Boot (SPL )?20[0-9]{2}\.' matches the version string (e.g. "U-Boot SPL 2025.01-3")
+    # but not generic "U-Boot" strings that can appear in kernel log messages.
     PRE_BOOT_DEADLINE=$(( VM_START_EPOCH + PRE_BOOT_TIMEOUT ))
     UBOOT_LINE=''
     while true; do
-        UBOOT_LINE=$(grep -m 1 -n 'U-Boot' "$DMESG_FILE" 2>/dev/null | cut -d: -f1 || true)
+        UBOOT_LINE=$(grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' "$DMESG_FILE" 2>/dev/null | cut -d: -f1 || true)
         [[ -n "$UBOOT_LINE" ]] && break
         remaining=$(( PRE_BOOT_DEADLINE - $(date -u +%s) ))
         if [[ $remaining -le 0 ]]; then
@@ -123,6 +125,14 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     kill "$CAPTURE_PID" 2>/dev/null || true
     wait "$CAPTURE_PID" 2>/dev/null || true
     CAPTURE_PID=''
+
+    # Trim pre-anchor content: discard everything before UBOOT_LINE so that
+    # parse_serial_output only counts TEST PASS/FAIL from the current boot.
+    # Without this, a prior run's markers in the same capture file are counted twice.
+    if [[ -n "$UBOOT_LINE" && "$UBOOT_LINE" -gt 1 ]]; then
+        tail -n +"$UBOOT_LINE" "$DMESG_FILE" > "${DMESG_FILE}.trimmed" \
+            && mv "${DMESG_FILE}.trimmed" "$DMESG_FILE"
+    fi
 else
     warn "serial-capture binary absent — using Bash read fallback (run: make bootstrap)"
 

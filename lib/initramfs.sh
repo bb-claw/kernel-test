@@ -68,20 +68,27 @@ mount -t devtmpfs none /dev       2>/dev/null || {
 
 echo "BOOT_OK: kernel reached init"
 
+pass_count=0
+fail_count=0
 for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] || continue
     name=$(basename "$t" .sh)
     echo "> TEST RUN: $name"
     if /bin/sh "$t"; then
         echo "< TEST PASS: $name"
+        pass_count=$((pass_count + 1))
     else
         echo "< TEST FAIL: $name"
+        fail_count=$((fail_count + 1))
     fi
 done
 
+total=$((pass_count + fail_count))
+echo "kernel-test: ${pass_count}/${total} tests passed"
 echo "TEST_DONE"
-# Brief pause so the emulated UART drains to the serial file before QEMU exits.
-sleep 1
+# Pause for host to drain capture before board reboots into next U-Boot cycle.
+# 5s on real hardware (board.sh) vs QEMU (which exits on reboot anyway).
+sleep 5
 reboot -f
 EOF
 chmod +x "$STAGE/init"
