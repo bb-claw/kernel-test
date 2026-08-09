@@ -96,11 +96,18 @@ install_packages() {
                 bc flex bison libelf-dev \
                 socat
 
-            # Cross-compilers in a separate step so a broken pre-existing package
-            # state does not abort the rest of bootstrap.
-            $SUDO apt-get install -y gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu || {
+            # Cross-compilers + sysroot headers in a separate step so a broken
+            # pre-existing package state does not abort the rest of bootstrap.
+            # libc6-dev-{arm64,riscv64}-cross are Recommends (not Depends) of the
+            # gcc-*-linux-gnu packages; on minimal cloud images Recommends are skipped,
+            # leaving the cross sysroot without asm/ UAPI headers and causing
+            # "asm/errno.h: No such file or directory" on any -static cross build.
+            $SUDO apt-get install -y \
+                gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu \
+                libc6-dev-arm64-cross libc6-dev-riscv64-cross || {
                 warn "Cross-compiler install failed — arm64/riscv kernel builds will not work"
-                warn "Fix with: sudo apt-get install -f && sudo apt-get install gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu"
+                warn "Fix with: sudo apt-get install -f && sudo apt-get install \\"
+                warn "  gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu libc6-dev-arm64-cross libc6-dev-riscv64-cross"
             }
 
             # Install dwarves and qemu-system-misc from backports via explicit -t.
