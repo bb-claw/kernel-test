@@ -25,7 +25,7 @@ TOYBOX="$CACHE_DIR/toybox-$TOYBOX_ARCH"
 
 info "Building initramfs for $CONFIG/$ARCH in $STAGE (toybox-$TOYBOX_ARCH)"
 rm -rf "$STAGE"
-mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests}
+mkdir -p "$STAGE"/{bin,usr/bin,dev,proc,sys,tmp,tests,etc,root}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -33,6 +33,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 cp "$TOYBOX" "$STAGE/bin/toybox"
 chmod +x "$STAGE/bin/toybox"
+
+# ── Write /etc/passwd and /etc/group ─────────────────────────────────────────
+# Toybox sh calls getpwuid(0) in setup_env() to populate HOME/USER/SHELL.
+# Without /etc/passwd it falls back to a BSS struct that is corrupted by NOFORK
+# TT-union aliasing on SMP hardware (SIGSEGV observed on VisionFive 2 / riscv).
+printf 'root:x:0:0:root:/root:/bin/sh\n' > "$STAGE/etc/passwd"
+printf 'root:x:0:\n'                      > "$STAGE/etc/group"
 
 # Symlinks for all Toybox applets.
 # Cross-arch binaries (arm64, riscv) cannot execute on the x86_64 build host;
@@ -66,22 +73,40 @@ mount -t devtmpfs none /dev       2>/dev/null || {
     mknod -m 666 /dev/null    c 1 3 2>/dev/null || true
 }
 
+# Silence console during tests: deferred kernel printk messages (e.g. mmc probe
+# errors) are flushed asynchronously and can split "< TEST PASS:" mid-write,
+# breaking parse_serial_output's grep anchor. The ring buffer is unaffected.
+dmesg -n 1 2>/dev/null || true
+
 echo "BOOT_OK: kernel reached init"
 
+test_count=0
+for t in $(ls /tests/*.sh 2>/dev/null | sort); do
+    [ -f "$t" ] && test_count=$((test_count + 1))
+done
+echo "kernel-test: starting ${test_count} tests"
+
+pass_count=0
+fail_count=0
 for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] || continue
     name=$(basename "$t" .sh)
     echo "> TEST RUN: $name"
     if /bin/sh "$t"; then
         echo "< TEST PASS: $name"
+        pass_count=$((pass_count + 1))
     else
         echo "< TEST FAIL: $name"
+        fail_count=$((fail_count + 1))
     fi
 done
 
+total=$((pass_count + fail_count))
+echo "kernel-test: ${pass_count}/${total} tests passed"
 echo "TEST_DONE"
-# Brief pause so the emulated UART drains to the serial file before QEMU exits.
-sleep 1
+# Pause for host to drain capture before board reboots into next U-Boot cycle.
+# 5s on real hardware (board.sh) vs QEMU (which exits on reboot anyway).
+sleep 5
 reboot -f
 EOF
 chmod +x "$STAGE/init"
@@ -103,9 +128,9 @@ fi
 
 # ── Copy ns-* test binaries ───────────────────────────────────────────────────
 
+ns_count=0
 NS_BIN_DIR="$SCRIPT_DIR/tests/ns/bin/$ARCH"
 if [[ -d "$NS_BIN_DIR" ]]; then
-    ns_count=0
     for bin in "$NS_BIN_DIR"/ns-*; do
         [[ -f $bin && -x $bin ]] || continue
         cp "$bin" "$STAGE/usr/bin/"
@@ -116,44 +141,35 @@ else
     warn "Namespace test binaries not found ($NS_BIN_DIR) — run: make bootstrap  (ns-* tests will skip)"
 fi
 
-# ── Copy perf-event binary ────────────────────────────────────────────────────
-
-PERF_BIN="$SCRIPT_DIR/tests/programs/perf-event/bin/$ARCH/perf-event"
-if [[ -x "$PERF_BIN" ]]; then
-    cp "$PERF_BIN" "$STAGE/usr/bin/"
-    info "perf-event binary installed → $STAGE/usr/bin/"
-else
-    warn "perf-event binary not found ($PERF_BIN) — run: make bootstrap  (400_perf-events will skip)"
-fi
-
-# ── Copy arena-test binary ────────────────────────────────────────────────────
-
-ARENA_BIN="$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test"
-if [[ -x "$ARENA_BIN" ]]; then
-    cp "$ARENA_BIN" "$STAGE/usr/bin/"
-    info "arena-test binary installed → $STAGE/usr/bin/"
-else
-    warn "arena-test binary not found ($ARENA_BIN) — run: make bootstrap  (410_arena-memory will skip)"
-fi
-
-# ── Write capability markers under /tests/ ───────────────────────────────────
+# ── Copy single-binary test programs + write capability markers ───────────────
 # Each marker is an empty file; tests check it as the first guard before doing
 # runtime probes (double-guard pattern: infrastructure ready + kernel feature present).
+
+install_program_binary() {
+    local name="$1" bin="$2" marker="$3" test_slot="$4"
+    if [[ -x "$bin" ]]; then
+        cp "$bin" "$STAGE/usr/bin/"
+        info "$name binary installed → $STAGE/usr/bin/"
+        touch "$STAGE/tests/$marker"
+    else
+        warn "$name binary not found ($bin) — run: make bootstrap  ($test_slot will skip)"
+    fi
+}
+
+install_program_binary "perf-event" \
+    "$SCRIPT_DIR/tests/programs/perf-event/bin/$ARCH/perf-event" \
+    "perf-enabled" "400_perf-events"
+
+install_program_binary "arena-test" \
+    "$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test" \
+    "arena-enabled" "410_arena-memory"
+
+# ── Write ns-enabled marker ───────────────────────────────────────────────────
 
 # ns-enabled: written when ns-* binaries are installed (make bootstrap was run)
 if [[ $ns_count -gt 0 ]]; then
     touch "$STAGE/tests/ns-enabled"
     info "ns-enabled marker written → /tests/ns-enabled"
-fi
-
-# perf-enabled: written when perf-event binary is installed
-if [[ -x "$PERF_BIN" ]]; then
-    touch "$STAGE/tests/perf-enabled"
-fi
-
-# arena-enabled: written when arena-test binary is installed
-if [[ -x "$ARENA_BIN" ]]; then
-    touch "$STAGE/tests/arena-enabled"
 fi
 
 # watchdog-enabled: written when CONFIG_WATCHDOG=y in the per-(config,arch) .config

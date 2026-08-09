@@ -38,7 +38,20 @@ board_reset() {
     fi
     if [[ ! -w "$relay" ]]; then
         warn "board_reset: $relay not writable — check udev rule and dialout/uucp group membership"
-        warn "  Manual reset required"
+        warn "  Manual power-on required"
+        return 0
+    fi
+    # Bail if relay and BOARD_TTY are the same device: writing CH340 relay bytes to the
+    # UART sends protocol garbage to the board's serial RX and does not cut power.
+    # Compare kernel major:minor (stat %t:%T) rather than realpath — two device nodes
+    # can have different canonical paths yet refer to the same underlying char device.
+    local relay_devno tty_devno
+    relay_devno=$(stat -L -c '%t:%T' "$relay"          2>/dev/null || true)
+    tty_devno=$(stat   -L -c '%t:%T' "${BOARD_TTY:-}"  2>/dev/null || true)
+    if [[ -n "$relay_devno" && -n "$tty_devno" && "$relay_devno" == "$tty_devno" ]]; then
+        warn "board_reset: relay ($relay) is the same device as BOARD_TTY — no separate power relay"
+        warn "  Fix: set HW_RELAY_VID/HW_RELAY_PID in local.mk to match a dedicated relay device"
+        warn "  Until then: power the board on manually before make hw-test"
         return 0
     fi
     info "board_reset: pulsing relay via $relay"
@@ -63,11 +76,13 @@ board_reset
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
-DEADLINE=$(( VM_START_EPOCH + TIMEOUT ))
 TIMED_OUT=0
+PRE_BOOT_TIMEOUT=${HW_PRE_BOOT_TIMEOUT:-90}
+DEADLINE=$(( VM_START_EPOCH + TIMEOUT ))  # Bash fallback path uses this directly
 
 if [[ -x "$SERIAL_CAPTURE" ]]; then
-    info "Capturing serial from $BOARD_TTY via serial-capture (timeout: ${TIMEOUT}s) → $DMESG_FILE"
+    info "Capturing serial from $BOARD_TTY via serial-capture → $DMESG_FILE"
+    info "(pre-boot: up to ${PRE_BOOT_TIMEOUT}s for U-Boot; test run: ${TIMEOUT}s)"
 
     CAPTURE_PID=''
     cleanup_capture() { [[ -n ${CAPTURE_PID:-} ]] && kill "$CAPTURE_PID" 2>/dev/null || true; }
@@ -76,17 +91,97 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
     "$SERIAL_CAPTURE" "$BOARD_TTY" 115200 "$DMESG_FILE" &
     CAPTURE_PID=$!
 
-    # Poll dmesg file for TEST_DONE; honour wall-clock deadline.
+    # Phase 1: wait for U-Boot banner; record its line number in the capture file.
+    # The boot sequence is: tests → TEST_DONE → reboot → U-Boot → kernel → tests.
+    # So U-Boot may appear AFTER a TEST_DONE from a partial capture already in the file.
+    # Pattern 'U-Boot (SPL )?20[0-9]{2}\.' matches the version string (e.g. "U-Boot SPL 2025.01-3")
+    # but not generic "U-Boot" strings that can appear in kernel log messages.
+    PRE_BOOT_DEADLINE=$(( VM_START_EPOCH + PRE_BOOT_TIMEOUT ))
+    UBOOT_LINE=''
+    MONITOR_LINE=0
     while true; do
-        remaining=$(( DEADLINE - $(date -u +%s) ))
-        if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
-        grep -qF 'TEST_DONE' "$DMESG_FILE" 2>/dev/null && break
+        UBOOT_LINE=$(grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' "$DMESG_FILE" 2>/dev/null | cut -d: -f1 || true)
+        [[ -n "$UBOOT_LINE" ]] && break
+
+        # Show TFTP/PXE download progress and detect boot failures
+        current_line=0
+        [[ -s "$DMESG_FILE" ]] && current_line=$(wc -l < "$DMESG_FILE")
+        if [[ $current_line -gt $MONITOR_LINE ]]; then
+            while IFS= read -r bline; do
+                if grep -qE 'Retry count exceeded|Aborting!|No FDT' <<< "$bline"; then
+                    warn "board: $bline"
+                elif grep -qE "TFTP from server|Filename '|Bytes transferred|DHCP client bound|PXE:" <<< "$bline"; then
+                    info "board: $bline"
+                fi
+            done < <(sed -n "$((MONITOR_LINE + 1)),${current_line}p" "$DMESG_FILE" 2>/dev/null || true)
+            MONITOR_LINE=$current_line
+        fi
+
+        remaining=$(( PRE_BOOT_DEADLINE - $(date -u +%s) ))
+        if [[ $remaining -le 0 ]]; then
+            warn "U-Boot not detected within ${PRE_BOOT_TIMEOUT}s — is the board powered on?"
+            TIMED_OUT=1; break
+        fi
         sleep 0.5
     done
+
+    # Phase 2: wait for TEST_DONE that appears AFTER the U-Boot line.
+    # A TEST_DONE before UBOOT_LINE belongs to a prior partial run and must be ignored.
+    if [[ $TIMED_OUT -eq 0 ]]; then
+        DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
+        info "U-Boot detected (line ${UBOOT_LINE}) — test timeout: ${TIMEOUT}s"
+        ANNOUNCED_START=0
+        PHASE2_REBOOTS=0
+        TAIL_FROM=$(( UBOOT_LINE + 1 ))
+        while true; do
+            remaining=$(( DEADLINE - $(date -u +%s) ))
+            if [[ $remaining -le 0 ]]; then TIMED_OUT=1; break; fi
+            # Read once from the anchor; reuse for all three pattern checks below.
+            tail_out=$(tail -n +"$TAIL_FROM" "$DMESG_FILE" 2>/dev/null || true)
+            if grep -qF 'TEST_DONE' <<< "$tail_out"; then
+                break
+            fi
+            # Relay board-side "kernel-test: starting N tests" to host stdout (once per boot)
+            if [[ $ANNOUNCED_START -eq 0 ]]; then
+                START_MSG=$(grep -m 1 'kernel-test: starting' <<< "$tail_out" || true)
+                if [[ -n "$START_MSG" ]]; then
+                    info "board: $START_MSG"
+                    ANNOUNCED_START=1
+                fi
+            fi
+            # Detect board reboot before tests start (TFTP failure retry, early panic, etc.).
+            # Guards:
+            #   ANNOUNCED_START=0 — once tests start, the next U-Boot is the normal
+            #     post-test reboot; TEST_DONE check above should catch it first.
+            #   NEXT_UBOOT > 50 lines — the SPL→main transition ("U-Boot SPL ..." then
+            #     "U-Boot ..." 5 lines later) both match the pattern; the line threshold
+            #     distinguishes a genuine new boot (hundreds of lines away) from SPL→main.
+            if [[ $PHASE2_REBOOTS -lt 3 && $ANNOUNCED_START -eq 0 ]]; then
+                NEXT_UBOOT=$(grep -m 1 -n -E 'U-Boot (SPL )?20[0-9]{2}\.' <<< "$tail_out" \
+                    | cut -d: -f1 || true)
+                if [[ -n "$NEXT_UBOOT" && $NEXT_UBOOT -gt 50 ]]; then
+                    UBOOT_LINE=$(( UBOOT_LINE + NEXT_UBOOT ))
+                    TAIL_FROM=$(( UBOOT_LINE + 1 ))
+                    warn "board: reboot detected before tests started — re-anchoring to line ${UBOOT_LINE}; timeout reset"
+                    DEADLINE=$(( $(date -u +%s) + TIMEOUT ))
+                    PHASE2_REBOOTS=$(( PHASE2_REBOOTS + 1 ))
+                fi
+            fi
+            sleep 0.5
+        done
+    fi
 
     kill "$CAPTURE_PID" 2>/dev/null || true
     wait "$CAPTURE_PID" 2>/dev/null || true
     CAPTURE_PID=''
+
+    # Trim pre-anchor content: discard everything before UBOOT_LINE so that
+    # parse_serial_output only counts TEST PASS/FAIL from the current boot.
+    # Without this, a prior run's markers in the same capture file are counted twice.
+    if [[ -n "$UBOOT_LINE" && "$UBOOT_LINE" -gt 1 ]]; then
+        tail -n +"$UBOOT_LINE" "$DMESG_FILE" > "${DMESG_FILE}.trimmed" \
+            && mv "${DMESG_FILE}.trimmed" "$DMESG_FILE"
+    fi
 else
     warn "serial-capture binary absent — using Bash read fallback (run: make bootstrap)"
 

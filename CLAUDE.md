@@ -42,6 +42,10 @@ make baseline                                  # pin a reference run for regress
 make kconfig-check SUBSYSTEM=<name>            # static Kconfig dependency analysis
 make bisect CONFIG_FILE=<path>                 # binary-search a failing archived config
 make verify-patch FILES=... [BASE=<ref>]       # build-test a patch across arches and compilers
+make hw-bootstrap [DRY_RUN=1]                  # install hardware test infra (needs sudo)
+make hw-deploy                                 # copy kernel+initramfs+DTB to TFTP_DIR
+make hw-test BOARD_TTY=/dev/ttyUSB0           # serial capture on real board (≡ make test)
+make hw BOARD_TTY=/dev/ttyUSB0                # build → hw-deploy → hw-test → report
 ```
 
 ### Fetch modes (per-clone preset)
