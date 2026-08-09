@@ -102,7 +102,7 @@ if [[ -x "$SERIAL_CAPTURE" ]]; then
         [[ -n "$UBOOT_LINE" ]] && break
 
         # Show TFTP/PXE download progress and detect boot failures
-        current_line=$(wc -l < "$DMESG_FILE" 2>/dev/null || echo 0)
+        current_line=$(grep -c '' "$DMESG_FILE" 2>/dev/null || echo 0)
         if [[ $current_line -gt $MONITOR_LINE ]]; then
             while IFS= read -r bline; do
                 if grep -qE 'Retry count exceeded|Aborting!|No FDT' <<< "$bline"; then
