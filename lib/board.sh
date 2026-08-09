@@ -43,10 +43,12 @@ board_reset() {
     fi
     # Bail if relay and BOARD_TTY are the same device: writing CH340 relay bytes to the
     # UART sends protocol garbage to the board's serial RX and does not cut power.
-    local relay_real tty_real
-    relay_real=$(realpath "$relay" 2>/dev/null || true)
-    tty_real=$(realpath "${BOARD_TTY:-}" 2>/dev/null || true)
-    if [[ -n "$relay_real" && "$relay_real" == "$tty_real" ]]; then
+    # Compare kernel major:minor (stat %t:%T) rather than realpath — two device nodes
+    # can have different canonical paths yet refer to the same underlying char device.
+    local relay_devno tty_devno
+    relay_devno=$(stat -c '%t:%T' "$relay"          2>/dev/null || true)
+    tty_devno=$(stat   -c '%t:%T' "${BOARD_TTY:-}"  2>/dev/null || true)
+    if [[ -n "$relay_devno" && -n "$tty_devno" && "$relay_devno" == "$tty_devno" ]]; then
         warn "board_reset: relay ($relay) is the same device as BOARD_TTY — no separate power relay"
         warn "  Fix: set HW_RELAY_VID/HW_RELAY_PID in local.mk to match a dedicated relay device"
         warn "  Until then: power the board on manually before make hw-test"
