@@ -25,6 +25,7 @@ CFLAGS_COMMON       := -std=c11 -O2 -D_DEFAULT_SOURCE \
                        -Wno-implicit-function-declaration
 CFLAGS_COMMON_GCC   := -Wall -Wextra -Wpedantic -Werror
 CFLAGS_COMMON_CLANG := -Weverything -Werror \
+                       -Wno-unknown-warning-option \
                        -Wno-disabled-macro-expansion \
                        -Wno-unsafe-buffer-usage
 

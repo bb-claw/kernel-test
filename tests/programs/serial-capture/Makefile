@@ -28,6 +28,7 @@ CFLAGS_COMMON_GCC := -Wall -Wextra -Wpedantic -Werror
 # Each suppression has an inline rationale.
 CFLAGS_COMMON_CLANG := \
     -Weverything -Werror \
+    -Wno-unknown-warning-option \
     -Wno-disabled-macro-expansion \
     -Wno-unsafe-buffer-usage
 # -Wno-disabled-macro-expansion: musl defines stderr as a self-referential

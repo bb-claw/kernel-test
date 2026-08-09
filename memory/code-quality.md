@@ -58,7 +58,7 @@ Reference: each program's `Makefile` under `tests/programs/`; `docs/programs-qua
 ```
 CFLAGS_COMMON       -std=c11 -O2 -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration
 CFLAGS_COMMON_GCC   -Wall -Wextra -Wpedantic -Werror
-CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-disabled-macro-expansion -Wno-unsafe-buffer-usage
+CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-unknown-warning-option -Wno-disabled-macro-expansion -Wno-unsafe-buffer-usage
 ```
 
 - **serial-capture (host-only)**: `bin/serial-capture-gcc` (musl-gcc, quality gate) + `bin/serial-capture` (musl-clang, shipped).
