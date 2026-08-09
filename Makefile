@@ -65,7 +65,7 @@ BOARD_ARCH     ?= riscv
 BOARD_TTY      ?= /dev/ttyUSB0
 TFTP_DIR       ?= $(CURDIR)/tftp
 
-# ── Hardware bootstrap (Phase 6a) — isolated test network + USB relay ─────────
+# ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
 HW_HOST_IP     ?= 192.168.100.1
 HW_DHCP_RANGE  ?= 192.168.100.100,192.168.100.200
@@ -75,7 +75,7 @@ HW_RELAY       ?= /dev/vf2-relay
 HW_RELAY_VID   ?= 1a86
 HW_RELAY_PID   ?= 7523
 
-# ── Hardware board boot (Phase 6b) — U-Boot TFTP boot ─────────────────────────
+# ── Hardware board boot — U-Boot TFTP boot ────────────────────────────────────
 # HW_TIMEOUT: serial capture timeout for the board (U-Boot + kernel + tests).
 #   Separate from TIMEOUT (QEMU VM); 120s covers U-Boot (~15s) + TFTP + kernel + tests.
 HW_TIMEOUT         ?= 120
@@ -277,7 +277,8 @@ vf2:
 # hw-full:   build → test → hw-deploy → hw-test → report  (QEMU + hardware combined pipeline).
 #
 # Requires: BOARD_TTY set to a real USB-UART device (default /dev/ttyUSB0).
-# USB relay reset handled by board_reset() in lib/board.sh (Phase 6a).
+# board_reset() in lib/board.sh pulses HW_RELAY; falls back to a manual-reset
+# warning when relay == BOARD_TTY (same device) or when HW_RELAY is absent.
 hw-deploy:
 	@bd="$(BUILD_DIR)/$(BOARD_CONFIG)-$(BOARD_ARCH)"; \
 	mkdir -p $(TFTP_DIR) 2>/dev/null || true; \

@@ -58,6 +58,11 @@ Examples:
 
 ---
 
+## initramfs Construction Requirements (lib/initramfs.sh)
+
+- **`/etc/passwd` + `/etc/group` required on SMP hardware**: Toybox sh calls `getpwuid(0)` in `setup_env()` to populate HOME/USER/SHELL. Without `/etc/passwd` it falls back to a BSS struct; on multi-core RISC-V (VisionFive 2 / JH7110) concurrent subprocesses alias into the same NOFORK TT-union BSS region causing SIGSEGV in ~7 of 43 test scripts. Fix: `printf 'root:x:0:0:root:/root:/bin/sh\n' > "$STAGE/etc/passwd"` and matching `/etc/group` — already in initramfs.sh; do not remove.
+- **`dmesg -n 1` at top of `/init`**: Deferred kernel printk messages (mmc probe errors, driver register dumps) are flushed asynchronously to the serial console and can split a `< TEST PASS:` marker mid-write, breaking `parse_serial_output`'s `grep -c '^< TEST PASS:'` anchor (observed: 42/43 instead of 43/43 on VF2). The kernel checks `console_loglevel` at flush time, so setting it to `KERN_EMERG` (1) before any test output prevents all such interleaving. The ring buffer is unaffected — `dmesg` in test scripts still reads all messages.
+
 ## Toybox sh 0.8.11+ Breaking Changes (affects all versions ≥ 0.8.11)
 
 - **`sh` is a NOFORK builtin** — `sh script.sh` (bare name) runs the script recursively in the same process via "command recursion", bypassing fork+exec. The inner invocation uses a different output path that does not flush to the serial console. **Fix: always use `/bin/sh script.sh` (full path) in `/init` and in any test that forks a shell subprocess.** `/bin/sh` has a `/` in the path, which forces fork+exec and bypasses the NOFORK optimization.
