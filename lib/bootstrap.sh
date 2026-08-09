@@ -287,6 +287,17 @@ else
     warn "On Debian: sudo apt-get install llvm"
 fi
 
+# ── musl sanity check (serial-capture dual-compiler build) ───────────────────
+# musl-gcc and musl-clang are both required; musl-clang is the shipped binary.
+
+if command -v musl-gcc &>/dev/null && command -v musl-clang &>/dev/null; then
+    info "musl-gcc + musl-clang: OK (serial-capture dual-compiler build ready)"
+else
+    warn "musl-gcc or musl-clang not found — serial-capture build will fail"
+    warn "On Arch:   sudo pacman -S musl"
+    warn "On Debian: sudo apt-get install musl-tools"
+fi
+
 # ── pahole version check (BTF/debug info for kernels ≥6.0) ───────────────────
 
 check_pahole_version() {
