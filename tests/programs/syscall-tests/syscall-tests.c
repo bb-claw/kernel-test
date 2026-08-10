@@ -395,7 +395,9 @@ static int test_unix(void)
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0) {
         int e = errno;
-        if (e == EAFNOSUPPORT || e == EPROTONOSUPPORT) {
+        /* ENOSYS: CONFIG_NET=n (no socket subsystem at all)
+         * EAFNOSUPPORT/EPROTONOSUPPORT: CONFIG_UNIX=n (sockets exist, AF_UNIX not registered) */
+        if (e == ENOSYS || e == EAFNOSUPPORT || e == EPROTONOSUPPORT) {
             skip("AF_UNIX not supported");
             return 0;
         }
