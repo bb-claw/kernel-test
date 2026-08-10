@@ -131,7 +131,7 @@ make all NO_FETCH=1 CONFIGS=vf2config ARCHS=riscv   # builds + boots in QEMU ris
 
 ---
 
-### Phase 5 — `feat/board-serial` *(complete — merged)*
+### Phase 5 — `feat/board-serial` ✓ DONE (branch merged to main)
 
 **What:** `lib/board.sh` — the hardware equivalent of `lib/vm.sh`. Implemented:
 
@@ -151,7 +151,7 @@ CI test `tests/ci/test-board-serial.sh` replays 4 fixtures through socat pty pai
 
 ---
 
-### Phase 6 — `feat/visionfive2-board` *(next milestone)*
+### Phase 6 — `feat/visionfive2-board` ✓ DONE (branch merged to main)
 
 **What:** Full board integration with tftp-based kernel delivery:
 
@@ -226,7 +226,7 @@ Recommended sequence if working serially: **1 → 2 → 3 → 4 → 5 → 6**
 
 ---
 
-## Phase 7 — `serial-capture` hardening *(deferred — trigger on concrete need)*
+## Phase 7 — `serial-capture` hardening ✓ DONE (branch merged to main)
 
 Three improvements identified during Phase 5 review. Deferred because the binary
 already works correctly for the VisionFive 2 use case.
