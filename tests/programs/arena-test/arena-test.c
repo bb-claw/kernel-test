@@ -26,6 +26,9 @@
 #include <unistd.h>    /* getpagesize()                                           */
 #include <sys/mman.h>  /* mmap(), munmap(), MAP_ANONYMOUS, MAP_PRIVATE            */
 
+static int verbose = 0;
+
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Arena allocator
@@ -44,6 +47,10 @@
  * "head" always points to the block where the next allocation will land.
  */
 
+typedef struct ArenaInfo {
+	size_t arena_block_size;	/* size of one block in the arena */
+} ArenaInfo;
+
 typedef struct ArenaBlock {
     struct ArenaBlock *next;   /* link to the next block (NULL if last)   */
     unsigned char     *base;   /* raw byte buffer for this block          */
@@ -52,17 +59,18 @@ typedef struct ArenaBlock {
 } ArenaBlock;
 
 typedef struct {
+	ArenaInfo info;		/* the general information of one arena and its blocks without the necessarity to process this on demand */
     ArenaBlock *head;       /* current block: new allocations go here    */
     ArenaBlock *first;      /* head of list: used to walk all blocks     */
-    size_t      block_size; /* default size when a new block is created  */
 } Arena;
 
+
 /* Allocate one ArenaBlock struct plus its backing buffer of `size` bytes. */
-static ArenaBlock *block_new(size_t size)
+static ArenaBlock *arena_block_new(size_t size)
 {
-    ArenaBlock *b = malloc(sizeof(ArenaBlock));
+    ArenaBlock *b = (ArenaBlock *)malloc(sizeof(ArenaBlock));
     if (!b) return NULL;
-    b->base = malloc(size);
+    b->base = (unsigned char *) malloc(size);
     if (!b->base) { free(b); return NULL; }
     b->size = size;
     b->used = 0;
@@ -74,8 +82,8 @@ static ArenaBlock *block_new(size_t size)
 static Arena arena_create(size_t block_size)
 {
     Arena a;
-    a.block_size = block_size;
-    a.head = a.first = block_new(block_size);
+    a.info.arena_block_size = block_size;
+    a.head = a.first = arena_block_new(block_size);
     return a;
 }
 
@@ -125,15 +133,15 @@ static void *arena_alloc(Arena *a, size_t n)
         if (a->head->next) {
             a->head = a->head->next;   /* reuse block from a previous cycle */
         } else {
-            size_t sz = aligned > a->block_size ? aligned : a->block_size;
-            ArenaBlock *b = block_new(sz);
+            size_t sz = aligned > a->info.arena_block_size ? aligned : a->info.arena_block_size;
+            ArenaBlock *b = arena_block_new(sz);
             if (!b) return NULL;
             a->head->next = b;
             a->head       = b;
         }
     }
 
-    void *ptr = a->head->base + a->head->used;
+    void *ptr  = a->head->base + a->head->used;
     a->head->used += aligned;
     return ptr;
 }
@@ -148,6 +156,26 @@ static void arena_reset(Arena *a)
         b->used = 0;
     a->head = a->first;
 }
+
+static void arena_print(Arena *a) {
+        size_t arena_size = 0;
+        int blocks = 0;
+        for (ArenaBlock *b = a->first; b; b = b->next) {
+                arena_size += b->size;
+                blocks++;
+        }
+        if (verbose)
+                printf("  Arena { size: %d, blocks: %d }\n", (int)arena_size, blocks);
+}
+
+static void arena_print_with_blocks(Arena *a) {
+        if (!verbose) return;
+        arena_print(a);
+        for (ArenaBlock *b = a->first; b; b = b->next) {
+                printf("    ArenaBlock { size: %d, used: %d }\n", (int)b->size, (int)b->used);
+        }
+}
+
 
 /* Count how many blocks are in the linked list. */
 static int block_count(const Arena *a)
@@ -182,6 +210,7 @@ static size_t total_used(const Arena *a)
  */
 static int test_alloc(int *readback_ok_out)
 {
+	if (verbose) printf("\n*** TEST: test_alloc ***\n");
     /*
      * Block size = 64 bytes.  Allocation sizes and alignment (64-bit shown):
      *   alloc(1)  → padded to  8 bytes  (block 1: 8/64 used)
@@ -190,11 +219,13 @@ static int test_alloc(int *readback_ok_out)
      * Expected block count after these three allocations: 2.
      */
     Arena a = arena_create(64);
+    arena_print_with_blocks(&a);
     if (!a.first) { *readback_ok_out = 0; return 0; }
 
-    unsigned char *p1 = arena_alloc(&a, 1);
-    unsigned char *p2 = arena_alloc(&a, 7);
-    unsigned char *p3 = arena_alloc(&a, 64);
+    unsigned char *p1 = (unsigned char *) arena_alloc(&a, 1);
+    unsigned char *p2 = (unsigned char *) arena_alloc(&a, 7);
+    unsigned char *p3 = (unsigned char *) arena_alloc(&a, 64);
+    arena_print_with_blocks(&a);
 
     int alloc_ok = p1 && p2 && p3           /* all pointers non-NULL       */
                    && (p1 != p2)            /* distinct addresses          */
@@ -212,6 +243,7 @@ static int test_alloc(int *readback_ok_out)
                        && (*p3 == 0xCC);
 
     arena_destroy(&a);
+    arena_print(&a);
     return alloc_ok;
 }
 
@@ -231,8 +263,11 @@ static int test_alloc(int *readback_ok_out)
  */
 static int test_reset(int *cycles_out)
 {
+	if (verbose) printf("\n*** TEST: test_reset ***\n");
     const int CYCLES = 3;
     Arena a = arena_create(64);
+    arena_print_with_blocks(&a);
+
     if (!a.first) { *cycles_out = 0; return 0; }
 
     int ok              = 1;
@@ -255,9 +290,11 @@ static int test_reset(int *cycles_out)
         /* Block count must stay constant — growing means we leaked a block */
         if (block_count(&a) != blocks_expected) { ok = 0; break; }
     }
+    arena_print_with_blocks(&a);
 
     *cycles_out = ok ? CYCLES : 0;
     arena_destroy(&a);
+    arena_print(&a);
     return ok;
 }
 
@@ -278,10 +315,13 @@ static int test_reset(int *cycles_out)
  */
 static int test_alignment(int *align_bytes_out)
 {
+	if (verbose) printf("\n*** TEST: test_alignment ***\n");
+
     size_t align = sizeof(void *);
     *align_bytes_out = (int)align;
 
     Arena a = arena_create(4096);   /* large enough for all allocations */
+    arena_print_with_blocks(&a);
     if (!a.first) return 0;
 
     static const size_t odd_sizes[] = {1, 3, 5, 7, 9, 15, 17, 31, 33, 63, 65};
@@ -294,8 +334,10 @@ static int test_alignment(int *align_bytes_out)
             break;
         }
     }
+    arena_print_with_blocks(&a);
 
     arena_destroy(&a);
+    arena_print(&a);
     return ok;
 }
 
@@ -317,6 +359,7 @@ static int test_alignment(int *align_bytes_out)
  */
 static int test_page_size(int *page_size_out)
 {
+	if (verbose) printf("\n*** TEST: test_page_size ***\n");
     int ps = (int)getpagesize();
     *page_size_out = ps;
 
@@ -327,13 +370,17 @@ static int test_page_size(int *page_size_out)
      * The next allocation (1 byte) must land in a new block 2.
      */
     Arena a = arena_create((size_t)ps);
+    arena_print_with_blocks(&a);
     if (!a.first) return 0;
 
     arena_alloc(&a, (size_t)ps);   /* fills block 1 completely */
+    arena_print_with_blocks(&a);
     void *p2 = arena_alloc(&a, 1); /* must overflow to block 2 */
+    arena_print_with_blocks(&a);
 
     int ok = (p2 != NULL) && (block_count(&a) >= 2);
     arena_destroy(&a);
+    arena_print(&a);
     return ok;
 }
 
@@ -356,6 +403,7 @@ static int test_page_size(int *page_size_out)
  */
 static int test_stress(int *blocks_out, int *readback_ok_out)
 {
+	if (verbose) printf("\n*** TEST: test_stress ***\n");
     const size_t MB        = 1024 * 1024;
     const size_t STRESS_MB = 32;
     const size_t BLK_SIZE  = 65536;                         /* 64 KiB arena blocks */
@@ -366,10 +414,11 @@ static int test_stress(int *blocks_out, int *readback_ok_out)
      * Keep one pointer per chunk so we can walk them for the read-back.
      * 8192 pointers × 8 bytes = 64 KiB — negligible overhead.
      */
-    unsigned char **ptrs = malloc(ITERS * sizeof(unsigned char *));
+    unsigned char **ptrs = (unsigned char **) malloc(ITERS * sizeof(unsigned char *));
     if (!ptrs) { *blocks_out = 0; *readback_ok_out = 0; return 0; }
 
     Arena a = arena_create(BLK_SIZE);
+    arena_print_with_blocks(&a);
     if (!a.first) {
         free(ptrs);
         *blocks_out = 0;
@@ -379,7 +428,7 @@ static int test_stress(int *blocks_out, int *readback_ok_out)
 
     /* Phase 1: allocate and fill every byte with a chunk-index pattern */
     for (size_t i = 0; i < ITERS; i++) {
-        ptrs[i] = arena_alloc(&a, CHUNK_SZ);
+        ptrs[i] = (unsigned char *) arena_alloc(&a, CHUNK_SZ);
         if (!ptrs[i]) {
             arena_destroy(&a);
             free(ptrs);
@@ -413,8 +462,10 @@ static int test_stress(int *blocks_out, int *readback_ok_out)
     free(ptrs);
 
     arena_reset(&a);
+    arena_print(&a);
     int reset_ok = (total_used(&a) == 0);
     arena_destroy(&a);
+    arena_print_with_blocks(&a);
     return reset_ok;
 }
 
@@ -446,7 +497,7 @@ static int test_mmap(int *pages_out)
     int    num_pages = 8;
     size_t map_size  = (size_t)num_pages * (size_t)page_size;
 
-    unsigned char *mem = mmap(NULL, map_size,
+    unsigned char *mem = (unsigned char *) mmap(NULL, map_size,
                               PROT_READ | PROT_WRITE,
                               MAP_PRIVATE | MAP_ANONYMOUS,
                               -1, 0);
@@ -480,6 +531,7 @@ static int test_mmap(int *pages_out)
  */
 int main(void)
 {
+    verbose = getenv("VERBOSE") != NULL;
     int all_ok = 1;
 
     /* Test 1: allocation correctness + write/read-back */

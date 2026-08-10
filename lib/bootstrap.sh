@@ -74,21 +74,40 @@ install_packages() {
                 fi
             fi
 
+            # Enable i386 foreign architecture before update so apt can resolve
+            # linux-libc-dev:i386 (provides asm/errno.h for gcc -m32 builds).
+            # Without this, gcc-multilib installs but 32-bit builds fail with
+            # "asm/errno.h: No such file or directory" on Ubuntu cloud images.
+            if ! $SUDO dpkg --print-foreign-architectures | grep -q i386; then
+                info "Adding i386 dpkg architecture for gcc -m32 support"
+                $SUDO dpkg --add-architecture i386
+            fi
+
             $SUDO apt-get update -qq
-            # Base packages from main; qemu-system-misc provides qemu-system-riscv64
+            # Base packages from main; qemu-system-misc provides qemu-system-riscv64.
+            # linux-libc-dev:i386 provides asm/errno.h + asm/types.h for gcc -m32;
+            # listed explicitly so it is installed even when gcc-multilib was already
+            # present before the i386 arch was registered.
             $SUDO apt-get install -y \
-                gcc gcc-multilib make ccache \
+                gcc gcc-multilib linux-libc-dev:i386 make ccache \
                 clang lld llvm musl-tools \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev \
                 socat
 
-            # Cross-compilers in a separate step so a broken pre-existing package
-            # state does not abort the rest of bootstrap.
-            $SUDO apt-get install -y gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu || {
+            # Cross-compilers + sysroot headers in a separate step so a broken
+            # pre-existing package state does not abort the rest of bootstrap.
+            # libc6-dev-{arm64,riscv64}-cross are Recommends (not Depends) of the
+            # gcc-*-linux-gnu packages; on minimal cloud images Recommends are skipped,
+            # leaving the cross sysroot without asm/ UAPI headers and causing
+            # "asm/errno.h: No such file or directory" on any -static cross build.
+            $SUDO apt-get install -y \
+                gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu \
+                libc6-dev-arm64-cross libc6-dev-riscv64-cross || {
                 warn "Cross-compiler install failed — arm64/riscv kernel builds will not work"
-                warn "Fix with: sudo apt-get install -f && sudo apt-get install gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu"
+                warn "Fix with: sudo apt-get install -f && sudo apt-get install \\"
+                warn "  gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu libc6-dev-arm64-cross libc6-dev-riscv64-cross"
             }
 
             # Install dwarves and qemu-system-misc from backports via explicit -t.
@@ -102,6 +121,36 @@ install_packages() {
                     warn "Could not upgrade from backports — BTF and/or riscv64 QEMU may not work correctly"
             else
                 $SUDO apt-get install -y dwarves
+            fi
+
+            # musl-tools only provides musl-gcc on Debian/Ubuntu; musl-clang does not
+            # exist as a package. On Arch the musl package provides both.
+            # Create a thin wrapper that adds musl headers to the front of the search
+            # path and redirects startup files and the static libc to the musl dirs:
+            #   -isystem /usr/include/x86_64-linux-musl   musl C headers (before glibc)
+            #   -B/-L   /usr/lib/x86_64-linux-musl        startup files + libc.a
+            # We do NOT use -nostdinc because the kernel UAPI headers
+            # (<linux/perf_event.h> etc.) live in /usr/include/linux/ alongside the
+            # glibc headers; we still need them reachable. The -isystem ordering
+            # ensures musl's stdio.h/stdlib.h/… are found before glibc's copies.
+            if ! command -v musl-clang &>/dev/null; then
+                if [[ -d /usr/include/x86_64-linux-musl && -d /usr/lib/x86_64-linux-musl ]]; then
+                    info "Creating /usr/local/bin/musl-clang (not provided by musl-tools)"
+                    $SUDO tee /usr/local/bin/musl-clang > /dev/null << 'MUSL_CLANG_WRAPPER'
+#!/bin/sh
+exec clang \
+    --target=x86_64-unknown-linux-musl \
+    -isystem /usr/include/x86_64-linux-musl \
+    -B/usr/lib/x86_64-linux-musl \
+    -L/usr/lib/x86_64-linux-musl \
+    -static-libgcc \
+    "$@"
+MUSL_CLANG_WRAPPER
+                    $SUDO chmod +x /usr/local/bin/musl-clang
+                else
+                    warn "musl headers not found in /usr/include/x86_64-linux-musl — musl-clang wrapper skipped"
+                    warn "On Debian: sudo apt-get install musl-tools; then re-run make bootstrap"
+                fi
             fi
             ;;
 
