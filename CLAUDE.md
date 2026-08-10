@@ -91,7 +91,7 @@ VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 
 ## How to Add a Test
 
-1. Create `tests/custom/NNN_my-test.sh` (3-digit slot, leave gaps: 010, 020, …); **next slot: 420_**
+1. Create `tests/custom/NNN_my-test.sh` (3-digit slot, leave gaps: 010, 020, …); **next slot: 480_**
 2. `exit 0` = pass; non-zero = fail; print `ok: msg` / `FAIL: msg` / `skip: msg`
 3. Harness injects all `tests/custom/*.sh` into the initramfs and runs them sequentially in the VM
 4. Stage both the script and the updated `memory/test-inventory.md` — pre-commit enforces this
