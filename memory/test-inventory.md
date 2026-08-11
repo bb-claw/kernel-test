@@ -60,8 +60,14 @@ and run in filename-sorted order by `/init`. Protocol:
 | `390_watchdog` | Watchdog subsystem: /dev/watchdog presence + char-device check; /sys/class/watchdog/* enumeration (all registered devices; name-based correlation to match $WD to its sysfs entry for correct nowayout); magic-close write "V" (skipped when NOWAYOUT=1); softlockup sysctl opportunistic; /proc/config.gz verification (FAIL if device present but CONFIG_WATCHDOG=n); skip when device absent (tinyconfig, allnoconfig) |
 | `400_perf-events` | perf_event_open(PERF_TYPE_SOFTWARE/TASK_CLOCK) via C helper; non-zero counter verified; skip if binary absent or CONFIG_PERF_EVENTS=n; opportunistic starfive-starlink-pmu sysfs check (ok on real VF2, skip in QEMU) |
 | `410_arena-memory` | Arena allocator: alloc/reset/destroy correctness; pointer alignment (8-byte on 64-bit, 4-byte on i386); page-size block overflow; 32 MiB write stress; skip if binary absent |
+| `420_32bit-boundary` | lseek64 >4 GiB on tmpfs (VFS off_t truncation class) + 128 MiB anonymous mmap write-read-back; skip if /tmp not writable or mmap fails; skip if binary absent |
+| `430_seccomp` | seccomp-filter enforcement: BPF filter blocks SYS_getpid (ENOSYS); skip if CONFIG_SECCOMP_FILTER absent (ENOSYS/EINVAL); skip if binary absent |
+| `440_io-uring` | Raw io_uring NOP SQE→CQE round-trip: setup ring, submit NOP, read CQE, verify res=0 user_data=0x42; skip if CONFIG_IO_URING absent (ENOSYS/EPERM); skip if binary absent |
+| `450_fd-ipc` | timerfd one-shot expiry + eventfd write/read=7 + signalfd SIGUSR1 receive; core kernel features, always available; skip if binary absent |
+| `460_unix-socket` | AF_UNIX socketpair SOCK_STREAM send/recv round-trip; skip if CONFIG_UNIX absent (EAFNOSUPPORT); skip if binary absent |
+| `470_landlock` | Landlock ABI version check + ruleset create + restrict path + verify open(/proc/version) blocked (EACCES); skip if CONFIG_SECURITY_LANDLOCK absent (ENOSYS); skip if binary absent |
 
-Next available slot: **420_** — 43 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **480_** — 49 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -84,6 +90,12 @@ Next available slot: **420_** — 43 total (tests/001_smoke.sh + tests/custom/*.
 | 390 watchdog | PASS | skip | skip | varies | skip |
 | 400 perf-events | PASS | skip | skip | varies | PASS |
 | 410 arena-memory | PASS | PASS | PASS | PASS | PASS |
+| 420 32bit-boundary | PASS | PASS/skip | PASS/skip | varies | PASS |
+| 430 seccomp | PASS | skip | skip | varies | PASS |
+| 440 io-uring | PASS | skip | skip | varies | PASS |
+| 450 fd-ipc | PASS | PASS | PASS | PASS | PASS |
+| 460 unix-socket | PASS | skip | skip | varies | PASS |
+| 470 landlock | PASS | skip | skip | varies | skip |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 290–360 require an ns-variant config (*nsconfig); skip via `/tests/ns-enabled` marker on tinyconfig/allnoconfig/defconfig/kunitconfig etc.
@@ -91,6 +103,7 @@ Next available slot: **420_** — 43 total (tests/001_smoke.sh + tests/custom/*.
 390 watchdog: guarded by `/tests/watchdog-enabled` marker (written when CONFIG_WATCHDOG=y in .config); PASS on defconfig/kunitconfig; skip on tinyconfig/allnoconfig/randdefconfig.
 400 guarded by `/tests/perf-enabled` marker (written when perf-event binary present); requires CONFIG_PERF_EVENTS=y (present in defconfig/randdef, absent in tinyconfig/allnoconfig).
 410 guarded by `/tests/arena-enabled` marker (written when arena-test binary present).
+420–470 guarded by syscall-tests binary presence (no capability marker; subcommands skip individually at runtime when required syscall is absent).
 
 ---
 

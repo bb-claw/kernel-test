@@ -164,6 +164,16 @@ install_program_binary "arena-test" \
     "$SCRIPT_DIR/tests/programs/arena-test/bin/$ARCH/arena-test" \
     "arena-enabled" "410_arena-memory"
 
+# syscall-tests is always injected when present; individual subcommands skip at runtime
+# when the required syscall is unavailable. No capability marker needed.
+SYSCALL_BIN="$SCRIPT_DIR/tests/programs/syscall-tests/bin/$ARCH/syscall-tests"
+if [[ -x "$SYSCALL_BIN" ]]; then
+    cp "$SYSCALL_BIN" "$STAGE/usr/bin/"
+    info "syscall-tests binary installed → $STAGE/usr/bin/"
+else
+    warn "syscall-tests binary not found ($SYSCALL_BIN) — run: make bootstrap  (420_–470_ will skip)"
+fi
+
 # ── Write ns-enabled marker ───────────────────────────────────────────────────
 
 # ns-enabled: written when ns-* binaries are installed (make bootstrap was run)

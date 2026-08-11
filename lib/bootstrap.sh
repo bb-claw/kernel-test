@@ -245,6 +245,22 @@ else
     warn "tests/programs/arena-test/ not found — 410_arena-memory will skip in the VM"
 fi
 
+# ── syscall-tests binary ──────────────────────────────────────────────────────
+# Build the syscall-tests static C binary for all 4 arches.
+# Injected into the initramfs at usr/bin/syscall-tests for 420_–470_ test scripts.
+
+SYSCALL_DIR="$(cd "$(dirname "$0")/../tests/programs/syscall-tests" && pwd)"
+if [[ -d $SYSCALL_DIR ]]; then
+    info "Building syscall-tests binary (tests/programs/syscall-tests/)..."
+    if make -C "$SYSCALL_DIR" all; then
+        info "syscall-tests binary built OK"
+    else
+        warn "syscall-tests binary build failed — 420_–470_ tests will skip in the VM"
+    fi
+else
+    warn "tests/programs/syscall-tests/ not found — 420_–470_ tests will skip in the VM"
+fi
+
 # Build the host-side serial-capture binary.
 # Used by lib/board.sh for robust UART capture in Phase 6+ (not injected into initramfs).
 
