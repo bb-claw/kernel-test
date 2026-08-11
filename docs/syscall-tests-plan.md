@@ -2,6 +2,21 @@
 
 Branch: `feat/syscall-tests`
 Start date: 2026-08-10
+**Status: IMPLEMENTED — PR #51 open, verified on v7.2-rc7 mainline + v7.1.7 stable**
+
+## Outcome (actual vs plan)
+
+All 5 goals met. Deviations from the design notes below:
+- **io_uring**: implemented as `IORING_OP_NOP` (not `IORING_OP_READ`) — NOP avoids needing
+  a pre-existing fd and exercises the full SQE→CQE path cleanly.
+- **Landlock**: blocks `open("/proc/version")` (not `/etc/passwd`) — procfs is always present
+  on defconfig; `/etc/passwd` is absent in the initramfs.
+- **460_ unix**: SOCK_STREAM only (datagram omitted) — stream is sufficient to exercise the
+  AF_UNIX code path; datagram adds no additional coverage for this class of regression.
+- **timerfd_settime** skips (not fails) on 32-bit allnoconfig — the 32-bit timer syscall
+  interface is unavailable on that config; eventfd + signalfd still run and pass.
+- **CONFIG_NET=n** makes `socketpair()` return `ENOSYS` (not `EAFNOSUPPORT`) — handled
+  alongside `EAFNOSUPPORT`/`EPROTONOSUPPORT` in the unix skip guard.
 
 ---
 

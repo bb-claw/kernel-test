@@ -330,7 +330,7 @@ static int test_fds(void)
         ts.it_value.tv_nsec = 1;
         if (timerfd_settime(tfd, 0, &ts, NULL) < 0) {
             /* EINVAL/ENOSYS: timer clock unavailable on this config (e.g. 32-bit allnoconfig) */
-            skip("timerfd_settime failed");
+            printf("skip: timerfd_settime failed (errno %d)\n", errno);
         } else {
             uint64_t exp = 0;
             ssize_t n = read(tfd, &exp, sizeof(exp));
