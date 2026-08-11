@@ -261,6 +261,22 @@ else
     warn "tests/programs/syscall-tests/ not found — 420_–470_ tests will skip in the VM"
 fi
 
+# ── snapshot binary ───────────────────────────────────────────────────────────
+# Build the snapshot static C binary for all 4 arches.
+# Injected into the initramfs at usr/bin/snapshot; /init runs it at boot.
+
+SNAPSHOT_DIR="$(cd "$(dirname "$0")/../tests/programs/snapshot" && pwd)"
+if [[ -d $SNAPSHOT_DIR ]]; then
+    info "Building snapshot binary (tests/programs/snapshot/)..."
+    if make -C "$SNAPSHOT_DIR" all; then
+        info "snapshot binary built OK"
+    else
+        warn "snapshot binary build failed — 480_snapshot will skip in the VM"
+    fi
+else
+    warn "tests/programs/snapshot/ not found — 480_snapshot will skip in the VM"
+fi
+
 # Build the host-side serial-capture binary.
 # Used by lib/board.sh for robust UART capture in Phase 6+ (not injected into initramfs).
 

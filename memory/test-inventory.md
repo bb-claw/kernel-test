@@ -66,8 +66,9 @@ and run in filename-sorted order by `/init`. Protocol:
 | `450_fd-ipc` | timerfd one-shot expiry + eventfd write/read=7 + signalfd SIGUSR1 receive; core kernel features, always available; skip if binary absent |
 | `460_unix-socket` | AF_UNIX socketpair SOCK_STREAM send/recv round-trip; skip if CONFIG_UNIX absent (EAFNOSUPPORT); skip if binary absent |
 | `470_landlock` | Landlock ABI version check + ruleset create + restrict path + verify open(/proc/version) blocked (EACCES); skip if CONFIG_SECURITY_LANDLOCK absent (ENOSYS); skip if binary absent |
+| `480_snapshot` | On-board system snapshot: validates /tmp/snapshot.txt written by /init at boot; checks section headers (SNAPSHOT/UNAME/UPTIME/CMDLINE/TAINTED/DMESG/MEMINFO) + snapshot_ok=1 exit marker; skip if binary absent |
 
-Next available slot: **480_** — 49 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **490_** — 50 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 
@@ -96,6 +97,7 @@ Next available slot: **480_** — 49 total (tests/001_smoke.sh + tests/custom/*.
 | 450 fd-ipc | PASS | PASS | PASS | PASS | PASS |
 | 460 unix-socket | PASS | skip | skip | varies | PASS |
 | 470 landlock | PASS | skip | skip | varies | skip |
+| 480 snapshot | PASS | PASS | PASS | PASS | PASS |
 
 `varies` = depends on which 500 options were sampled. i386 passes all non-skipped tests.
 290–360 require an ns-variant config (*nsconfig); skip via `/tests/ns-enabled` marker on tinyconfig/allnoconfig/defconfig/kunitconfig etc.
@@ -104,6 +106,7 @@ Next available slot: **480_** — 49 total (tests/001_smoke.sh + tests/custom/*.
 400 guarded by `/tests/perf-enabled` marker (written when perf-event binary present); requires CONFIG_PERF_EVENTS=y (present in defconfig/randdef, absent in tinyconfig/allnoconfig).
 410 guarded by `/tests/arena-enabled` marker (written when arena-test binary present).
 420–470 guarded by syscall-tests binary presence (no capability marker; subcommands skip individually at runtime when required syscall is absent).
+480 guarded by snapshot binary presence (no capability marker; uname/proc/syslog always available); /init writes /tmp/snapshot.txt at boot before the test loop.
 
 ---
 
