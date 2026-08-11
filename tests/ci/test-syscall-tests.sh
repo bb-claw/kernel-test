@@ -51,6 +51,7 @@ begin_test "st-binary-available"
 if [[ ! -x "$ST_BIN" ]]; then
     printf '  skip  syscall-tests x86_64 binary absent — run: make bootstrap\n'
     finish
+    exit 0
 fi
 pass "syscall-tests x86_64 binary present and executable"
 
