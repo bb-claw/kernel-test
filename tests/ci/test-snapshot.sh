@@ -70,11 +70,16 @@ else
 fi
 
 begin_test "sn-structure"
-for section in SNAPSHOT UNAME UPTIME CMDLINE TAINTED DMESG MEMINFO; do
-    if grep -q "^=== ${section} ===" "$SN_OUT" 2>/dev/null; then
-        pass "section present: $section"
+if grep -q "^\*\* SNAPSHOT \*\*" "$SN_OUT" 2>/dev/null; then
+    pass "SNAPSHOT header present"
+else
+    fail "SNAPSHOT header missing"
+fi
+for field in HOSTNAME UNAME INIT UPTIME LOADAVG MEMORY KERNELMEM HUGEPAGES SWAP PAGESIZE CPU FLAGS CLOCKSOURCE FS USER LSM ASLR DMESG_RESTRICT KPTR_RESTRICT SCHEDSTATS CGROUP_CTRL ENTROPY TAINTED CMDLINE DMESG; do
+    if grep -q "${field}:" "$SN_OUT" 2>/dev/null; then
+        pass "field present: $field"
     else
-        fail "section missing: $section"
+        fail "field missing: $field"
     fi
 done
 

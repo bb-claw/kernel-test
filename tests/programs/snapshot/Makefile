@@ -24,15 +24,15 @@ CFLAGS_COMMON_GCC   := -Wall -Wextra -Wpedantic -Werror
 CFLAGS_COMMON_CLANG := -Weverything -Werror \
                        -Wno-unknown-warning-option \
                        -Wno-disabled-macro-expansion \
-                       -Wno-unsafe-buffer-usage
-
-# Note: as Tier 2 (syslog) is implemented, syslog() is declared in <sys/syslog.h>
-# with a GNU prototype; musl-clang may need -Wno-covered-switch-default or similar.
-# Add suppressions here with a comment explaining which warning they cover.
+                       -Wno-unsafe-buffer-usage \
+                       -Wno-padded
+# -Wno-padded: struct utsname is 390 bytes (6 × 65-char fields), not a multiple
+# of 4; embedding it in a struct causes implicit padding before int ok. We can't
+# control the system struct layout, so suppress rather than paper over it.
 
 CC_CLANG := musl-clang
 
-.PHONY: all clean
+.PHONY: all clean fmt
 
 all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-clang
 
@@ -49,6 +49,9 @@ bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
 	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_COMMON_CLANG) $(CFLAGS_x86_64) -o $@ $<
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+
+fmt:
+	clang-format --style=file -i $(SRC)
 
 clean:
 	rm -rf bin/
