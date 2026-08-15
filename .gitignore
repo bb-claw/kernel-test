@@ -39,8 +39,7 @@ tests/ns/bin/
 # Compiled snapshot binary — built by make bootstrap, not committed
 tests/programs/snapshot/bin/
 
-# clang-format helpers in snapshot dir — machine-specific symlinks/local copies
-tests/programs/snapshot/.clang-format
+# clang-format local copy (LLVM style) in snapshot dir — not the kernel style
 tests/programs/snapshot/.clang-format-llvm
 
 # Scratch / ad-hoc development directory
