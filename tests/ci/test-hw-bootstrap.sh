@@ -432,4 +432,21 @@ else
     fail "init: dmesg -n 1 must appear before BOOT_OK (dmesg=$dmesg_line, BOOT_OK=$bootok_line)"
 fi
 
+# ── 21. /init writes protocol markers directly to /dev/console ───────────────
+
+begin_test "initramfs-console-markers"
+# Toybox sh 0.8.11+ uses block-buffered stdout; reboot -f skips atexit so the
+# buffer is never flushed.  All protocol markers must write to /dev/console
+# directly to appear in order and not be lost before reboot.
+assert_contains "$(grep 'BOOT_OK'         "$REPO/lib/initramfs.sh")" "/dev/console" \
+    "init: BOOT_OK writes to /dev/console"
+assert_contains "$(grep 'TEST RUN'        "$REPO/lib/initramfs.sh")" "/dev/console" \
+    "init: TEST RUN writes to /dev/console"
+assert_contains "$(grep 'TEST PASS'       "$REPO/lib/initramfs.sh")" "/dev/console" \
+    "init: TEST PASS writes to /dev/console"
+assert_contains "$(grep 'TEST FAIL'       "$REPO/lib/initramfs.sh")" "/dev/console" \
+    "init: TEST FAIL writes to /dev/console"
+assert_contains "$(grep 'printf.*TEST_DONE' "$REPO/lib/initramfs.sh")" "/dev/console" \
+    "init: TEST_DONE writes to /dev/console"
+
 finish
