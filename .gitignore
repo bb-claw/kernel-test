@@ -36,6 +36,15 @@ local.mk
 # Compiled namespace test binaries — built by make bootstrap, not committed
 tests/ns/bin/
 
+# Compiled snapshot binary — built by make bootstrap, not committed
+tests/programs/snapshot/bin/
+
+# clang-format local copy (LLVM style) in snapshot dir — not the kernel style
+tests/programs/snapshot/.clang-format-llvm
+
+# Scratch / ad-hoc development directory
+OLD/
+
 # Module build artifacts (out-of-tree builds from modules/*/Makefile)
 modules/*/*.o
 modules/*/*.ko

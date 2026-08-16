@@ -80,6 +80,11 @@ dmesg -n 1 2>/dev/null || true
 
 echo "BOOT_OK: kernel reached init"
 
+# Capture clean boot state before test scripts run or add output to the ring buffer.
+if [ -x /usr/bin/snapshot ]; then
+    /usr/bin/snapshot > /tmp/snapshot.txt 2>/dev/null || true
+fi
+
 test_count=0
 for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] && test_count=$((test_count + 1))
@@ -172,6 +177,16 @@ if [[ -x "$SYSCALL_BIN" ]]; then
     info "syscall-tests binary installed → $STAGE/usr/bin/"
 else
     warn "syscall-tests binary not found ($SYSCALL_BIN) — run: make bootstrap  (420_–470_ will skip)"
+fi
+
+# snapshot is always injected when present; /init runs it before the test loop.
+# No capability marker needed (uname/proc/syslog available on all configs).
+SNAPSHOT_BIN="$SCRIPT_DIR/tests/programs/snapshot/bin/$ARCH/snapshot"
+if [[ -x "$SNAPSHOT_BIN" ]]; then
+    cp "$SNAPSHOT_BIN" "$STAGE/usr/bin/"
+    info "snapshot binary installed → $STAGE/usr/bin/"
+else
+    warn "snapshot binary not found ($SNAPSHOT_BIN) — run: make bootstrap  (480_snapshot will skip)"
 fi
 
 # ── Write ns-enabled marker ───────────────────────────────────────────────────
