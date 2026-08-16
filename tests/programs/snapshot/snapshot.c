@@ -265,11 +265,16 @@ static void dump_security(void)
 
 	if (try_read_file(PROC_SYS_KERNEL_ASLR, buf, sizeof(buf)) == 0)
 		print_result("ASLR", buf);
-	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) ==
-	    0)
+	else
+		print_result("ASLR", "n/a");
+	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) == 0)
 		print_result("DMESG_RESTRICT", buf);
+	else
+		print_result("DMESG_RESTRICT", "n/a");
 	if (try_read_file(PROC_SYS_KERNEL_KPTR_RESTRICT, buf, sizeof(buf)) == 0)
 		print_result("KPTR_RESTRICT", buf);
+	else
+		print_result("KPTR_RESTRICT", "n/a");
 }
 
 static void dump_lsm(void)
@@ -287,9 +292,10 @@ static void dump_clocksource(void)
 {
 	char buf[128];
 
-	if (try_read_file(SYS_CURRENT_CLOCKSOURCE, buf, sizeof(buf)) == 0) {
+	if (try_read_file(SYS_CURRENT_CLOCKSOURCE, buf, sizeof(buf)) == 0)
 		print_result("CLOCKSOURCE", buf);
-	}
+	else
+		print_result("CLOCKSOURCE", "n/a");
 }
 
 static void dump_pagesize(void)
