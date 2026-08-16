@@ -265,11 +265,16 @@ static void dump_security(void)
 
 	if (try_read_file(PROC_SYS_KERNEL_ASLR, buf, sizeof(buf)) == 0)
 		print_result("ASLR", buf);
-	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) ==
-	    0)
+	else
+		print_result("ASLR", "n/a");
+	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) == 0)
 		print_result("DMESG_RESTRICT", buf);
+	else
+		print_result("DMESG_RESTRICT", "n/a");
 	if (try_read_file(PROC_SYS_KERNEL_KPTR_RESTRICT, buf, sizeof(buf)) == 0)
 		print_result("KPTR_RESTRICT", buf);
+	else
+		print_result("KPTR_RESTRICT", "n/a");
 }
 
 static void dump_lsm(void)
@@ -287,9 +292,10 @@ static void dump_clocksource(void)
 {
 	char buf[128];
 
-	if (try_read_file(SYS_CURRENT_CLOCKSOURCE, buf, sizeof(buf)) == 0) {
+	if (try_read_file(SYS_CURRENT_CLOCKSOURCE, buf, sizeof(buf)) == 0)
 		print_result("CLOCKSOURCE", buf);
-	}
+	else
+		print_result("CLOCKSOURCE", "n/a");
 }
 
 static void dump_pagesize(void)
@@ -305,6 +311,9 @@ static void dump_pagesize(void)
 	print_result("PAGESIZE", str);
 }
 
+#define MAX_ISSUE_LINES 10
+#define MAX_ISSUE_LINE_LEN 200
+
 static void dump_dmesg(void)
 {
 	char str[256];
@@ -314,6 +323,8 @@ static void dump_dmesg(void)
 	int oops = 0, bugs = 0, warns = 0, panics = 0;
 	int rcu_stall = 0, hung_task = 0, oom_kill = 0, lockup = 0,
 	    kunit_fail = 0;
+	char issue_lines[MAX_ISSUE_LINES][MAX_ISSUE_LINE_LEN];
+	int n_issue_lines = 0;
 
 	len = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
 	if (len < 0) {
@@ -365,6 +376,18 @@ static void dump_dmesg(void)
 			if (p && (p[7] >= '0' && p[7] <= '9'))
 				kunit_fail++;
 		}
+		if (n_issue_lines < MAX_ISSUE_LINES &&
+		    (strstr(line, "Oops:") || strstr(line, "BUG:") ||
+		     strstr(line, "Kernel panic") ||
+		     strstr(line, "self-detected stall") ||
+		     strstr(line, "blocked for more than") ||
+		     strstr(line, "Out of memory: Killed process"))) {
+			strncpy(issue_lines[n_issue_lines], line,
+				MAX_ISSUE_LINE_LEN - 1);
+			issue_lines[n_issue_lines][MAX_ISSUE_LINE_LEN - 1] =
+				'\0';
+			n_issue_lines++;
+		}
 		if (!nl)
 			break;
 		line = nl + 1;
@@ -381,6 +404,10 @@ static void dump_dmesg(void)
 		oops, bugs, warns, panics, rcu_stall, hung_task, oom_kill,
 		lockup, kunit_fail);
 	print_result("DMESG", str);
+
+	for (int i = 0; i < n_issue_lines; i++)
+		printf("%15s: %.*s\n", "ISSUE_LINE",
+		       MAX_ISSUE_LINE_LEN - 1, issue_lines[i]);
 }
 
 static void dump_meminfo(void)

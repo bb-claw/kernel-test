@@ -78,7 +78,11 @@ mount -t devtmpfs none /dev       2>/dev/null || {
 # breaking parse_serial_output's grep anchor. The ring buffer is unaffected.
 dmesg -n 1 2>/dev/null || true
 
-echo "BOOT_OK: kernel reached init"
+# Protocol markers go directly to /dev/console, bypassing Toybox sh's
+# block-buffered stdout.  Without this, markers accumulate in the userspace
+# buffer and appear out-of-order relative to child test output; TEST_DONE is
+# lost entirely because reboot -f skips atexit and never flushes the buffer.
+printf 'BOOT_OK: kernel reached init\n' > /dev/console
 
 # Capture clean boot state before test scripts run or add output to the ring buffer.
 if [ -x /usr/bin/snapshot ]; then
@@ -89,26 +93,26 @@ test_count=0
 for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] && test_count=$((test_count + 1))
 done
-echo "kernel-test: starting ${test_count} tests"
+printf 'kernel-test: starting %s tests\n' "$test_count" > /dev/console
 
 pass_count=0
 fail_count=0
 for t in $(ls /tests/*.sh 2>/dev/null | sort); do
     [ -f "$t" ] || continue
     name=$(basename "$t" .sh)
-    echo "> TEST RUN: $name"
+    printf '> TEST RUN: %s\n' "$name" > /dev/console
     if /bin/sh "$t"; then
-        echo "< TEST PASS: $name"
+        printf '< TEST PASS: %s\n' "$name" > /dev/console
         pass_count=$((pass_count + 1))
     else
-        echo "< TEST FAIL: $name"
+        printf '< TEST FAIL: %s\n' "$name" > /dev/console
         fail_count=$((fail_count + 1))
     fi
 done
 
 total=$((pass_count + fail_count))
-echo "kernel-test: ${pass_count}/${total} tests passed"
-echo "TEST_DONE"
+printf 'kernel-test: %s/%s tests passed\n' "$pass_count" "$total" > /dev/console
+printf 'TEST_DONE\n' > /dev/console
 # Pause for host to drain capture before board reboots into next U-Boot cycle.
 # 5s on real hardware (board.sh) vs QEMU (which exits on reboot anyway).
 sleep 5

@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 START_EPOCH=$(date +%s)
-BUDGET=300  # soft 5-minute cap
+BUDGET=$(( ${BUDGET:-300} + 0 ))  # soft time cap in seconds; override: make dev-test BUDGET=N
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 if [[ -n "${SEED:-}" ]]; then
@@ -164,78 +164,68 @@ printf "%s\n" "$BAR" | sed 's/──/─/g'
 # Weight 1=<30s (CI fixtures/dry-run), 2=20-60s (VM combos), 3=60-120s (TCG)
 # Entries separated such that we can shuffle and pick by weight budget.
 
-# Build the pool array respecting environment constraints
+# Build the pool array respecting environment constraints.
+# Format: "IDs|weight|label|command"  — pipe separator avoids clash with ':' in labels.
 pool=()
 
 # Weight-2 VM config combos (random config variants on x86_64)
-pool+=("A4_A5_A7:2:ci-test: test-vm-parser.sh (FAIL/TIMEOUT paths):bash $REPO_ROOT/tests/ci/test-vm-parser.sh")
-pool+=("B3:2:VM smoke: rand500config/x86_64 (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=rand500config ARCHS=x86_64")
-pool+=("B4:2:VM smoke: randdefconfig/x86_64 (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=randdefconfig ARCHS=x86_64")
-pool+=("B6:2:VM smoke: tinynsconfig/x86_64 (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinynsconfig ARCHS=x86_64")
+pool+=("A4_A5_A7|2|ci-test: test-vm-parser.sh (FAIL/TIMEOUT paths)|bash $REPO_ROOT/tests/ci/test-vm-parser.sh")
+pool+=("B3|2|VM smoke: rand500config/x86_64 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=rand500config ARCHS=x86_64")
+pool+=("B4|2|VM smoke: randdefconfig/x86_64 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=randdefconfig ARCHS=x86_64")
+pool+=("B6|2|VM smoke: tinynsconfig/x86_64 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinynsconfig ARCHS=x86_64")
 
 # Weight-3 cross-arch TCG (only if cross-compiler available)
 if [[ $HAS_ARM64_CC = yes ]]; then
-    pool+=("D1:3:VM smoke: defconfig/arm64 (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=arm64")
+    pool+=("D1|3|VM smoke: defconfig/arm64 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=arm64")
 fi
 if [[ $HAS_RISCV_CC = yes ]]; then
-    pool+=("D2:3:VM smoke: defconfig/riscv (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=riscv")
+    pool+=("D2|3|VM smoke: defconfig/riscv (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=riscv")
 fi
-pool+=("D3:3:VM smoke: tinyconfig/i386 (NO_BUILD=1):make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS=i386")
+pool+=("D3|3|VM smoke: tinyconfig/i386 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS=i386")
 
 # Weight-1 CI fixture tests (fast; always available regardless of kernel/QEMU)
-pool+=("E1:1:ci-test: verify-patch dry-run:bash $REPO_ROOT/tests/ci/test-arch-scripts.sh")
-pool+=("E2:1:ci-test: test-common.sh:bash $REPO_ROOT/tests/ci/test-common.sh")
-pool+=("E3:1:ci-test: test-config-bisect.sh:bash $REPO_ROOT/tests/ci/test-config-bisect.sh")
-pool+=("E4:1:ci-test: test-lint-context.sh:bash $REPO_ROOT/tests/ci/test-lint-context.sh")
-pool+=("E5:1:ci-test: test-makefile-defaults.sh:bash $REPO_ROOT/tests/ci/test-makefile-defaults.sh")
-pool+=("E6:1:ci-test: test-warnings.sh:bash $REPO_ROOT/tests/ci/test-warnings.sh")
-pool+=("F1:1:ci-test: test-fetch.sh:bash $REPO_ROOT/tests/ci/test-fetch.sh")
-pool+=("F2:1:ci-test: test-ns-configs.sh:bash $REPO_ROOT/tests/ci/test-ns-configs.sh")
-pool+=("F3:1:ci-test: test-ns-scripts.sh:bash $REPO_ROOT/tests/ci/test-ns-scripts.sh")
-pool+=("F4:1:ci-test: test-ns-build.sh:bash $REPO_ROOT/tests/ci/test-ns-build.sh")
+pool+=("E1|1|ci-test: test-arch-scripts.sh|bash $REPO_ROOT/tests/ci/test-arch-scripts.sh")
+pool+=("E2|1|ci-test: test-common.sh|bash $REPO_ROOT/tests/ci/test-common.sh")
+pool+=("E3|1|ci-test: test-config-bisect.sh|bash $REPO_ROOT/tests/ci/test-config-bisect.sh")
+pool+=("E4|1|ci-test: test-lint-context.sh|bash $REPO_ROOT/tests/ci/test-lint-context.sh")
+pool+=("E5|1|ci-test: test-makefile-defaults.sh|bash $REPO_ROOT/tests/ci/test-makefile-defaults.sh")
+pool+=("E6|1|ci-test: test-warnings.sh|bash $REPO_ROOT/tests/ci/test-warnings.sh")
+pool+=("F1|1|ci-test: test-fetch.sh|bash $REPO_ROOT/tests/ci/test-fetch.sh")
+pool+=("F2|1|ci-test: test-ns-configs.sh|bash $REPO_ROOT/tests/ci/test-ns-configs.sh")
+pool+=("F3|1|ci-test: test-ns-scripts.sh|bash $REPO_ROOT/tests/ci/test-ns-scripts.sh")
+pool+=("F4|1|ci-test: test-ns-build.sh|bash $REPO_ROOT/tests/ci/test-ns-build.sh")
 
 # Hardware board paths — skip unless board present
 if [[ $HAS_BOARD = yes ]]; then
-    pool+=("D4:2:ci-test: test-board-serial.sh:bash $REPO_ROOT/tests/ci/test-board-serial.sh")
-    pool+=("D5:2:ci-test: test-hw-bootstrap.sh:bash $REPO_ROOT/tests/ci/test-hw-bootstrap.sh")
-    pool+=("D6:2:ci-test: hw-bootstrap dry-run:make -C $REPO_ROOT hw-bootstrap DRY_RUN=1")
+    pool+=("D4|2|ci-test: test-board-serial.sh|bash $REPO_ROOT/tests/ci/test-board-serial.sh")
+    pool+=("D5|2|ci-test: test-hw-bootstrap.sh|bash $REPO_ROOT/tests/ci/test-hw-bootstrap.sh")
+    pool+=("D6|2|hw-bootstrap dry-run|make -C $REPO_ROOT hw-bootstrap DRY_RUN=1")
 else
     result_skip "board paths D4 D5 D6" "HAS_BOARD=no"
 fi
 
-# Weighted shuffle using seed (bash RANDOM is seeded, use manual LCG for reproducibility)
+# Assign a uniform random key to each pool entry, then sort descending.
+# LCG state is updated inline — NOT via a function called with $() — because
+# $() creates a subshell and discards state changes, making every entry get
+# the same key and breaking randomisation entirely.
 lcg_state=$SEED
-lcg_next() {
-    lcg_state=$(( (1103515245 * lcg_state + 12345) & 0x7fffffff ))
-    echo $lcg_state
-}
-
-# Assign a random key to each pool entry, then sort
 declare -a keyed=()
 for entry in "${pool[@]}"; do
-    r=$(lcg_next)
-    # Extract weight from entry (field 2)
-    w=$(printf '%s' "$entry" | cut -d: -f2)
-    # Lower weight = more preferred = higher score for same random value
-    # Sort key: random / weight (lower weight entries get larger keys on average)
-    keyed+=("$(( r / w )):$entry")
+    lcg_state=$(( (1103515245 * lcg_state + 12345) & 0x7fffffff ))
+    keyed+=("$lcg_state|$entry")
 done
 
-# Sort descending by key (highest first = selected first)
-mapfile -t sorted < <(printf '%s\n' "${keyed[@]}" | sort -t: -k1 -rn)
+mapfile -t sorted < <(printf '%s\n' "${keyed[@]}" | sort -t'|' -k1 -rn)
 
 # Target: draw until we've covered ≥9 additional paths or hit budget
 TARGET_RANDOM=9
 random_covered=0
 
 for keyed_entry in "${sorted[@]}"; do
-    # Strip the sort key prefix (everything up to and including first ':')
-    entry="${keyed_entry#*:}"
-    ids=$(printf '%s' "$entry" | cut -d: -f1)
-    # weight=$(printf '%s' "$entry" | cut -d: -f2)  # unused at runtime
-    label=$(printf '%s' "$entry" | cut -d: -f3)
-    # Command is everything from field 4 onward (may contain ':')
-    cmd=$(printf '%s' "$entry" | cut -d: -f4-)
+    entry="${keyed_entry#*|}"           # strip sort-key prefix
+    ids=$(  printf '%s' "$entry" | cut -d'|' -f1)
+    label=$(printf '%s' "$entry" | cut -d'|' -f3)
+    cmd=$(  printf '%s' "$entry" | cut -d'|' -f4-)
 
     budget_ok || break
 
