@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 START_EPOCH=$(date +%s)
-BUDGET=300  # soft 5-minute cap
+BUDGET=$(( ${BUDGET:-300} + 0 ))  # soft time cap in seconds; override: make dev-test BUDGET=N
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 if [[ -n "${SEED:-}" ]]; then
