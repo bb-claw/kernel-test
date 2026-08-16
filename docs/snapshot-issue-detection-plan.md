@@ -2,7 +2,7 @@
 
 Branch: `feat/snapshot-issue-detection`
 Start date: 2026-08-16
-Status: IN PROGRESS
+Status: DONE
 
 ---
 
