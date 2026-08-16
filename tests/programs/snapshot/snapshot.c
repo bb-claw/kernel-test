@@ -32,7 +32,7 @@
  *   ENTROPY       /proc/sys/kernel/random/entropy_avail
  *   #MODULES      /proc/modules — loaded module count
  *   TAINTED       /proc/sys/kernel/tainted
- *   DMESG         klogctl — oops/bug/warning/panic counts
+ *   DMESG         klogctl — oops/bug/warning/panic/kunit_fail counts
  *   CMDLINE       /proc/cmdline
  */
 
@@ -233,11 +233,11 @@ static void dump_pagesize(void)
 
 static void dump_dmesg(void)
 {
-	char str[128];
+	char str[160];
 	char *buf;
-	char *p;
+	char *line;
 	int len;
-	int oops = 0, bugs = 0, warns = 0, panics = 0;
+	int oops = 0, bugs = 0, warns = 0, panics = 0, kunit_fail = 0;
 
 	len = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
 	if (len < 0) {
@@ -262,24 +262,31 @@ static void dump_dmesg(void)
 	}
 	buf[len] = '\0';
 
-	for (p = buf; *p != '\0'; p++) {
-		if (*p != '\n')
-			continue;
-		p++;
-		if (strstr(p, "Oops:"))
+	line = buf;
+	while (*line != '\0') {
+		char *nl = strchr(line, '\n');
+		if (nl)
+			*nl = '\0';
+		if (strstr(line, "Oops:"))
 			oops++;
-		if (strstr(p, "BUG:"))
+		if (strstr(line, "BUG:"))
 			bugs++;
-		if (strstr(p, "WARNING:"))
+		if (strstr(line, "WARNING:"))
 			warns++;
-		if (strstr(p, "Kernel panic"))
+		if (strstr(line, "Kernel panic"))
 			panics++;
+		if (strstr(line, "not ok "))
+			kunit_fail++;
+		if (!nl)
+			break;
+		line = nl + 1;
 	}
 
 	free(buf);
 
-	snprintf(str, sizeof(str), "oops=%d bugs=%d warns=%d panics=%d\n", oops,
-		 bugs, warns, panics);
+	snprintf(str, sizeof(str),
+		 "oops=%d bugs=%d warns=%d panics=%d kunit_fail=%d\n", oops,
+		 bugs, warns, panics, kunit_fail);
 	print_result("DMESG", str);
 }
 
