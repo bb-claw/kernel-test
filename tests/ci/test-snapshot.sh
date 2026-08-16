@@ -91,14 +91,6 @@ for field in HOSTNAME UNAME INIT UPTIME LOADAVG MEMORY KERNELMEM HUGEPAGES SWAP 
     fi
 done
 
-begin_test "sn-clean-exit"
-if grep -q "^snapshot_ok=1" "$SN_OUT" 2>/dev/null; then
-    pass "snapshot_ok=1 present"
-else
-    fail "snapshot_ok=1 missing (binary may have crashed before completion)"
-    cat "$SN_OUT" >&2
-fi
-
 begin_test "sn-issues"
 # Verify ISSUES field is present and exit code matches the clamped issue count.
 issues_val=$(grep 'ISSUES:' "$SN_OUT" 2>/dev/null | grep -o '[0-9]*$' | head -1 || true)

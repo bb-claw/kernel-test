@@ -5,7 +5,7 @@
  * stdout. /init redirects stdout to /tmp/snapshot.txt before the test loop.
  *
  * Output format: one "** SNAPSHOT **" header, then one "LABEL: value" line
- * per field, followed by a trailing "snapshot_ok=1" line on clean exit.
+ * per field. Exit code: 0 = clean, 1-254 = issue count, 255 = infra failure.
  *
  * Fields collected:
  *   HOSTNAME      gethostname(2)
@@ -721,8 +721,6 @@ int main(void)
 	dump_dmesg();
 	dump_cmdline();
 	dump_issues();
-
-	printf("snapshot_ok=1\n");
 
 	if (fail_count != 0)
 		exit(255);

@@ -14,6 +14,7 @@ SNAP_FILE=/tmp/snapshot.txt
 
 # /init should have written the file before this test runs.
 # If absent (e.g. binary installed after initramfs was built), run it now.
+# Exit code is discarded here — the re-run at the end checks it definitively.
 if [ ! -f "$SNAP_FILE" ]; then
     "$SNAP_BIN" > "$SNAP_FILE" 2>/dev/null || true
 fi
