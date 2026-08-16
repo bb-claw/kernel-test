@@ -5,6 +5,7 @@
  * Works in QEMU TCG (no hardware PMU required).
  */
 #include <sys/syscall.h>
+#include <sched.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -42,6 +43,11 @@ int main(void)
 	}
 
 	for (i = 0; i < 100000; i++) {}
+
+	/* Force a scheduler pass so update_curr() commits sum_exec_runtime.
+	 * Without CONFIG_HIGH_RES_TIMERS, task accounting only updates on ticks
+	 * (HZ=250 → 4 ms); the loop finishes in <1 ms and TASK_CLOCK reads 0. */
+	sched_yield();
 
 	if (read(fd, &count, sizeof(count)) != (ssize_t)sizeof(count)) {
 		perror("read");
