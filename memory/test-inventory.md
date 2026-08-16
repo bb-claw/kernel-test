@@ -66,7 +66,7 @@ and run in filename-sorted order by `/init`. Protocol:
 | `450_fd-ipc` | timerfd one-shot expiry + eventfd write/read=7 + signalfd SIGUSR1 receive; core kernel features, always available; skip if binary absent |
 | `460_unix-socket` | AF_UNIX socketpair SOCK_STREAM send/recv round-trip; skip if CONFIG_UNIX absent (EAFNOSUPPORT); skip if binary absent |
 | `470_landlock` | Landlock ABI version check + ruleset create + restrict path + verify open(/proc/version) blocked (EACCES); skip if CONFIG_SECURITY_LANDLOCK absent (ENOSYS); skip if binary absent |
-| `480_snapshot` | On-board system snapshot: validates /tmp/snapshot.txt written by /init at boot; checks SNAPSHOT header + 26 fields (identity: HOSTNAME/UNAME/INIT; system: UPTIME/LOADAVG/PAGESIZE/CLOCKSOURCE; memory: MEMORY/KERNELMEM/HUGEPAGES/SWAP; cpu: CPU/FLAGS; security: LSM/ASLR/DMESG_RESTRICT/KPTR_RESTRICT/TAINTED; kernel: SCHEDSTATS/CGROUP_CTRL/ENTROPY/#MODULES/FS/DMESG/CMDLINE) + snapshot_ok=1 exit marker; SCHEDSTATS/CGROUP_CTRL silently skipped if absent; skip if binary absent |
+| `480_snapshot` | On-board system snapshot: validates /tmp/snapshot.txt written by /init at boot; checks SNAPSHOT header + 27 fields (identity: HOSTNAME/UNAME/INIT; system: UPTIME/LOADAVG/PAGESIZE/CLOCKSOURCE; memory: MEMORY/KERNELMEM/HUGEPAGES/SWAP; cpu: CPU/FLAGS; security: LSM/ASLR/DMESG_RESTRICT/KPTR_RESTRICT/TAINTED; kernel: SCHEDSTATS/CGROUP_CTRL/ENTROPY/#MODULES/FS/DMESG/ISSUES/CMDLINE); ISSUES: 0 at boot (exit 0=clean 1-254=issue-count 255=infra-fail); SCHEDSTATS/CGROUP_CTRL silently skipped if absent; skip if binary absent |
 
 Next available slot: **490_** — 50 total (tests/001_smoke.sh + tests/custom/*.sh)
 

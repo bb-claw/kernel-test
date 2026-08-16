@@ -81,17 +81,18 @@ fi
 
 cat /tmp/snapshot.txt
 
-# Re-run snapshot to get the issue-detection exit code.
-# Writes to a separate file so the boot-time /tmp/snapshot.txt is preserved.
-"$SNAP_BIN" > /tmp/snapshot-recheck.txt 2>/dev/null
-snap_exit=$?
-if [ "$snap_exit" -eq 0 ]; then
-    ok "snapshot: no issues detected (exit 0)"
+# Parse the ISSUES count from the boot-time snapshot rather than re-running.
+# klogctl reads the entire ring buffer non-destructively; a post-test re-run
+# would include messages accumulated during the test suite, causing false
+# positives from kernel messages unrelated to boot health.
+snap_issues=$(grep 'ISSUES:' "$SNAP_FILE" | sed 's/.*ISSUES: *//' | head -1)
+if [ -z "$snap_issues" ]; then
+    fail "snapshot: ISSUES count absent or unparseable"
 else
-    if [ "$snap_exit" -eq 255 ]; then
-        fail "snapshot: infrastructure failure (exit 255)"
+    if [ "$snap_issues" -eq 0 ]; then
+        ok "snapshot: no issues detected at boot (ISSUES: 0)"
     else
-        fail "snapshot: $snap_exit issue(s) detected (see /tmp/snapshot-recheck.txt)"
+        fail "snapshot: $snap_issues issue(s) detected at boot"
     fi
 fi
 

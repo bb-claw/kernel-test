@@ -185,24 +185,26 @@ static void dump_tainted(void)
 		const char *name;
 		int is_issue; /* 1 = kernel misbehaviour; 0 = administrative/load-time fact */
 	} flags[] = {
-		{  0, "PROPRIETARY_MODULE",    0 },
-		{  1, "FORCED_MODULE",         0 },
-		{  2, "CPU_OUT_OF_SPEC",       0 },
-		{  3, "FORCED_RMMOD",          0 },
-		{  4, "MACHINE_CHECK",         1 },
-		{  5, "BAD_PAGE",              1 },
-		{  6, "USER",                  0 },
-		{  7, "DIE",                   1 },
-		{  8, "OVERRIDDEN_ACPI_TABLE", 0 },
-		{  9, "WARN",                  1 },
-		{ 10, "STAGING_DRIVER",        0 },
-		{ 11, "FIRMWARE_WORKAROUND",   0 },
-		{ 12, "OOT_MODULE",            0 },
-		{ 13, "UNSIGNED_MODULE",       0 },
-		{ 14, "SOFTLOCKUP",            1 },
-		{ 15, "LIVEPATCH",             0 },
-		{ 16, "AUX_TAINT",             0 },
-		{ 17, "RANDSTRUCT",            0 },
+		{ 0, "PROPRIETARY_MODULE", 0 },
+		{ 1, "FORCED_MODULE", 0 },
+		{ 2, "CPU_OUT_OF_SPEC", 0 },
+		{ 3, "FORCED_RMMOD", 0 },
+		{ 4, "MACHINE_CHECK", 1 },
+		{ 5, "BAD_PAGE", 1 },
+		{ 6, "USER", 0 },
+		{ 7, "DIE", 1 },
+		{ 8, "OVERRIDDEN_ACPI_TABLE", 0 },
+		{ 9, "WARN", 1 },
+		{ 10, "STAGING_DRIVER", 0 },
+		{ 11, "FIRMWARE_WORKAROUND", 0 },
+		{ 12, "OOT_MODULE", 0 },
+		{ 13, "UNSIGNED_MODULE", 0 },
+		{ 14, "SOFTLOCKUP", 1 },
+		{ 15, "LIVEPATCH", 0 },
+		{ 16, "AUX_TAINT", 0 },
+		{ 17, "RANDSTRUCT", 0 },
+		{ 18, "TEST", 0 },
+		{ 19, "FWCTL", 0 },
 	};
 	char raw[32];
 	char str[512];
@@ -343,7 +345,10 @@ static void dump_dmesg(void)
 			*nl = '\0';
 		if (strstr(line, "Oops:"))
 			oops++;
-		if (strstr(line, "BUG:"))
+		if (strstr(line, "BUG: soft lockup") ||
+		    strstr(line, "BUG: hard lockup"))
+			lockup++;
+		else if (strstr(line, "BUG:"))
 			bugs++;
 		if (strstr(line, "WARNING:"))
 			warns++;
@@ -355,11 +360,11 @@ static void dump_dmesg(void)
 			hung_task++;
 		if (strstr(line, "Out of memory: Killed process"))
 			oom_kill++;
-		if (strstr(line, "BUG: soft lockup") ||
-		    strstr(line, "BUG: hard lockup"))
-			lockup++;
-		if (strstr(line, "not ok "))
-			kunit_fail++;
+		{
+			const char *p = strstr(line, "not ok ");
+			if (p && (p[7] >= '0' && p[7] <= '9'))
+				kunit_fail++;
+		}
 		if (!nl)
 			break;
 		line = nl + 1;

@@ -70,13 +70,17 @@ defconfig kernels from driver probes and deprecated API usage):
 |---|---|---|
 | TAINTED | value nonzero | +1 (flat, regardless of which bits) |
 | DMESG oops | `"Oops:"` per line | +count |
-| DMESG bugs | `"BUG:"` per line | +count |
+| DMESG bugs | `"BUG:"` per line (excluding soft/hard lockup lines) | +count |
 | DMESG panics | `"Kernel panic"` per line | +count |
 | DMESG rcu_stall | `"self-detected stall"` per line | +count |
 | DMESG hung_task | `"blocked for more than"` per line | +count |
 | DMESG oom_kill | `"Out of memory: Killed process"` per line | +count |
 | DMESG lockup | `"BUG: soft lockup"` or `"BUG: hard lockup"` per line | +count |
-| DMESG kunit_fail | `"not ok "` per line | +count |
+| DMESG kunit_fail | `"not ok "` followed by a digit per line | +count |
+
+Note: soft/hard lockup lines match only `lockup`, not also `bugs` (no double-counting).
+`kunit_fail` requires a digit after `"not ok "` to match KUnit TAP format and avoid
+matching unrelated kernel messages containing "not ok" as a phrase.
 
 `dump_dmesg()` is called before `dump_tainted()` in the output order — the DMESG
 counters are tallied inside `dump_dmesg()`, then `dump_tainted()` adds its +1 if nonzero.
@@ -122,7 +126,9 @@ Multiple active bits produce a space-separated list in parentheses.
 | 14 | L | SOFTLOCKUP |
 | 15 | K | LIVEPATCH |
 | 16 | X | AUX_TAINT |
-| 17 | N | RANDSTRUCT |
+| 17 | T | RANDSTRUCT |
+| 18 | N | TEST |
+| 19 | J | FWCTL |
 
 Clean kernel output: `TAINTED: 0`
 Single bit: `TAINTED: 16384 (SOFTLOCKUP)`
@@ -155,42 +161,25 @@ of issue_count). It marks "snapshot did not crash mid-run", not "kernel is clean
 
 ## 480_snapshot.sh Changes
 
-Current final block:
-```sh
-if grep -q "^snapshot_ok=1" "$SNAP_FILE"; then
-    ok "snapshot_ok=1 (clean exit)"
-else
-    fail "snapshot_ok=1 missing"
-fi
-```
+Replaced `snapshot_ok=1` check with ISSUES field verification.
 
-New block — re-run snapshot and check exit code:
+The final verdict reads the ISSUES count directly from the boot-time `/tmp/snapshot.txt`
+rather than re-running the binary. `klogctl(KLOG_READ_ALL)` is non-destructive — a
+post-test re-run would include kernel log messages accumulated during all 50 tests,
+causing false positives from ring buffer entries unrelated to boot health.
+
 ```sh
-# Re-run snapshot to get the issue-detection exit code.
-# Output goes to a separate file so the boot-time /tmp/snapshot.txt is preserved.
-"$SNAP_BIN" > /tmp/snapshot-recheck.txt 2>/dev/null
-snap_exit=$?
-if [ "$snap_exit" -eq 0 ]; then
-    ok "snapshot: no issues detected (exit 0)"
+snap_issues=$(grep 'ISSUES:' "$SNAP_FILE" | sed 's/.*ISSUES: *//' | head -1)
+if [ -z "$snap_issues" ]; then
+    fail "snapshot: ISSUES count absent or unparseable"
 else
-    if [ "$snap_exit" -eq 255 ]; then
-        fail "snapshot: infrastructure failure (exit 255)"
+    if [ "$snap_issues" -eq 0 ]; then
+        ok "snapshot: no issues detected at boot (ISSUES: 0)"
     else
-        fail "snapshot: $snap_exit issue(s) detected (see /tmp/snapshot-recheck.txt)"
+        fail "snapshot: $snap_issues issue(s) detected at boot"
     fi
 fi
 ```
-
-Note: `if out=$(cmd); then` is a Toybox sh bug (assignment always exits 0). The above
-uses a file redirect so `$?` captures the real exit code — consistent with the existing
-pattern in other test scripts.
-
-`/tmp/snapshot-recheck.txt` is written so the post-test run is available for inspection
-alongside the boot-time snapshot, without overwriting `/tmp/snapshot.txt`.
-
-The `snapshot_ok=1` check is removed from `480_snapshot.sh` since the exit code now
-carries the definitive verdict. The field is still present in the output for humans
-reading the file directly.
 
 ---
 
