@@ -37,10 +37,10 @@
 | `TFTP_DIR` | `$(CURDIR)/tftp` | Local TFTP root; gitignored; auto-created by `make hw-deploy` |
 | `HW_TIMEOUT` / `HW_PRE_BOOT_TIMEOUT` | `120` / `90` | Board capture timeout (U-Boot+TFTP+kernel+tests) and pre-boot U-Boot wait; both separate from `TIMEOUT` (QEMU) |
 | `HW_IFACE` | `eno1` | Ethernet interface for isolated test network (`make hw-bootstrap`) |
-| `HW_HOST_IP` | `192.168.100.1` | Static IP on `HW_IFACE`; TFTP next-server in DHCP reply |
-| `HW_DHCP_RANGE` | `192.168.100.100,192.168.100.200` | DHCP pool for the board |
+| `HW_HOST_IP` / `HW_DHCP_RANGE` | `192.168.100.1` / `.100–.200` | Static IP on `HW_IFACE` (TFTP next-server); DHCP pool for the board |
 | `HW_RELAY` | `/dev/vf2-relay` | Stable udev symlink to USB relay for `board_reset` |
 | `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
+| `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -146,5 +146,5 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 
 ### CI / linting / dev-test
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
-`make dev-test` — ≤5-min branch gate; fixed core + random draw; SEED=N replays; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
+`make dev-test` — ≤5-min branch gate; fixed core + random draw; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.

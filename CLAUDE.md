@@ -34,7 +34,7 @@ make ns-full                                   # namespace full: 5 ns-variant co
 make extended                                  # full then ns-full (10 configs); for staging automation
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
-make dev-test                                  # branch gate: ≤5 min, ≥50% of 35 decision paths; SEED=N replays
+make dev-test                                  # branch gate: ≤5 min, ≥50% of 35 decision paths; SEED=N replays, BUDGET=N cap
 make hook-dev-test                             # toggle dev-test in .githooks/pre-push (opt-in; run again removes)
 make bootstrap                                 # install deps, download Toybox, activate git hooks
 make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot (Arch/Manjaro only)

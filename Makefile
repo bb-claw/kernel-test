@@ -752,6 +752,8 @@ Variables (current values):
   HW_RELAY            = $(HW_RELAY)  (USB relay device symlink for board_reset; default: /dev/vf2-relay)
   HW_RELAY_VID        = $(HW_RELAY_VID)  (USB vendor ID of relay; CH340 default: 1a86)
   HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
+  SEED                = $(if $(SEED),$(SEED),(not set — make dev-test SEED=N for reproducible random draw))
+  BUDGET              = $(if $(BUDGET),$(BUDGET),(not set — make dev-test BUDGET=N overrides 300s time cap; default: 300))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
