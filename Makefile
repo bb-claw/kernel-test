@@ -137,7 +137,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test dev-test hook-dev-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -197,6 +197,18 @@ lint-context:
 # 'make test' already targets the kernel VM tests — this target is separate.
 ci-test:
 	$(Q)scripts/ci-run-tests.sh
+
+# ≤5-minute branch verification gate: fixed core (lint + C build + 4 CI tests +
+# tinyconfig/defconfig/localconfig VM smokes) + random weighted draw.
+# Covers ≥50% of 35 identified decision paths every run.
+# SEED=N makes the random selection reproducible.
+dev-test:
+	@SEED="$(SEED)" scripts/dev-test.sh
+
+# Toggle dev-test in .githooks/pre-push (per-machine opt-in).
+# Running this target a second time removes what it added.
+hook-dev-test:
+	@scripts/hook-dev-test.sh
 
 hooks:
 	@git config core.hooksPath .githooks
@@ -671,6 +683,8 @@ Targets:
   verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
   lint             Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
   ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
+  dev-test         ≤5-min branch verification gate: ≥50% of 35 decision paths; fixed core + random draw (SEED=N)
+  hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
   clean            Remove build/ and cache/
   distclean        Remove build/ and cache/ (reports/archives in DATA_REPO — manage separately)
   help             Show this message
