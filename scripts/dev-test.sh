@@ -204,20 +204,15 @@ else
     result_skip "board paths D4 D5 D6" "HAS_BOARD=no"
 fi
 
-# Weighted shuffle using seed (manual LCG — bash RANDOM is not reliably seedable)
+# Assign a uniform random key to each pool entry, then sort descending.
+# LCG state is updated inline — NOT via a function called with $() — because
+# $() creates a subshell and discards state changes, making every entry get
+# the same key and breaking randomisation entirely.
 lcg_state=$SEED
-lcg_next() {
-    lcg_state=$(( (1103515245 * lcg_state + 12345) & 0x7fffffff ))
-    echo $lcg_state
-}
-
-# Assign a random key to each pool entry, then sort descending.
-# Lower weight = more preferred = larger key on average (r / w is larger for w=1).
 declare -a keyed=()
 for entry in "${pool[@]}"; do
-    r=$(lcg_next)
-    w=$(printf '%s' "$entry" | cut -d'|' -f2)
-    keyed+=("$(( r / w ))|$entry")
+    lcg_state=$(( (1103515245 * lcg_state + 12345) & 0x7fffffff ))
+    keyed+=("$lcg_state|$entry")
 done
 
 mapfile -t sorted < <(printf '%s\n' "${keyed[@]}" | sort -t'|' -k1 -rn)
