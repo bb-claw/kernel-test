@@ -48,6 +48,7 @@ check_field UNAME
 check_field PAGESIZE
 check_field USER
 check_field DMESG
+check_field ISSUES
 
 # Fields sourced from /proc or /sys — absent when CONFIG_PROC_FS=n (tinyconfig).
 if [ -r /proc/uptime ]; then
@@ -79,10 +80,18 @@ fi
 
 cat /tmp/snapshot.txt
 
-if grep -q "^snapshot_ok=1" "$SNAP_FILE"; then
-    ok "snapshot_ok=1 (clean exit)"
+# Re-run snapshot to get the issue-detection exit code.
+# Writes to a separate file so the boot-time /tmp/snapshot.txt is preserved.
+"$SNAP_BIN" > /tmp/snapshot-recheck.txt 2>/dev/null
+snap_exit=$?
+if [ "$snap_exit" -eq 0 ]; then
+    ok "snapshot: no issues detected (exit 0)"
 else
-    fail "snapshot_ok=1 missing (snapshot may have crashed mid-run)"
+    if [ "$snap_exit" -eq 255 ]; then
+        fail "snapshot: infrastructure failure (exit 255)"
+    else
+        fail "snapshot: $snap_exit issue(s) detected (see /tmp/snapshot-recheck.txt)"
+    fi
 fi
 
 [ $fails -eq 0 ] || exit 1

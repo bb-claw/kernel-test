@@ -62,11 +62,19 @@ pass "snapshot x86_64 binary present and executable"
 
 begin_test "sn-run"
 tmpdir; SN_OUT="$_LAST_TMPDIR/snapshot.out"
+# Clear ring buffer so pre-existing host dmesg noise doesn't trip issue detection.
+# Requires CAP_SYSLOG — silently skipped when unavailable.
+dmesg -C 2>/dev/null || true
 if "$SN_BIN" >"$SN_OUT" 2>&1; then
-    pass "exit 0"
+    SN_EXIT=0
 else
-    fail "non-zero exit — output:"
+    SN_EXIT=$?
+fi
+if [[ $SN_EXIT -eq 255 ]]; then
+    fail "infrastructure failure (exit 255) — output:"
     cat "$SN_OUT" >&2
+else
+    pass "exit $SN_EXIT (no infrastructure failure)"
 fi
 
 begin_test "sn-structure"
@@ -75,7 +83,7 @@ if grep -q "^\*\* SNAPSHOT \*\*" "$SN_OUT" 2>/dev/null; then
 else
     fail "SNAPSHOT header missing"
 fi
-for field in HOSTNAME UNAME INIT UPTIME LOADAVG MEMORY KERNELMEM HUGEPAGES SWAP PAGESIZE CPU FLAGS CLOCKSOURCE FS USER LSM ASLR DMESG_RESTRICT KPTR_RESTRICT SCHEDSTATS CGROUP_CTRL ENTROPY TAINTED CMDLINE DMESG; do
+for field in HOSTNAME UNAME INIT UPTIME LOADAVG MEMORY KERNELMEM HUGEPAGES SWAP PAGESIZE CPU FLAGS CLOCKSOURCE FS USER LSM ASLR DMESG_RESTRICT KPTR_RESTRICT SCHEDSTATS CGROUP_CTRL ENTROPY TAINTED CMDLINE DMESG ISSUES; do
     if grep -q "${field}:" "$SN_OUT" 2>/dev/null; then
         pass "field present: $field"
     else
@@ -89,6 +97,52 @@ if grep -q "^snapshot_ok=1" "$SN_OUT" 2>/dev/null; then
 else
     fail "snapshot_ok=1 missing (binary may have crashed before completion)"
     cat "$SN_OUT" >&2
+fi
+
+begin_test "sn-issues"
+# Verify ISSUES field is present and exit code matches the clamped issue count.
+issues_val=$(grep 'ISSUES:' "$SN_OUT" 2>/dev/null | grep -o '[0-9]*$' | head -1 || true)
+if [[ -z "$issues_val" ]]; then
+    fail "ISSUES field not found"
+else
+    pass "ISSUES: $issues_val present"
+    if [[ $issues_val -gt 254 ]]; then
+        expected_exit=254
+    else
+        expected_exit=$issues_val
+    fi
+    if [[ $SN_EXIT -eq $expected_exit ]]; then
+        pass "exit code matches ISSUES count (exit=$SN_EXIT issues=$issues_val)"
+    else
+        fail "exit code mismatch: got $SN_EXIT, expected $expected_exit (ISSUES: $issues_val)"
+    fi
+fi
+
+begin_test "sn-dmesg-format"
+# When CAP_SYSLOG is unavailable, DMESG shows "skip:" — only check format then.
+if grep -q 'DMESG:.*skip:' "$SN_OUT" 2>/dev/null; then
+    pass "DMESG: CAP_SYSLOG unavailable — format check skipped"
+else
+    if grep -q 'DMESG:.*rcu_stall=' "$SN_OUT" 2>/dev/null; then
+        pass "DMESG field contains rcu_stall counter"
+    else
+        fail "DMESG field missing rcu_stall counter"
+        grep 'DMESG:' "$SN_OUT" >&2 || true
+    fi
+    if grep -q 'DMESG:.*lockup=' "$SN_OUT" 2>/dev/null; then
+        pass "DMESG field contains lockup counter"
+    else
+        fail "DMESG field missing lockup counter"
+    fi
+fi
+
+begin_test "sn-taint-format"
+# Clean kernel: "TAINTED: 0" — tainted kernel: "TAINTED: N (FLAG ...)"
+if grep -q 'TAINTED:.*[0-9]' "$SN_OUT" 2>/dev/null; then
+    pass "TAINTED field has numeric value"
+else
+    fail "TAINTED field missing or malformed"
+    grep 'TAINTED:' "$SN_OUT" >&2 || true
 fi
 
 finish
