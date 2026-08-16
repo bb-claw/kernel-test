@@ -183,25 +183,26 @@ static void dump_tainted(void)
 	static const struct {
 		int bit;
 		const char *name;
+		int is_issue; /* 1 = kernel misbehaviour; 0 = administrative/load-time fact */
 	} flags[] = {
-		{  0, "PROPRIETARY_MODULE"    },
-		{  1, "FORCED_MODULE"         },
-		{  2, "CPU_OUT_OF_SPEC"       },
-		{  3, "FORCED_RMMOD"          },
-		{  4, "MACHINE_CHECK"         },
-		{  5, "BAD_PAGE"              },
-		{  6, "USER"                  },
-		{  7, "DIE"                   },
-		{  8, "OVERRIDDEN_ACPI_TABLE" },
-		{  9, "WARN"                  },
-		{ 10, "STAGING_DRIVER"        },
-		{ 11, "FIRMWARE_WORKAROUND"   },
-		{ 12, "OOT_MODULE"            },
-		{ 13, "UNSIGNED_MODULE"       },
-		{ 14, "SOFTLOCKUP"            },
-		{ 15, "LIVEPATCH"             },
-		{ 16, "AUX_TAINT"             },
-		{ 17, "RANDSTRUCT"            },
+		{  0, "PROPRIETARY_MODULE",    0 },
+		{  1, "FORCED_MODULE",         0 },
+		{  2, "CPU_OUT_OF_SPEC",       0 },
+		{  3, "FORCED_RMMOD",          0 },
+		{  4, "MACHINE_CHECK",         1 },
+		{  5, "BAD_PAGE",              1 },
+		{  6, "USER",                  0 },
+		{  7, "DIE",                   1 },
+		{  8, "OVERRIDDEN_ACPI_TABLE", 0 },
+		{  9, "WARN",                  1 },
+		{ 10, "STAGING_DRIVER",        0 },
+		{ 11, "FIRMWARE_WORKAROUND",   0 },
+		{ 12, "OOT_MODULE",            0 },
+		{ 13, "UNSIGNED_MODULE",       0 },
+		{ 14, "SOFTLOCKUP",            1 },
+		{ 15, "LIVEPATCH",             0 },
+		{ 16, "AUX_TAINT",             0 },
+		{ 17, "RANDSTRUCT",            0 },
 	};
 	char raw[32];
 	char str[512];
@@ -224,7 +225,10 @@ static void dump_tainted(void)
 		return;
 	}
 
-	issue_count++;
+	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+		if (flags[i].is_issue && (tainted & (1L << flags[i].bit)))
+			issue_count++;
+	}
 
 	slen = (size_t)snprintf(str, sizeof(str), "%ld (", tainted);
 	first = 1;
@@ -233,8 +237,8 @@ static void dump_tainted(void)
 			continue;
 		if (!first && slen < sizeof(str) - 2)
 			str[slen++] = ' ';
-		slen += (size_t)snprintf(str + slen, sizeof(str) - slen,
-					 "%s", flags[i].name);
+		slen += (size_t)snprintf(str + slen, sizeof(str) - slen, "%s",
+					 flags[i].name);
 		first = 0;
 	}
 	if (slen < sizeof(str) - 2)
@@ -306,7 +310,8 @@ static void dump_dmesg(void)
 	char *line;
 	int len;
 	int oops = 0, bugs = 0, warns = 0, panics = 0;
-	int rcu_stall = 0, hung_task = 0, oom_kill = 0, lockup = 0, kunit_fail = 0;
+	int rcu_stall = 0, hung_task = 0, oom_kill = 0, lockup = 0,
+	    kunit_fail = 0;
 
 	len = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
 	if (len < 0) {
@@ -365,10 +370,11 @@ static void dump_dmesg(void)
 	issue_count += oops + bugs + panics + rcu_stall + hung_task + oom_kill +
 		       lockup + kunit_fail;
 
-	snprintf(str, sizeof(str),
-		 "oops=%d bugs=%d warns=%d panics=%d rcu_stall=%d hung_task=%d oom_kill=%d lockup=%d kunit_fail=%d\n",
-		 oops, bugs, warns, panics, rcu_stall, hung_task, oom_kill,
-		 lockup, kunit_fail);
+	snprintf(
+		str, sizeof(str),
+		"oops=%d bugs=%d warns=%d panics=%d rcu_stall=%d hung_task=%d oom_kill=%d lockup=%d kunit_fail=%d\n",
+		oops, bugs, warns, panics, rcu_stall, hung_task, oom_kill,
+		lockup, kunit_fail);
 	print_result("DMESG", str);
 }
 
