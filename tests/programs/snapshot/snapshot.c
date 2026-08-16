@@ -5,7 +5,7 @@
  * stdout. /init redirects stdout to /tmp/snapshot.txt before the test loop.
  *
  * Output format: one "** SNAPSHOT **" header, then one "LABEL: value" line
- * per field, followed by a trailing "snapshot_ok=1" line on clean exit.
+ * per field. Exit code: 0 = clean, 1-254 = issue count, 255 = infra failure.
  *
  * Fields collected:
  *   HOSTNAME      gethostname(2)
@@ -32,7 +32,8 @@
  *   ENTROPY       /proc/sys/kernel/random/entropy_avail
  *   #MODULES      /proc/modules — loaded module count
  *   TAINTED       /proc/sys/kernel/tainted
- *   DMESG         klogctl — oops/bug/warning/panic/kunit_fail counts
+ *   DMESG         klogctl — oops/bugs/warns/panics/rcu_stall/hung_task/oom_kill/lockup/kunit_fail
+ *   ISSUES        total issue count (taint + hard dmesg events)
  *   CMDLINE       /proc/cmdline
  */
 
@@ -70,6 +71,7 @@
 	"/sys/devices/system/clocksource/clocksource0/current_clocksource"
 
 static int fail_count = 0;
+static int issue_count = 0;
 
 static void header(const char *msg)
 {
@@ -178,11 +180,83 @@ static void dump_cmdline(void)
 
 static void dump_tainted(void)
 {
-	char buf[32];
+	static const struct {
+		int bit;
+		const char *name;
+		int is_issue; /* 1 = kernel misbehaviour; 0 = administrative/load-time fact */
+	} flags[] = {
+		{ 0, "PROPRIETARY_MODULE", 0 },
+		{ 1, "FORCED_MODULE", 0 },
+		{ 2, "CPU_OUT_OF_SPEC", 0 },
+		{ 3, "FORCED_RMMOD", 0 },
+		{ 4, "MACHINE_CHECK", 1 },
+		{ 5, "BAD_PAGE", 1 },
+		{ 6, "USER", 0 },
+		{ 7, "DIE", 1 },
+		{ 8, "OVERRIDDEN_ACPI_TABLE", 0 },
+		{ 9, "WARN", 1 },
+		{ 10, "STAGING_DRIVER", 0 },
+		{ 11, "FIRMWARE_WORKAROUND", 0 },
+		{ 12, "OOT_MODULE", 0 },
+		{ 13, "UNSIGNED_MODULE", 0 },
+		{ 14, "SOFTLOCKUP", 1 },
+		{ 15, "LIVEPATCH", 0 },
+		{ 16, "AUX_TAINT", 0 },
+		{ 17, "RANDSTRUCT", 0 },
+		{ 18, "TEST", 0 },
+		{ 19, "FWCTL", 0 },
+	};
+	char raw[32];
+	char str[512];
+	char *end;
+	long tainted;
+	size_t i, slen;
+	int first;
 
-	if (try_read_file(PROC_SYS_KERNEL_TAINTED, buf, sizeof(buf)) == 0) {
-		print_result("TAINTED", buf);
+	if (try_read_file(PROC_SYS_KERNEL_TAINTED, raw, sizeof(raw)) != 0)
+		return;
+
+	tainted = strtol(raw, &end, 10);
+	if (end == raw) {
+		print_result("TAINTED", raw);
+		return;
 	}
+
+	if (tainted == 0) {
+		print_result("TAINTED", "0\n");
+		return;
+	}
+
+	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+		if (flags[i].is_issue && (tainted & (1L << flags[i].bit)))
+			issue_count++;
+	}
+
+	slen = (size_t)snprintf(str, sizeof(str), "%ld (", tainted);
+	first = 1;
+	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+		if (!(tainted & (1L << flags[i].bit)))
+			continue;
+		if (!first && slen < sizeof(str) - 2)
+			str[slen++] = ' ';
+		slen += (size_t)snprintf(str + slen, sizeof(str) - slen, "%s",
+					 flags[i].name);
+		first = 0;
+	}
+	if (slen < sizeof(str) - 2)
+		str[slen++] = ')';
+	if (slen < sizeof(str) - 1)
+		str[slen++] = '\n';
+	str[slen] = '\0';
+
+	print_result("TAINTED", str);
+}
+
+static void dump_issues(void)
+{
+	char str[16];
+	snprintf(str, sizeof(str), "%d\n", issue_count);
+	print_result("ISSUES", str);
 }
 
 static void dump_security(void)
@@ -233,11 +307,13 @@ static void dump_pagesize(void)
 
 static void dump_dmesg(void)
 {
-	char str[160];
+	char str[256];
 	char *buf;
 	char *line;
 	int len;
-	int oops = 0, bugs = 0, warns = 0, panics = 0, kunit_fail = 0;
+	int oops = 0, bugs = 0, warns = 0, panics = 0;
+	int rcu_stall = 0, hung_task = 0, oom_kill = 0, lockup = 0,
+	    kunit_fail = 0;
 
 	len = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
 	if (len < 0) {
@@ -269,14 +345,26 @@ static void dump_dmesg(void)
 			*nl = '\0';
 		if (strstr(line, "Oops:"))
 			oops++;
-		if (strstr(line, "BUG:"))
+		if (strstr(line, "BUG: soft lockup") ||
+		    strstr(line, "BUG: hard lockup"))
+			lockup++;
+		else if (strstr(line, "BUG:"))
 			bugs++;
 		if (strstr(line, "WARNING:"))
 			warns++;
 		if (strstr(line, "Kernel panic"))
 			panics++;
-		if (strstr(line, "not ok "))
-			kunit_fail++;
+		if (strstr(line, "self-detected stall"))
+			rcu_stall++;
+		if (strstr(line, "blocked for more than"))
+			hung_task++;
+		if (strstr(line, "Out of memory: Killed process"))
+			oom_kill++;
+		{
+			const char *p = strstr(line, "not ok ");
+			if (p && (p[7] >= '0' && p[7] <= '9'))
+				kunit_fail++;
+		}
 		if (!nl)
 			break;
 		line = nl + 1;
@@ -284,9 +372,14 @@ static void dump_dmesg(void)
 
 	free(buf);
 
-	snprintf(str, sizeof(str),
-		 "oops=%d bugs=%d warns=%d panics=%d kunit_fail=%d\n", oops,
-		 bugs, warns, panics, kunit_fail);
+	issue_count += oops + bugs + panics + rcu_stall + hung_task + oom_kill +
+		       lockup + kunit_fail;
+
+	snprintf(
+		str, sizeof(str),
+		"oops=%d bugs=%d warns=%d panics=%d rcu_stall=%d hung_task=%d oom_kill=%d lockup=%d kunit_fail=%d\n",
+		oops, bugs, warns, panics, rcu_stall, hung_task, oom_kill,
+		lockup, kunit_fail);
 	print_result("DMESG", str);
 }
 
@@ -632,12 +725,11 @@ int main(void)
 	dump_tainted();
 	dump_dmesg();
 	dump_cmdline();
+	dump_issues();
 
-	if (fail_count != 0) {
-		exit(EXIT_FAILURE);
-	}
-
-	printf("snapshot_ok=1\n");
-
-	exit(EXIT_SUCCESS);
+	if (fail_count != 0)
+		exit(255);
+	if (issue_count > 254)
+		exit(254);
+	exit(issue_count);
 }

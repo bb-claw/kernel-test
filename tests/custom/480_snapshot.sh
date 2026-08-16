@@ -14,6 +14,7 @@ SNAP_FILE=/tmp/snapshot.txt
 
 # /init should have written the file before this test runs.
 # If absent (e.g. binary installed after initramfs was built), run it now.
+# Exit code is discarded here — the re-run at the end checks it definitively.
 if [ ! -f "$SNAP_FILE" ]; then
     "$SNAP_BIN" > "$SNAP_FILE" 2>/dev/null || true
 fi
@@ -48,6 +49,7 @@ check_field UNAME
 check_field PAGESIZE
 check_field USER
 check_field DMESG
+check_field ISSUES
 
 # Fields sourced from /proc or /sys — absent when CONFIG_PROC_FS=n (tinyconfig).
 if [ -r /proc/uptime ]; then
@@ -79,10 +81,19 @@ fi
 
 cat /tmp/snapshot.txt
 
-if grep -q "^snapshot_ok=1" "$SNAP_FILE"; then
-    ok "snapshot_ok=1 (clean exit)"
+# Parse the ISSUES count from the boot-time snapshot rather than re-running.
+# klogctl reads the entire ring buffer non-destructively; a post-test re-run
+# would include messages accumulated during the test suite, causing false
+# positives from kernel messages unrelated to boot health.
+snap_issues=$(grep 'ISSUES:' "$SNAP_FILE" | sed 's/.*ISSUES: *//' | head -1)
+if [ -z "$snap_issues" ]; then
+    fail "snapshot: ISSUES count absent or unparseable"
 else
-    fail "snapshot_ok=1 missing (snapshot may have crashed mid-run)"
+    if [ "$snap_issues" -eq 0 ]; then
+        ok "snapshot: no issues detected at boot (ISSUES: 0)"
+    else
+        fail "snapshot: $snap_issues issue(s) detected at boot"
+    fi
 fi
 
 [ $fails -eq 0 ] || exit 1
