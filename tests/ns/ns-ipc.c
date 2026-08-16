@@ -49,6 +49,10 @@ static int cmd_semop(void)
 	/* Create a semaphore inside the new IPC namespace */
 	int semid = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600);
 	if (semid < 0) {
+		if (errno == ENOSYS) {
+			printf("semop: CONFIG_SYSVIPC=n, skipping\n");
+			return 0;
+		}
 		fprintf(stderr, "semget: %s\n", strerror(errno));
 		return 1;
 	}
