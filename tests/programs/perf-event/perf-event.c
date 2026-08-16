@@ -4,12 +4,24 @@
  * reads the counter, prints it, and exits 0 if the count is > 0.
  * Works in QEMU TCG (no hardware PMU required).
  */
-#include <linux/perf_event.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+
+/* Minimal perf_event ABI — avoids linux/perf_event.h kernel-header dependency.
+ * musl-gcc does not search /usr/include, so the installed linux-libc-dev header
+ * is unreachable.  These three definitions are stable kernel ABI (since 2.6.31). */
+#define PERF_TYPE_SOFTWARE        1U
+#define PERF_COUNT_SW_TASK_CLOCK  1ULL
+
+struct perf_event_attr {
+    uint32_t type;
+    uint32_t size;
+    uint64_t config;
+    uint8_t  pad[120]; /* remaining fields unused; size field informs kernel */
+};
 
 int main(void)
 {

@@ -36,9 +36,30 @@
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 
-/* seccomp BPF */
-#include <linux/filter.h>
-#include <linux/seccomp.h>
+/* seccomp BPF — musl-gcc does not search /usr/include so linux/ headers are
+ * unreachable; use __has_include to prefer the system header when available
+ * and fall back to inline minimal definitions (stable ABI since Linux 3.5). */
+#if defined(__has_include) && __has_include(<linux/filter.h>)
+#  include <linux/filter.h>
+#  include <linux/seccomp.h>
+#else
+   struct sock_filter { uint16_t code; uint8_t jt; uint8_t jf; uint32_t k; };
+   struct sock_fprog  { unsigned short len; struct sock_filter *filter; };
+#  define BPF_LD   0x00
+#  define BPF_JMP  0x05
+#  define BPF_RET  0x06
+#  define BPF_W    0x00
+#  define BPF_ABS  0x20
+#  define BPF_JEQ  0x10
+#  define BPF_K    0x00
+#  define BPF_STMT(code, k)         { (uint16_t)(code), 0,  0,  (k) }
+#  define BPF_JUMP(code, k, jt, jf) { (uint16_t)(code), jt, jf, (k) }
+#  define SECCOMP_SET_MODE_FILTER  1
+#  define SECCOMP_RET_ALLOW        0x7fff0000U
+#  define SECCOMP_RET_ERRNO        0x00050000U
+#  define SECCOMP_RET_DATA         0x0000ffffU
+   struct seccomp_data { int nr; uint32_t arch; uint64_t instruction_pointer; uint64_t args[6]; };
+#endif
 #include <stddef.h>     /* offsetof */
 
 /* O_PATH is a Linux extension; glibc requires _GNU_SOURCE or kernel >= 2.6.39 */
@@ -46,8 +67,38 @@
 #  define O_PATH 010000000
 #endif
 
-/* io_uring */
-#include <linux/io_uring.h>
+/* io_uring — same musl-gcc header availability issue; stable ABI since Linux 5.1 */
+#if defined(__has_include) && __has_include(<linux/io_uring.h>)
+#  include <linux/io_uring.h>
+#else
+#  define IORING_OP_NOP           0
+#  define IORING_ENTER_GETEVENTS  (1U << 0)
+#  define IORING_OFF_SQ_RING      0ULL
+#  define IORING_OFF_CQ_RING      0x8000000ULL
+#  define IORING_OFF_SQES         0x10000000ULL
+   struct io_sqring_offsets {
+       uint32_t head; uint32_t tail; uint32_t ring_mask; uint32_t ring_entries;
+       uint32_t flags; uint32_t dropped; uint32_t array; uint32_t resv[3];
+   };
+   struct io_cqring_offsets {
+       uint32_t head; uint32_t tail; uint32_t ring_mask; uint32_t ring_entries;
+       uint32_t overflow; uint32_t cqes; uint32_t flags; uint32_t resv[3];
+   };
+   struct io_uring_params {
+       uint32_t sq_entries; uint32_t cq_entries; uint32_t flags;
+       uint32_t sq_thread_cpu; uint32_t sq_thread_idle; uint32_t features;
+       uint32_t wq_fd; uint32_t resv[3];
+       struct io_sqring_offsets sq_off;
+       struct io_cqring_offsets cq_off;
+   };
+   struct io_uring_sqe {
+       uint8_t opcode; uint8_t flags; uint16_t ioprio; int32_t fd;
+       uint64_t off; uint64_t addr; uint32_t len; uint32_t rw_flags;
+       uint64_t user_data; uint16_t buf_index; uint16_t personality;
+       int32_t splice_fd_in; uint64_t pad[2];
+   };
+   struct io_uring_cqe { uint64_t user_data; int32_t res; uint32_t flags; };
+#endif
 
 /* landlock — guarded because it was added in kernel 5.13 headers */
 #if defined(__has_include) && __has_include(<linux/landlock.h>)
