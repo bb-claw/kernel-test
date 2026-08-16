@@ -11,6 +11,7 @@ run_fetch() {
     local kt="$1" bdir="$2"
     KERNEL_TREE="$kt" \
     BUILD_DIR="$bdir" \
+    STABLE_RELEASE="" \
     "$REPO/lib/fetch.sh" 2>&1 || true
 }
 
