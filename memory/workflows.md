@@ -144,7 +144,7 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 
 **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
 
-### CI / linting
-`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc); `make lint-context` — sizes only.
-`make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). PR-title check CI-only. GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
+### CI / linting / dev-test
+`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
+`make dev-test` — ≤5-min branch gate; fixed core + random draw; SEED=N replays; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.
