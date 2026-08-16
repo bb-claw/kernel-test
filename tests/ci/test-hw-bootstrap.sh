@@ -276,7 +276,7 @@ assert_contains "$(grep 'sleep 5'                "$REPO/lib/initramfs.sh")" "sle
     "init: 5s drain sleep before reboot"
 # Verify ordering: summary must appear before TEST_DONE in the template
 summary_line=$(grep -n 'kernel-test:' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
-testdone_line=$(grep -n '"TEST_DONE"' "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+testdone_line=$(grep -n "printf.*TEST_DONE" "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
 if [[ -n "$summary_line" && -n "$testdone_line" && "$summary_line" -lt "$testdone_line" ]]; then
     pass "init: summary line appears before TEST_DONE"
 else
@@ -425,7 +425,7 @@ assert_contains "$(grep 'dmesg -n 1' "$REPO/lib/initramfs.sh")" "dmesg -n 1" \
     "init: dmesg -n 1 present to silence console during tests"
 # Must appear before BOOT_OK so it catches messages deferred from before /init starts
 dmesg_line=$(grep -n 'dmesg -n 1'  "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
-bootok_line=$(grep -n '"BOOT_OK:'   "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
+bootok_line=$(grep -n 'BOOT_OK:'    "$REPO/lib/initramfs.sh" | head -1 | cut -d: -f1)
 if [[ -n "$dmesg_line" && -n "$bootok_line" && "$dmesg_line" -lt "$bootok_line" ]]; then
     pass "init: dmesg -n 1 appears before BOOT_OK"
 else
