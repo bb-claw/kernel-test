@@ -62,6 +62,7 @@ make extended                                         # full then ns-full (10 co
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
+make programs                                         # rebuild C test binaries (tests/programs/ + tests/ns/) without system packages; auto-runs in make all
 make hw-bootstrap [DRY_RUN=1]                         # install dnsmasq/networkd/udev for board testing (needs sudo)
 make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR (default: ./tftp/)
 make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
@@ -143,7 +144,6 @@ make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.
 
 **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
-
 ### CI / linting / dev-test
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). GitHub Actions: lint every push; ci-test on `lib/**`, `scripts/**`, `tests/ci/**`, Makefile changes.
 `make dev-test` — ≤5-min branch gate; fixed core + random draw; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.

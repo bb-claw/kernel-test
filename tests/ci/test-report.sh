@@ -165,4 +165,73 @@ txt=$(cat "$run_dir/summary.txt")
 assert_contains "$txt" "kunit:259/259" "kunit count format correct"
 assert_contains "$txt" "sh:30/30"      "shell test count alongside kunit"
 
+# ── Stale-variable regression: failed count must not bleed between rows ───────
+
+begin_test "Notes: failed count per-row, no bleed into passing row (stale-variable regression)"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+# Row 1 (tinyconfig): 1 failed test with FAILED_TESTS set
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS 0 0 1 4
+printf 'FAILED_TESTS=480_snapshot\n' >> "$bdir/tinyconfig-x86_64/vm.status"
+# Row 2 (defconfig): all pass, no FAILED_TESTS
+make_build_dir "$bdir" defconfig x86_64 PASS PASS 0 0 0 5
+run_report "$bdir" "tinyconfig defconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+tinyconfig_line=$(grep '^tinyconfig' "$run_dir/summary.txt" | head -1 || true)
+defconfig_line=$(grep '^defconfig'  "$run_dir/summary.txt" | head -1 || true)
+assert_contains     "$tinyconfig_line" "1 failed" "tinyconfig row shows 1 failed"
+assert_not_contains "$defconfig_line"  "failed"   "defconfig row: no stale failed count"
+
+# ── Stale-variable regression: no bleed into build-only row ───────────────────
+
+begin_test "Notes: failed count does not bleed into build-only row"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+# Row 1 (tinyconfig): 1 failed test
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS 0 0 1 4
+printf 'FAILED_TESTS=480_snapshot\n' >> "$bdir/tinyconfig-x86_64/vm.status"
+# Row 2 (allmodconfig): build-only, no vm.status
+make_build_dir "$bdir" allmodconfig x86_64 PASS
+run_report "$bdir" "tinyconfig allmodconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+allmodconfig_line=$(grep '^allmodconfig' "$run_dir/summary.txt" | head -1 || true)
+assert_not_contains "$allmodconfig_line" "failed" "allmodconfig row: no bleed from prior failing row"
+
+# ── fail_reason visible in Notes column ───────────────────────────────────────
+
+begin_test "Notes: fail_reason shown when boot fails"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" tinyconfig x86_64 PASS FAIL
+printf 'FAIL_REASON=timeout\n' >> "$bdir/tinyconfig-x86_64/vm.status"
+run_report "$bdir" "tinyconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+tinyconfig_line=$(grep '^tinyconfig' "$run_dir/summary.txt" | head -1 || true)
+assert_contains "$tinyconfig_line" "timeout" "fail_reason appears in Notes"
+
+# ── cfg-fixed flag in Notes column ───────────────────────────────────────────
+
+begin_test "Notes: cfg-fixed shown when CONFIG_CORRECTED=1"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS
+printf 'CONFIG_CORRECTED=1\n' >> "$bdir/tinyconfig-x86_64/build.status"
+run_report "$bdir" "tinyconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+tinyconfig_line=$(grep '^tinyconfig' "$run_dir/summary.txt" | head -1 || true)
+assert_contains "$tinyconfig_line" "cfg-fixed" "cfg-fixed appears in Notes when CONFIG_CORRECTED=1"
+
+# ── HTML Notes: failed test names listed ─────────────────────────────────────
+
+begin_test "HTML Notes: failed test names listed in span"
+setup_kernel_tree; setup_data_repo
+tmpdir; bdir="$_LAST_TMPDIR"
+make_build_dir "$bdir" tinyconfig x86_64 PASS PASS 0 0 1 4
+printf 'FAILED_TESTS=480_snapshot\n' >> "$bdir/tinyconfig-x86_64/vm.status"
+run_report "$bdir" "tinyconfig" "x86_64"
+run_dir=$(find "$DATA_REPO/reports" -maxdepth 1 -mindepth 1 -type d | head -1)
+html=$(cat "$run_dir/summary.html")
+assert_contains "$html" "failed: 480_snapshot" "HTML Notes lists failed test name"
+assert_contains "$html" "class=\"fail\""        "HTML Notes uses fail CSS class"
+
 finish
