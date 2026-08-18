@@ -91,7 +91,7 @@ fi
 }
 
 # ── C3: key CI tests ──────────────────────────────────────────────────────────
-budget_ok || { result_skip "ci-tests: vm-parser report snapshot diff" "budget"; true; } && {
+budget_ok || { result_skip "ci-tests: vm-parser report snapshot diff syscall-tests" "budget"; true; } && {
 t0=$(date +%s)
 ci_label="ci-tests: vm-parser report snapshot diff syscall-tests"
 if bash "$REPO_ROOT/tests/ci/test-vm-parser.sh"    &>/tmp/dev-test-citest-parser.log \
