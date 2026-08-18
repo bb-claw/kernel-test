@@ -36,6 +36,12 @@
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 
+/* System V IPC */
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
+
 /* seccomp BPF — musl-gcc does not search /usr/include so linux/ headers are
  * unreachable; use __has_include to prefer the system header when available
  * and fall back to inline minimal definitions (stable ABI since Linux 3.5). */
@@ -134,6 +140,40 @@
 #  define SYS_landlock_add_rule       445
 #  define SYS_landlock_restrict_self  446
 #endif
+
+#ifndef SYS_bpf
+#  if   defined(__x86_64__)
+#    define SYS_bpf 321
+#  elif defined(__i386__)
+#    define SYS_bpf 357
+#  elif defined(__aarch64__) || defined(__riscv)
+#    define SYS_bpf 280
+#  endif
+#endif
+
+/* eBPF constants — stable API since Linux 3.18 */
+#define ST_BPF_PROG_LOAD               5U
+#define ST_BPF_PROG_TYPE_SOCKET_FILTER 1U
+#define ST_BPF_ALU64  0x07u
+#define ST_BPF_MOV    0xb0u
+#define ST_BPF_K      0x00u
+#define ST_BPF_JMP    0x05u
+#define ST_BPF_EXIT   0x90u
+
+/* bpf_insn: 8 bytes, stable ABI */
+struct st_bpf_insn { uint8_t code; uint8_t regs; int16_t off; int32_t imm; };
+
+/* Minimal bpf_attr for BPF_PROG_LOAD — first 40 bytes of union bpf_attr.
+ * Smaller than sizeof(union bpf_attr); kernel zeroes remaining fields. */
+struct st_bpf_prog_attr {
+    uint32_t prog_type;   /* offset  0 */
+    uint32_t insn_cnt;    /* offset  4 */
+    uint64_t insns;       /* offset  8 */
+    uint64_t license;     /* offset 16 */
+    uint32_t log_level;   /* offset 24 */
+    uint32_t log_size;    /* offset 28 */
+    uint64_t log_buf;     /* offset 32 */
+};                        /* sizeof = 40 */
 
 /* ── Output helpers ─────────────────────────────────────────────────────── */
 
@@ -556,21 +596,173 @@ static int test_landlock(void)
     return g_fails ? 1 : 0;
 }
 
+/* ── eBPF ────────────────────────────────────────────────────────────────── */
+
+static int test_bpf(void)
+{
+    /* Minimal eBPF SOCKET_FILTER: set r0 = 0 (drop all), exit.
+     * Exercises bpf() syscall, BPF verifier, and JIT/interpreter path. */
+    struct st_bpf_insn prog[] = {
+        { (uint8_t)(ST_BPF_ALU64 | ST_BPF_MOV | ST_BPF_K), 0, 0, 0 }, /* r0 = 0 */
+        { (uint8_t)(ST_BPF_JMP  | ST_BPF_EXIT),             0, 0, 0 }, /* exit   */
+    };
+    const char license[] = "GPL";
+    char log_buf[256];
+    memset(log_buf, 0, sizeof(log_buf));
+
+    struct st_bpf_prog_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = ST_BPF_PROG_TYPE_SOCKET_FILTER;
+    attr.insn_cnt  = (uint32_t)(sizeof(prog) / sizeof(prog[0]));
+    attr.insns     = (uint64_t)(uintptr_t)prog;
+    attr.license   = (uint64_t)(uintptr_t)license;
+    attr.log_level = 1;
+    attr.log_size  = (uint32_t)sizeof(log_buf);
+    attr.log_buf   = (uint64_t)(uintptr_t)log_buf;
+
+    long fd = syscall(SYS_bpf, (int)ST_BPF_PROG_LOAD, &attr, (unsigned int)sizeof(attr));
+    if (fd < 0) {
+        int e = errno;
+        if (e == ENOSYS) { skip("CONFIG_BPF_SYSCALL not available"); return 0; }
+        if (e == EPERM)  { skip("bpf() EPERM — unprivileged BPF restricted"); return 0; }
+        printf("FAIL: bpf(BPF_PROG_LOAD) errno=%d\n", e);
+        if (log_buf[0])
+            printf("  verifier: %s\n", log_buf);
+        g_fails++;
+        return 1;
+    }
+    ok("bpf(BPF_PROG_LOAD, SOCKET_FILTER): verifier accepted, fd valid");
+    close((int)fd);
+    return g_fails ? 1 : 0;
+}
+
+/* ── System V IPC ────────────────────────────────────────────────────────── */
+
+static int test_sysvipc_shm(void)
+{
+    int id = shmget(IPC_PRIVATE, 4096, IPC_CREAT | 0600);
+    if (id < 0) {
+        int e = errno;
+        if (e == ENOSYS) { skip("CONFIG_SYSVIPC not available"); return 0; }
+        fail("shmget IPC_PRIVATE");
+        return 1;
+    }
+    ok("shmget: shared memory segment created");
+
+    void *p = shmat(id, NULL, 0);
+    if (p == (void *)-1) { fail("shmat"); shmctl(id, IPC_RMID, NULL); return 1; }
+    ok("shmat: segment attached");
+
+    unsigned char *b = (unsigned char *)p;
+    b[0]    = 0xAA;
+    b[4095] = 0xBB;
+    if (b[0] == 0xAA && b[4095] == 0xBB)
+        ok("shm write/read: boundary bytes verified");
+    else {
+        fail("shm write/read: boundary bytes mismatch");
+        shmdt(p);
+        shmctl(id, IPC_RMID, NULL);
+        return 1;
+    }
+
+    shmdt(p);
+    ok("shmdt: segment detached");
+    shmctl(id, IPC_RMID, NULL);
+    ok("shmctl IPC_RMID: segment removed");
+    return g_fails ? 1 : 0;
+}
+
+static int test_sysvipc_sem(void)
+{
+    int id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600);
+    if (id < 0) {
+        int e = errno;
+        if (e == ENOSYS) { skip("CONFIG_SYSVIPC not available"); return 0; }
+        fail("semget IPC_PRIVATE");
+        return 1;
+    }
+    ok("semget: semaphore set created");
+
+    /* V: increment semaphore 0 by 1 */
+    struct sembuf v_op = { 0, 1, 0 };
+    if (semop(id, &v_op, 1) < 0) { fail("semop V"); semctl(id, 0, IPC_RMID); return 1; }
+    ok("semop V: incremented to 1");
+
+    /* P: decrement semaphore 0 by 1 (non-blocking since value is 1) */
+    struct sembuf p_op = { 0, -1, IPC_NOWAIT };
+    if (semop(id, &p_op, 1) < 0) { fail("semop P"); semctl(id, 0, IPC_RMID); return 1; }
+    ok("semop P: decremented to 0");
+
+    semctl(id, 0, IPC_RMID);
+    ok("semctl IPC_RMID: semaphore removed");
+    return g_fails ? 1 : 0;
+}
+
+static int test_sysvipc_msg(void)
+{
+    int id = msgget(IPC_PRIVATE, IPC_CREAT | 0600);
+    if (id < 0) {
+        int e = errno;
+        if (e == ENOSYS) { skip("CONFIG_SYSVIPC not available"); return 0; }
+        fail("msgget IPC_PRIVATE");
+        return 1;
+    }
+    ok("msgget: message queue created");
+
+    struct { long mtype; char text[16]; } msg;
+    msg.mtype = 1;
+    memcpy(msg.text, "kernel-test", 12);
+
+    if (msgsnd(id, &msg, sizeof(msg.text), 0) < 0) {
+        fail("msgsnd");
+        msgctl(id, IPC_RMID, NULL);
+        return 1;
+    }
+    ok("msgsnd: message sent");
+
+    struct { long mtype; char text[16]; } recv;
+    memset(&recv, 0, sizeof(recv));
+    ssize_t n = msgrcv(id, &recv, sizeof(recv.text), 1, 0);
+    if (n < 0) {
+        fail("msgrcv");
+        msgctl(id, IPC_RMID, NULL);
+        return 1;
+    }
+    if (memcmp(recv.text, msg.text, 12) == 0)
+        ok("msgrcv: message received and verified");
+    else {
+        fail("msgrcv: payload mismatch");
+        msgctl(id, IPC_RMID, NULL);
+        return 1;
+    }
+
+    msgctl(id, IPC_RMID, NULL);
+    ok("msgctl IPC_RMID: queue removed");
+    return g_fails ? 1 : 0;
+}
+
 /* ── Dispatcher ─────────────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[])
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: syscall-tests <32bit|seccomp|io_uring|fds|unix|landlock>\n");
+        fprintf(stderr,
+            "usage: syscall-tests"
+            " <32bit|seccomp|io_uring|fds|unix|landlock"
+            "|bpf|sysvipc-shm|sysvipc-sem|sysvipc-msg>\n");
         return 1;
     }
     const char *cmd = argv[1];
-    if (strcmp(cmd, "32bit")    == 0) return test_32bit();
-    if (strcmp(cmd, "seccomp")  == 0) return test_seccomp();
-    if (strcmp(cmd, "io_uring") == 0) return test_io_uring();
-    if (strcmp(cmd, "fds")      == 0) return test_fds();
-    if (strcmp(cmd, "unix")     == 0) return test_unix();
-    if (strcmp(cmd, "landlock") == 0) return test_landlock();
+    if (strcmp(cmd, "32bit")       == 0) return test_32bit();
+    if (strcmp(cmd, "seccomp")     == 0) return test_seccomp();
+    if (strcmp(cmd, "io_uring")    == 0) return test_io_uring();
+    if (strcmp(cmd, "fds")         == 0) return test_fds();
+    if (strcmp(cmd, "unix")        == 0) return test_unix();
+    if (strcmp(cmd, "landlock")    == 0) return test_landlock();
+    if (strcmp(cmd, "bpf")         == 0) return test_bpf();
+    if (strcmp(cmd, "sysvipc-shm") == 0) return test_sysvipc_shm();
+    if (strcmp(cmd, "sysvipc-sem") == 0) return test_sysvipc_sem();
+    if (strcmp(cmd, "sysvipc-msg") == 0) return test_sysvipc_msg();
     fprintf(stderr, "unknown subcommand: %s\n", cmd);
     return 1;
 }

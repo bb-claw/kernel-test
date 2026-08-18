@@ -140,7 +140,7 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 ---
 
 ## Review Checklist (before opening a PR)
-- [ ] `make dev-test` passes (≥50% decision paths, ≤5 min)
+- [ ] `make dev-test` passes (≥50% decision paths, ≤6 min)
 - [ ] `shellcheck --severity=warning` clean (pre-push does this automatically)
 - [ ] All test scripts are executable (`ls -la tests/custom/`)
 - [ ] `make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS="x86_64 i386"` passes

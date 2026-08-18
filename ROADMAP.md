@@ -266,11 +266,15 @@ Prerequisites before sending:
 
 ## Future Tests *(post-Phase 6, QEMU-verifiable first, any order)*
 
-| Test | What it covers | Why it matters |
-|---|---|---|
-| `seccomp` | `prctl(PR_SET_SECCOMP)` strict + BPF filter | Browsers, containers; regressions break Chrome |
-| `io_uring` | setup, submission, completion queue basics | Heavy merge traffic per cycle; high regression signal |
-| `timerfd` / `signalfd` | fd-based async primitives | Used by systemd and containers |
+Already done (slots 430–480): `seccomp` (430_), `io_uring` (440_), `timerfd`/`signalfd`/`eventfd` (450_), `unix-socket` (460_), `landlock` (470_), `snapshot` (480_).
+
+Remaining candidates (next slot: 490_):
+
+| Test | Slot | What it covers | Why it matters |
+|---|---|---|---|
+| `bpf` | 490_ | `bpf(BPF_PROG_LOAD, SOCKET_FILTER)` — verifier + JIT/interpreter | BPF underpins seccomp, landlock, tc, XDP; verifier regressions break many subsystems |
+| `sysvipc` | 500_ | `shmget`/`shmat`/`semget`/`semop`/`msgget` | Used by X11, PostgreSQL, containers; `CONFIG_SYSVIPC` present in defconfig, skip on tinyconfig |
+| `i386 fixed core` | — | Move i386/tinyconfig from random dev-test pool to fixed core | Guarantees 32-bit path coverage every `make dev-test`; i386 KVM is fast (~20 s) |
 
 ---
 

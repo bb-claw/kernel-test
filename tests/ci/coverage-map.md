@@ -1,6 +1,6 @@
 # dev-test Coverage Map
 
-35 functional decision paths across 6 groups.
+36 functional decision paths across 6 groups.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
 | ID  | Description                                                  | Covering scenario                          | Group       |
@@ -28,10 +28,11 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | C7  | C programs: musl-clang quality gate (x86_64, -Weverything)   | make -C tests/programs all                 | C-ci        |
 | D1  | arm64 TCG boot (cortex-a57, 1 G RAM, 2× TIMEOUT)             | random pool (weight 3)                     | D-crossarch |
 | D2  | riscv TCG boot (qemu-system-riscv64 ≥8.x, FPU fragment)      | random pool (weight 3)                     | D-crossarch |
-| D3  | i386 KVM/TCG boot (toybox-i686, 32-bit off_t boundary)        | random pool (weight 3)                     | D-crossarch |
+| D3  | i386 KVM/TCG boot — tinyconfig (toybox-i686, 32-bit off_t)   | fixed core via C7                          | D-crossarch |
 | D4  | Board: U-Boot SPL Phase 1 + Phase 2 TEST_DONE anchor         | random pool (skip: HAS_BOARD absent)       | D-crossarch |
 | D5  | Board: TFTP/PXE boot, kernel + DTB transfer                   | random pool (skip: HAS_BOARD absent)       | D-crossarch |
 | D6  | hw-bootstrap: networkd DHCPServer + atftpd + udev relay       | random pool (skip: HAS_BOARD absent)       | D-crossarch |
+| D7  | i386 KVM/TCG boot — defconfig (32-bit, full test suite)       | fixed core via C8                          | D-crossarch |
 | E1  | verify-patch single mode: build one file/dir across arches    | random pool (weight 1, dry-run)            | E-devtools  |
 | E2  | verify-patch before/after (BASE=): git worktree compare       | random pool (weight 1, dry-run)            | E-devtools  |
 | E3  | config-bisect: 8-cycle binary search, PINNED_OPTS multi-pass  | random pool (weight 1, dry-run)            | E-devtools  |

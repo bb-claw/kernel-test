@@ -45,7 +45,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 
 ## Current State
 
-- **Tests:** 50 total (1 smoke + 49 custom; see test-inventory.md); next slot: 490_
+- **Tests:** 52 total (1 smoke + 51 custom; see test-inventory.md); next slot: 510_
 - **Architectures:** x86_64 + i386 (KVM); arm64 + riscv (TCG). x86 falls back to TCG (2× timeout) without `/dev/kvm`. arm64 QEMU uses `-cpu cortex-a57` (ARMv8.0-A) — LSE atomics absent from `/proc/cpuinfo Features` is expected, not a regression. Toybox: x86_64→toybox-x86_64, i386→toybox-i686, arm64→toybox-aarch64, riscv→toybox-riscv64. Clang (`LLVM=1`) needs `clang`+`lld`+`llvm` (all three; clang alone doesn't pull in llvm on Arch or Debian). riscv needs `riscv64-linux-gnu-gcc` + `qemu-system-riscv64 ≥8.x` (bookworm-backports for B-extension).
 - **Config profiles:** 9 default + 2 extra (localconfig x86_64-only; vf2config riscv-only JH7110). Two-layer fragments: arch-neutral base + arch overlay (serial driver, FPU; absent = silently skipped).
 - **Fetch:** four clones (kernel-test / kernel-test-stable / kernel-test-stable-rc / kernel-test-next); preset auto-selected by directory name; kernel-test-next uses `make fetch-next` (linux-next has no rc tags).

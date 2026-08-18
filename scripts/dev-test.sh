@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 START_EPOCH=$(date +%s)
-BUDGET=$(( ${BUDGET:-300} + 0 ))  # soft time cap in seconds; override: make dev-test BUDGET=N
+BUDGET=$(( ${BUDGET:-360} + 0 ))  # soft time cap in seconds; override: make dev-test BUDGET=N
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 if [[ -n "${SEED:-}" ]]; then
@@ -152,6 +152,32 @@ else
     result_skip "VM smoke: localconfig/x86_64" "/proc/config.gz absent"
 fi
 
+# ── C7: tinyconfig/i386 VM smoke (NO_BUILD=1) ────────────────────────────────
+budget_ok || { result_skip "VM smoke: tinyconfig/i386" "budget"; true; } && {
+t0=$(date +%s)
+if make -C "$REPO_ROOT" all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS=i386 \
+        &>/tmp/dev-test-tiny-i386.log; then
+    result_pass "VM smoke: tinyconfig/i386" $(( $(date +%s) - t0 ))
+    cover D3
+else
+    result_fail "VM smoke: tinyconfig/i386" $(( $(date +%s) - t0 ))
+    printf "       see /tmp/dev-test-tiny-i386.log\n"
+fi
+}
+
+# ── C8: defconfig/i386 VM smoke (NO_BUILD=1) ─────────────────────────────────
+budget_ok || { result_skip "VM smoke: defconfig/i386" "budget"; true; } && {
+t0=$(date +%s)
+if make -C "$REPO_ROOT" all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=i386 \
+        &>/tmp/dev-test-def-i386.log; then
+    result_pass "VM smoke: defconfig/i386" $(( $(date +%s) - t0 ))
+    cover D7
+else
+    result_fail "VM smoke: defconfig/i386" $(( $(date +%s) - t0 ))
+    printf "       see /tmp/dev-test-def-i386.log\n"
+fi
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # RANDOM POOL — weighted draw from remaining 21 paths
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -181,7 +207,7 @@ fi
 if [[ $HAS_RISCV_CC = yes ]]; then
     pool+=("D2|3|VM smoke: defconfig/riscv (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=defconfig ARCHS=riscv")
 fi
-pool+=("D3|3|VM smoke: tinyconfig/i386 (NO_BUILD=1)|make -C $REPO_ROOT all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig ARCHS=i386")
+# D3 (tinyconfig/i386) and D7 (defconfig/i386) are now in the fixed core (C7, C8)
 
 # Weight-1 CI fixture tests (fast; always available regardless of kernel/QEMU)
 pool+=("E1|1|ci-test: test-arch-scripts.sh|bash $REPO_ROOT/tests/ci/test-arch-scripts.sh")
@@ -251,7 +277,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=35
+total_paths=36
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)
