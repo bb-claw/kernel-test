@@ -47,7 +47,7 @@ cat "configs/$CONFIG.config" >> "$OUT_DIR/.config"
 make olddefconfig   # resolves all dependency conflicts
 ```
 `KCONFIG_ALLCONFIG` is NOT used — `tinyconfig` overrides it internally.
-`configs/defconfig.config` (added for 390_watchdog) enables options absent from all arch defconfigs (e.g. `CONFIG_SOFT_WATCHDOG=y`); NS-variant defconfig-based configs (`defnsconfig` etc.) inherit it via `EFFECTIVE_CONFIG` in `build.sh`.
+`configs/defconfig.config` enables options absent from arch defconfigs: `CONFIG_SOFT_WATCHDOG=y` (390_watchdog), `CONFIG_BPF_SYSCALL=y` (490_bpf — off in arch defconfig; kunitconfig inherits via defconfig base). NS-variant defconfig-based configs (`defnsconfig` etc.) inherit it via `EFFECTIVE_CONFIG` in `build.sh`.
 
 ---
 

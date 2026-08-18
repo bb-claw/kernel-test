@@ -67,8 +67,10 @@ and run in filename-sorted order by `/init`. Protocol:
 | `460_unix-socket` | AF_UNIX socketpair SOCK_STREAM send/recv round-trip; skip if CONFIG_UNIX absent (EAFNOSUPPORT); skip if binary absent |
 | `470_landlock` | Landlock ABI version check + ruleset create + restrict path + verify open(/proc/version) blocked (EACCES); skip if CONFIG_SECURITY_LANDLOCK absent (ENOSYS); skip if binary absent |
 | `480_snapshot` | On-board system snapshot: validates /tmp/snapshot.txt written by /init at boot; checks SNAPSHOT header + 27 fields (identity: HOSTNAME/UNAME/INIT; system: UPTIME/LOADAVG/PAGESIZE/CLOCKSOURCE; memory: MEMORY/KERNELMEM/HUGEPAGES/SWAP; cpu: CPU/FLAGS; security: LSM/ASLR/DMESG_RESTRICT/KPTR_RESTRICT/TAINTED; kernel: SCHEDSTATS/CGROUP_CTRL/ENTROPY/#MODULES/FS/DMESG/ISSUES/CMDLINE); ISSUES: 0 at boot (exit 0=clean 1-254=issue-count 255=infra-fail); SCHEDSTATS/CGROUP_CTRL silently skipped if absent; skip if binary absent |
+| `490_bpf` | eBPF socket filter: `bpf(BPF_PROG_LOAD, SOCKET_FILTER)` with minimal 2-insn program (MOV r0=0; EXIT); verifies BPF verifier acceptance and JIT/interpreter path; skip if binary absent or CONFIG_BPF_SYSCALL=n (ENOSYS/EPERM) |
+| `500_sysvipc` | System V IPC: shmget/shmat/shmdt/shmctl (write+read 4096-byte segment); semget/semop V+P/semctl; msgget/msgsnd/msgrcv/msgctl; skip if binary absent or /proc/sysvipc absent (CONFIG_SYSVIPC=n) |
 
-Next available slot: **490_** — 50 total (tests/001_smoke.sh + tests/custom/*.sh)
+Next available slot: **510_** — 52 total (tests/001_smoke.sh + tests/custom/*.sh)
 
 ---
 

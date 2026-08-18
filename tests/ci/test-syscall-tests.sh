@@ -79,6 +79,10 @@ run_subcommand io_uring
 run_subcommand fds
 run_subcommand unix
 run_subcommand landlock
+run_subcommand bpf
+run_subcommand sysvipc-shm
+run_subcommand sysvipc-sem
+run_subcommand sysvipc-msg
 
 # ── Missing subcommand ────────────────────────────────────────────────────────
 
