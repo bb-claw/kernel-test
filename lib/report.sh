@@ -93,7 +93,7 @@ for config in $CONFIGS; do
         if is_build_only "$config"; then
             boot='build-only'
             tests_pass='-'; tests_total='-'
-            kunit_pass='0'; kunit_fail='0'; fail_reason=''
+            kunit_pass='0'; kunit_fail='0'; fail_reason=''; failed_tests=''; tests_fail='0'
             started=$(fmt_time "$build_start")
             duration=$(fmt_dur  "$build_dur")
         elif [[ -f "$out/vm.status" ]]; then
@@ -224,7 +224,12 @@ TXT="$RUN_DIR/summary.txt"
             fi
         fi
         notes="${fr}"
-        fail_count=${tests_fail:-0}
+        if [[ -n $ftests ]]; then
+            read -ra _ftarr <<< "$ftests"
+            fail_count=${#_ftarr[@]}
+        else
+            fail_count=0
+        fi
         [[ $fail_count -gt 0 ]] 2>/dev/null && notes="${notes:+$notes | }${fail_count} failed" || true
         [[ ${corr:-} == 1 ]] && notes="${notes:+$notes | }cfg-fixed"
         printf '%-16s %-8s %-8s %-12s %-14s %-9s %-8s %s\n' \
@@ -466,7 +471,7 @@ info "Running warning analysis ..."
 # ── Commit report to data repo ────────────────────────────────────────────────
 
 run_name=$(basename "$RUN_DIR")
-git -C "$DATA_REPO" pull --rebase --autostash
+git -C "$DATA_REPO" pull --no-rebase --autostash
 git -C "$DATA_REPO" add "reports/$run_name"
 if git -C "$DATA_REPO" diff --cached --quiet; then
     info "data repo: nothing new to commit"

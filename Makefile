@@ -137,7 +137,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test dev-test hook-dev-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test dev-test hook-dev-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -358,6 +358,7 @@ all:
 	+@$(MAKE) fetch
 	+@rc=0; \
 	 $(MAKE) build    || rc=1; \
+	 $(MAKE) programs || true; \
 	 $(MAKE) initramfs || true; \
 	 $(MAKE) test     || rc=1; \
 	 $(MAKE) report; \
@@ -432,6 +433,16 @@ else
 	done; \
 	exit $$rc
 endif
+
+# Rebuild C test binaries (tests/programs/ and tests/ns/) without a full bootstrap.
+# Runs automatically in 'make all' before initramfs, even when NO_BUILD=1.
+# Run directly after changing C helper source to avoid a stale binary in the initramfs.
+programs:
+	@echo "[programs] Building tests/programs/ and tests/ns/ binaries"
+	$(Q)rc=0; \
+	make -C tests/programs || rc=1; \
+	make -C tests/ns       || rc=1; \
+	exit $$rc
 
 # Build one initramfs per (config, arch) pair so each can include config-specific markers.
 initramfs:
@@ -663,6 +674,7 @@ Targets:
   checkout         Fetch and checkout a specific tag or commit  (requires TAG=)
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
+  programs         Rebuild C test binaries (tests/programs/ and tests/ns/) without system packages; runs automatically before initramfs in 'make all'
   initramfs        Assemble Toybox cpio initramfs for each arch; injects tests/custom/*.sh, tests/ns/bin/<arch>/ns-*, tests/programs/*/bin/<arch>/*
   test             Boot each (config, arch) in QEMU/KVM and run tests
   report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)

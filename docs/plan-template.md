@@ -60,6 +60,10 @@ No changes to: <list anything adjacent that might seem in scope but isn't>
 ## Testing commands
 
 ```sh
+# Always run before pushing any branch
+make dev-test
+# Expected: exit 0, ≥50% decision paths covered within time budget
+
 # 1. <What this verifies>
 <exact command>
 # Expected: <output or exit code>

@@ -464,7 +464,10 @@ setup_data_repo "$DATA_REPO"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 
-info "Bootstrap complete. Suggested next steps:"
+info "Bootstrap complete."
+info "To rebuild C test binaries without reinstalling system packages: make programs"
+printf '\n'
+printf 'Suggested next steps:\n'
 printf '\n'
 printf '  # Clone the upstream kernel tree (skip if you already have one)\n'
 printf '  git clone --depth=1 \\\n'
