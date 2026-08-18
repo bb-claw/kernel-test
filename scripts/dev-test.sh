@@ -1,6 +1,6 @@
 #!/bin/bash
-# Branch verification gate: covers ≥50% of 35 functional decision paths.
-# Fixed core (≥40%) always runs; random draw (≥10%) varies by SEED.
+# Branch verification gate: covers >70% of 36 functional decision paths.
+# Fixed core (≥72%) always runs; random draw samples remaining VM combos.
 # Usage: scripts/dev-test.sh [SEED=N]
 set -euo pipefail
 
@@ -93,16 +93,17 @@ fi
 # ── C3: key CI tests ──────────────────────────────────────────────────────────
 budget_ok || { result_skip "ci-tests: vm-parser report snapshot diff" "budget"; true; } && {
 t0=$(date +%s)
-ci_label="ci-tests: vm-parser report snapshot diff"
-if bash "$REPO_ROOT/tests/ci/test-vm-parser.sh" &>/tmp/dev-test-citest-parser.log \
-    && bash "$REPO_ROOT/tests/ci/test-report.sh" &>/tmp/dev-test-citest-report.log \
+ci_label="ci-tests: vm-parser report snapshot diff syscall-tests"
+if bash "$REPO_ROOT/tests/ci/test-vm-parser.sh"    &>/tmp/dev-test-citest-parser.log \
+    && bash "$REPO_ROOT/tests/ci/test-report.sh"   &>/tmp/dev-test-citest-report.log \
     && bash "$REPO_ROOT/tests/ci/test-snapshot.sh" &>/tmp/dev-test-citest-snapshot.log \
-    && bash "$REPO_ROOT/tests/ci/test-diff.sh" &>/tmp/dev-test-citest-diff.log; then
+    && bash "$REPO_ROOT/tests/ci/test-diff.sh"     &>/tmp/dev-test-citest-diff.log \
+    && bash "$REPO_ROOT/tests/ci/test-syscall-tests.sh" &>/tmp/dev-test-citest-syscall.log; then
     result_pass "$ci_label" $(( $(date +%s) - t0 ))
     cover C1 C2 C3 C4 C5
 else
     result_fail "$ci_label" $(( $(date +%s) - t0 ))
-    for f in parser report snapshot diff; do
+    for f in parser report snapshot diff syscall; do
         log="/tmp/dev-test-citest-$f.log"
         [[ -s $log ]] && grep -q 'FAIL\|Error\|error' "$log" && printf "       %s: see %s\n" "$f" "$log" || true
     done
@@ -178,8 +179,39 @@ else
 fi
 }
 
+# ── C9: remaining CI tests (E1–F4 paths) ─────────────────────────────────────
+# These weight-1 entries used to live in the random pool; promoting them to
+# fixed core raises the guaranteed floor from 44% to ≥72% (27/36 paths).
+ci9_tests=(
+    "E1:test-arch-scripts.sh"
+    "E2:test-common.sh"
+    "E3:test-config-bisect.sh"
+    "E4:test-lint-context.sh"
+    "E5:test-makefile-defaults.sh"
+    "E6:test-warnings.sh"
+    "F1:test-fetch.sh"
+    "F2:test-ns-configs.sh"
+    "F3:test-ns-scripts.sh"
+    "F4:test-ns-build.sh"
+)
+for ci_entry in "${ci9_tests[@]}"; do
+    ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
+    if [[ $(elapsed) -ge $BUDGET ]]; then
+        result_skip "ci-test: $ci_script" "budget"
+        continue
+    fi
+    t0=$(date +%s)
+    if bash "$REPO_ROOT/tests/ci/$ci_script" &>"/tmp/dev-test-ci-${ci_id}.log"; then
+        result_pass "ci-test: $ci_script" $(( $(date +%s) - t0 ))
+        cover "$ci_id"
+    else
+        result_fail "ci-test: $ci_script" $(( $(date +%s) - t0 ))
+        printf "       see /tmp/dev-test-ci-%s.log\n" "$ci_id"
+    fi
+done
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# RANDOM POOL — weighted draw from remaining 21 paths
+# RANDOM POOL — VM-combo draw (fixed core already exceeds 70%; pool is bonus)
 # ═══════════════════════════════════════════════════════════════════════════════
 printf "%s\n" "$BAR" | sed 's/──/─/g'
 cols=$(tput cols 2>/dev/null || echo 70)
@@ -209,17 +241,7 @@ if [[ $HAS_RISCV_CC = yes ]]; then
 fi
 # D3 (tinyconfig/i386) and D7 (defconfig/i386) are now in the fixed core (C7, C8)
 
-# Weight-1 CI fixture tests (fast; always available regardless of kernel/QEMU)
-pool+=("E1|1|ci-test: test-arch-scripts.sh|bash $REPO_ROOT/tests/ci/test-arch-scripts.sh")
-pool+=("E2|1|ci-test: test-common.sh|bash $REPO_ROOT/tests/ci/test-common.sh")
-pool+=("E3|1|ci-test: test-config-bisect.sh|bash $REPO_ROOT/tests/ci/test-config-bisect.sh")
-pool+=("E4|1|ci-test: test-lint-context.sh|bash $REPO_ROOT/tests/ci/test-lint-context.sh")
-pool+=("E5|1|ci-test: test-makefile-defaults.sh|bash $REPO_ROOT/tests/ci/test-makefile-defaults.sh")
-pool+=("E6|1|ci-test: test-warnings.sh|bash $REPO_ROOT/tests/ci/test-warnings.sh")
-pool+=("F1|1|ci-test: test-fetch.sh|bash $REPO_ROOT/tests/ci/test-fetch.sh")
-pool+=("F2|1|ci-test: test-ns-configs.sh|bash $REPO_ROOT/tests/ci/test-ns-configs.sh")
-pool+=("F3|1|ci-test: test-ns-scripts.sh|bash $REPO_ROOT/tests/ci/test-ns-scripts.sh")
-pool+=("F4|1|ci-test: test-ns-build.sh|bash $REPO_ROOT/tests/ci/test-ns-build.sh")
+# E1–F4 are now in fixed core C9; only VM combos remain in the random pool.
 
 # Hardware board paths — skip unless board present
 if [[ $HAS_BOARD = yes ]]; then
@@ -243,8 +265,8 @@ done
 
 mapfile -t sorted < <(printf '%s\n' "${keyed[@]}" | sort -t'|' -k1 -rn)
 
-# Target: draw until we've covered ≥9 additional paths or hit budget
-TARGET_RANDOM=9
+# Target: draw until we've covered ≥4 additional paths or hit budget
+TARGET_RANDOM=4
 random_covered=0
 
 for keyed_entry in "${sorted[@]}"; do
@@ -282,14 +304,19 @@ covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)
 
-if [[ $fail_count -eq 0 ]]; then
+if [[ $fail_count -eq 0 ]] && [[ $pct -gt 70 ]]; then
     printf "  ${GREEN}PASS${RESET}  dev-test complete  paths=%d/%d (%d%%)  time=%ds\n" \
         "$covered_count" "$total_paths" "$pct" "$elapsed_total"
     printf "        re-run: make dev-test SEED=%d\n" "$SEED"
     exit 0
 else
-    printf "  ${RED}FAIL${RESET}  dev-test FAILED  paths=%d/%d (%d%%)  time=%ds\n" \
-        "$covered_count" "$total_paths" "$pct" "$elapsed_total"
+    if [[ $fail_count -gt 0 ]]; then
+        printf "  ${RED}FAIL${RESET}  dev-test FAILED  paths=%d/%d (%d%%)  time=%ds\n" \
+            "$covered_count" "$total_paths" "$pct" "$elapsed_total"
+    else
+        printf "  ${RED}FAIL${RESET}  dev-test FAILED: coverage %d%% ≤ 70%%  paths=%d/%d  time=%ds\n" \
+            "$pct" "$covered_count" "$total_paths" "$elapsed_total"
+    fi
     printf "        re-run: make dev-test SEED=%d\n" "$SEED"
     exit 1
 fi
