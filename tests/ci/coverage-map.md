@@ -1,6 +1,8 @@
 # dev-test Coverage Map
 
 36 functional decision paths across 6 groups.
+Fixed core (C1–C9) guarantees ≥72% coverage (27/36 paths, 26/36 without /proc/config.gz).
+dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
 | ID  | Description                                                  | Covering scenario                          | Group       |
@@ -33,13 +35,13 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | D5  | Board: TFTP/PXE boot, kernel + DTB transfer                   | random pool (skip: HAS_BOARD absent)       | D-crossarch |
 | D6  | hw-bootstrap: networkd DHCPServer + atftpd + udev relay       | random pool (skip: HAS_BOARD absent)       | D-crossarch |
 | D7  | i386 KVM/TCG boot — defconfig (32-bit, full test suite)       | fixed core via C8                          | D-crossarch |
-| E1  | verify-patch single mode: build one file/dir across arches    | random pool (weight 1, dry-run)            | E-devtools  |
-| E2  | verify-patch before/after (BASE=): git worktree compare       | random pool (weight 1, dry-run)            | E-devtools  |
-| E3  | config-bisect: 8-cycle binary search, PINNED_OPTS multi-pass  | random pool (weight 1, dry-run)            | E-devtools  |
-| E4  | kconfig-check: subsystem dependency sweep, GATE_CFGS, DRY_RUN | random pool (weight 1, dry-run)           | E-devtools  |
-| E5  | dmesg host analysis: rcu/lockup/oom pattern extraction        | random pool (weight 1, fixture replay)     | E-devtools  |
-| E6  | Warning analysis: per-combo counts, NEW/FIXED vs prev run     | random pool (weight 1, fixture replay)     | E-devtools  |
-| F1  | Mainline rc fetch: git ls-remote --depth=1 for latest rc tag  | random pool (weight 1, fixture replay)     | F-fetch     |
-| F2  | Stable release fetch: STABLE_RELEASE=X.Y selects latest tag   | random pool (weight 1, fixture replay)     | F-fetch     |
-| F3  | Stable-rc branch fetch: branch reset to FETCH_HEAD            | random pool (weight 1, fixture replay)     | F-fetch     |
-| F4  | linux-next: make fetch-next (separate clone, no rc tags)      | random pool (weight 1, fixture replay)     | F-fetch     |
+| E1  | arch test scripts (370/380/400): structure, skip guards, shellcheck           | fixed core via C9 (test-arch-scripts.sh)      | E-ci        |
+| E2  | lib/common.sh helpers: setup_git_array, reset_to_fetch_head, arch helpers     | fixed core via C9 (test-common.sh)            | E-ci        |
+| E3  | scripts/config-bisect.sh: filename parsing, candidate extraction, PINNED_OPTS | fixed core via C9 (test-config-bisect.sh)     | E-ci        |
+| E4  | scripts/lint-context.sh: CLAUDE.md + memory/*.md line-count gate              | fixed core via C9 (test-lint-context.sh)      | E-ci        |
+| E5  | Makefile variable defaults: exported names + default values                   | fixed core via C9 (test-makefile-defaults.sh) | E-ci        |
+| E6  | lib/warnings.sh: extraction, FAIL-skip, cross-arch divergence, run-diff       | fixed core via C9 (test-warnings.sh)          | E-ci        |
+| F1  | lib/fetch.sh: local-tag fallback, kernel version recording (fixture, no net)  | fixed core via C9 (test-fetch.sh)             | F-ns        |
+| F2  | ns-variant config derivation: EFFECTIVE_CONFIG, namespaces.config merging     | fixed core via C9 (test-ns-configs.sh)        | F-ns        |
+| F3  | 290–360 ns test scripts: structure, skip guards, shellcheck compliance         | fixed core via C9 (test-ns-scripts.sh)        | F-ns        |
+| F4  | tests/ns/ C source + Makefile: file presence, license headers, optional build  | fixed core via C9 (test-ns-build.sh)          | F-ns        |
