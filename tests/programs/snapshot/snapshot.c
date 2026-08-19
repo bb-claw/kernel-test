@@ -227,9 +227,17 @@ static void dump_tainted(void)
 		return;
 	}
 
-	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
-		if (flags[i].is_issue && (tainted & (1L << flags[i].bit)))
+	{
+		int of_unittest = (access("/tests/of-unittest-enabled", F_OK) == 0);
+		for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+			if (!flags[i].is_issue || !(tainted & (1L << flags[i].bit)))
+				continue;
+			/* of_unittest deliberately fires WARN_ONCE() in lifecycle tests;
+			 * suppress only when the marker confirms it was built in */
+			if (flags[i].bit == 9 && of_unittest)
+				continue;
 			issue_count++;
+		}
 	}
 
 	slen = (size_t)snprintf(str, sizeof(str), "%ld (", tainted);
