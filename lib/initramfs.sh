@@ -208,6 +208,15 @@ if [[ -f "$CONFIG_FILE" ]] && grep -q '^CONFIG_WATCHDOG=y' "$CONFIG_FILE"; then
     info "watchdog-enabled marker written → /tests/watchdog-enabled"
 fi
 
+# of-unittest-enabled: written when CONFIG_OF_UNITTEST=y in the final .config
+# of_unittest deliberately triggers WARN_ONCE() in lifecycle tests (arm64 only in
+# practice — OF_DYNAMIC absent on riscv, OF_EARLY_FLATTREE absent on x86); snapshot
+# uses this marker to suppress WARN taint from the boot health issue count
+if [[ -f "$CONFIG_FILE" ]] && grep -q '^CONFIG_OF_UNITTEST=y' "$CONFIG_FILE"; then
+    touch "$STAGE/tests/of-unittest-enabled"
+    info "of-unittest-enabled marker written → /tests/of-unittest-enabled"
+fi
+
 # ── Pack cpio + gzip ──────────────────────────────────────────────────────────
 
 info "Packing initramfs → $OUTPUT"

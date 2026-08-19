@@ -227,14 +227,17 @@ static void dump_tainted(void)
 		return;
 	}
 
-	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
-		if (!flags[i].is_issue || !(tainted & (1L << flags[i].bit)))
-			continue;
-		/* WARN (bit 9) in a test-mode kernel (bit 18) is expected: KUnit and
-		 * of_unittest deliberately trigger WARN() as error-path coverage. */
-		if (flags[i].bit == 9 && (tainted & (1L << 18)))
-			continue;
-		issue_count++;
+	{
+		int of_unittest = (access("/tests/of-unittest-enabled", F_OK) == 0);
+		for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+			if (!flags[i].is_issue || !(tainted & (1L << flags[i].bit)))
+				continue;
+			/* of_unittest deliberately fires WARN_ONCE() in lifecycle tests;
+			 * suppress only when the marker confirms it was built in */
+			if (flags[i].bit == 9 && of_unittest)
+				continue;
+			issue_count++;
+		}
 	}
 
 	slen = (size_t)snprintf(str, sizeof(str), "%ld (", tainted);
