@@ -228,8 +228,13 @@ static void dump_tainted(void)
 	}
 
 	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
-		if (flags[i].is_issue && (tainted & (1L << flags[i].bit)))
-			issue_count++;
+		if (!flags[i].is_issue || !(tainted & (1L << flags[i].bit)))
+			continue;
+		/* WARN (bit 9) in a test-mode kernel (bit 18) is expected: KUnit and
+		 * of_unittest deliberately trigger WARN() as error-path coverage. */
+		if (flags[i].bit == 9 && (tainted & (1L << 18)))
+			continue;
+		issue_count++;
 	}
 
 	slen = (size_t)snprintf(str, sizeof(str), "%ld (", tainted);
