@@ -15,14 +15,25 @@ jobs:
   ci:
     name: lint → ci-test → programs
     runs-on: ubuntu-22.04
+    container:
+      image: debian:bookworm
 
     steps:
+      # git must be in the container before actions/checkout can run
+      - name: Install git and base tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            git ca-certificates curl make cpio
+
       - uses: actions/checkout@v4
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
+          apt-get install -y --no-install-recommends \
             shellcheck \
             gcc gcc-multilib musl-tools \
             gcc-aarch64-linux-gnu libc6-dev-arm64-cross \
@@ -32,7 +43,7 @@ jobs:
 
       - name: Create musl-clang wrapper
         run: |
-          sudo tee /usr/local/bin/musl-clang > /dev/null << 'EOF'
+          tee /usr/local/bin/musl-clang > /dev/null << 'EOF'
           #!/bin/sh
           exec clang \
               --target=x86_64-unknown-linux-musl \
@@ -42,7 +53,7 @@ jobs:
               -static-libgcc \
               "$@"
           EOF
-          sudo chmod +x /usr/local/bin/musl-clang
+          chmod +x /usr/local/bin/musl-clang
 
       - name: Configure git identity
         run: |
