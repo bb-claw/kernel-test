@@ -26,7 +26,7 @@ if ! command -v musl-gcc &>/dev/null || ! command -v musl-clang &>/dev/null; the
     printf '        (install: sudo pacman -S musl  or  sudo apt-get install musl-tools)\n'
 else
     tmpdir; BUILD_STDERR="$_LAST_TMPDIR/build-stderr.txt"
-    if make -C "$ST_DIR" clean all 2>"$BUILD_STDERR"; then
+    if make -C "$ST_DIR" clean all ARCHES="x86_64" 2>"$BUILD_STDERR"; then
         pass "GCC + Clang build: zero warnings, all binaries produced"
         assert_file_exists "$ST_BIN"                                "x86_64 GCC binary present"
         assert_file_exists "$ST_DIR/bin/x86_64/syscall-tests-clang" "x86_64 Clang quality-gate binary present"
@@ -36,10 +36,16 @@ else
     fi
 fi
 
-# i386 cross-compile smoke (informational)
+# i386: separate build when gcc -m32 is available (requires gcc-multilib).
 begin_test "st-i386-build"
 if command -v gcc &>/dev/null && gcc -m32 -x c -o /dev/null - </dev/null 2>/dev/null; then
-    assert_file_exists "$ST_DIR/bin/i386/syscall-tests" "i386 binary built"
+    tmpdir; I386_STDERR="$_LAST_TMPDIR/st-i386-stderr.txt"
+    if make -C "$ST_DIR" "bin/i386/syscall-tests" 2>"$I386_STDERR"; then
+        assert_file_exists "$ST_DIR/bin/i386/syscall-tests" "i386 binary built"
+    else
+        fail "i386 build failed — compiler output:"
+        cat "$I386_STDERR" >&2
+    fi
 else
     printf '  skip  gcc -m32 not available — i386 binary not checked\n'
     pass "i386 cross-compile notice logged"
