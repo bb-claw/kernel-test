@@ -35,7 +35,7 @@ CC_VALGRIND    := gcc
 CFLAGS_VALGRIND := -std=c11 -g -O1 -D_DEFAULT_SOURCE -static \
                    -Wno-declaration-after-statement \
                    -Wno-implicit-function-declaration \
-                   -Wall -Wextra -Wpedantic -Werror
+                   -fanalyzer -Wall -Wextra -Wpedantic -Werror
 
 .PHONY: all clean valgrind
 
