@@ -43,7 +43,7 @@ CFLAGS_VALGRIND := -std=c11 -g -O1 -D_DEFAULT_SOURCE -static \
                    -Wno-implicit-function-declaration \
                    -fanalyzer -Wall -Wextra -Wpedantic -Werror
 
-.PHONY: all clean valgrind
+.PHONY: all clean valgrind scan
 
 all: $(BIN_GCC) $(BIN)
 
@@ -57,6 +57,11 @@ $(BIN): $(SRC) | bin
 
 bin:
 	mkdir -p bin
+
+scan:
+	@printf '[serial-capture] clang %s (analyzer)\n' $(SRC)
+	clang --analyze -Xanalyzer -analyzer-output=text \
+	    $(CFLAGS_COMMON) -Werror -o /dev/null $(SRC)
 
 valgrind: bin/serial-capture-valgrind
 

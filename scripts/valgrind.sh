@@ -23,7 +23,23 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 2; }
 info() { printf '[valgrind] %s\n' "$*"; }
 
 command -v valgrind >/dev/null || die "valgrind not installed — run: make bootstrap"
+command -v clang    >/dev/null || die "clang not installed — run: make bootstrap"
 [[ -f "$SUPP" ]]               || die "suppressions not found: $SUPP"
+
+# ── Clang static analyzer ─────────────────────────────────────────────────────
+
+info "running Clang static analyzer..."
+for prog in arena-test perf-event syscall-tests snapshot serial-capture; do
+    printf '[valgrind] %-36s ' "scan/$prog"
+    scan_log="$LOG_DIR/scan-${prog}-${D}.log"
+    rc=0
+    make -C "$PROGRAMS_DIR/$prog" scan > "$scan_log" 2>&1 || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        printf 'PASS\n'; PASS=$((PASS+1))
+    else
+        printf 'FAIL  (see %s)\n' "${scan_log#"$REPO_ROOT/"}"; FAIL=$((FAIL+1))
+    fi
+done
 
 # ── Build valgrind variants ────────────────────────────────────────────────────
 

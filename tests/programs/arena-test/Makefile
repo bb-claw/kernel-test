@@ -37,7 +37,7 @@ CFLAGS_VALGRIND := -std=c11 -g -O1 -D_DEFAULT_SOURCE -static \
                    -Wno-implicit-function-declaration \
                    -fanalyzer -Wall -Wextra -Wpedantic -Werror
 
-.PHONY: all clean valgrind
+.PHONY: all clean valgrind scan
 
 all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-clang
 
@@ -54,6 +54,11 @@ bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
 	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_COMMON_CLANG) $(CFLAGS_x86_64) -o $@ $<
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+
+scan:
+	@printf '[arena] clang  %s (analyzer)\n' $(SRC)
+	clang --analyze -Xanalyzer -analyzer-output=text \
+	    $(CFLAGS_COMMON) -Werror -o /dev/null $(SRC)
 
 valgrind: bin/x86_64/$(BIN)-valgrind
 
