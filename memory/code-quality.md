@@ -65,9 +65,9 @@ CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-unknown-warning-option -Wno-disabl
 - **arena-test / perf-event (cross-compiled)**: `bin/<arch>/<name>` (GCC, 4 arches, shipped) + `bin/x86_64/<name>-clang` (musl-clang, quality gate; Clang cross for arm64/riscv needs sysroot not in bootstrap). `make -C tests/programs` builds all three.
 - **musl hard-required**: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian); build errors if absent. Clang suppressions: `-Wno-disabled-macro-expansion` — musl `stderr` macro; `-Wno-unsafe-buffer-usage` — pointer arithmetic is bounds-correct.
 - **Sign-conversion on `tcflag_t`**: cast explicitly: `tty.c_cflag &= (tcflag_t)~CSTOPB;` — code fix, not a suppression.
+- **Valgrind builds**: `bin/x86_64/<name>-valgrind` (gcc/static glibc, x86_64-only; `make valgrind`). Suppressions: `tests/programs/valgrind.supp`. `make bootstrap` installs valgrind+socat.
 
 ---
-
 ## Bash Lib Script Pitfalls
 
 - **`${arr[-1]:-}` on empty array with `set -euo pipefail`** → bash evaluates the subscript before applying `:-`; prints `arr: bad array subscript` and `set -e` aborts the script. Triggered when `mapfile -t arr < <(...)` receives no output (e.g. `ls-remote` fails on transient TLS error). Fix: `[[ ${#arr[@]} -gt 0 ]] && VAR=${arr[-1]} || VAR=""`.

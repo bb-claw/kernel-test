@@ -1,6 +1,6 @@
 #!/bin/bash
-# Branch verification gate: covers >70% of 36 functional decision paths.
-# Fixed core (≥72%) always runs; random draw samples remaining VM combos.
+# Branch verification gate: covers >70% of 39 functional decision paths.
+# Fixed core (>70%) always runs; random draw samples remaining VM combos.
 # Usage: scripts/dev-test.sh [SEED=N]
 set -euo pipefail
 
@@ -181,7 +181,7 @@ fi
 
 # ── C9: remaining CI tests (E1–F4 paths) ─────────────────────────────────────
 # These weight-1 entries used to live in the random pool; promoting them to
-# fixed core raises the guaranteed floor from 44% to ≥72% (27/36 paths).
+# fixed core raises the guaranteed floor from 44% to >70% (28/39 paths).
 ci9_tests=(
     "E1:test-arch-scripts.sh"
     "E2:test-common.sh"
@@ -193,6 +193,7 @@ ci9_tests=(
     "F2:test-ns-configs.sh"
     "F3:test-ns-scripts.sh"
     "F4:test-ns-build.sh"
+    "G1:test-valgrind.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}

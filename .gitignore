@@ -27,6 +27,9 @@ consolidation/
 # Host dmesg captures and analysis files — stored in DATA_REPO/dmesg/
 dmesg/
 
+# Valgrind run logs and temporary PTY files
+valgrind/
+
 # Claude Code local settings (contains user-specific paths and permissions)
 .claude/
 

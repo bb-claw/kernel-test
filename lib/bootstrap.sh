@@ -49,7 +49,8 @@ install_packages() {
                 clang lld llvm musl \
                 qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
-                bc flex bison libelf pahole
+                bc flex bison libelf pahole \
+                valgrind socat
             ;;
 
         apt)
@@ -94,7 +95,7 @@ install_packages() {
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev \
-                socat
+                socat valgrind
 
             # Cross-compilers + sysroot headers in a separate step so a broken
             # pre-existing package state does not abort the rest of bootstrap.
@@ -160,7 +161,8 @@ MUSL_CLANG_WRAPPER
                 clang lld llvm \
                 qemu-system-x86 qemu-system-aarch64 \
                 cpio git lzop \
-                bc flex bison elfutils-libelf-devel dwarves
+                bc flex bison elfutils-libelf-devel dwarves \
+                valgrind socat glibc-debuginfo
             ;;
 
         zypper)
@@ -169,7 +171,8 @@ MUSL_CLANG_WRAPPER
                 clang lld llvm \
                 qemu-x86 qemu-arm \
                 cpio git lzop \
-                bc flex bison libelf-devel dwarves
+                bc flex bison libelf-devel dwarves \
+                valgrind socat glibc-debuginfo
             ;;
 
         unknown)
