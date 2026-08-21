@@ -17,6 +17,7 @@
 | `NO_BUILD` | `0` | `NO_BUILD=1` |
 | `V` | `0` | `V=1` |
 | `DMESG_LABEL` | `mainline` | `DMESG_LABEL=stable` (used by `make dmesg` only) |
+| `SNAPSHOT` | `1` | `SNAPSHOT=0` — skip snapshot step in `make dmesg` |
 | `LABEL` | _(auto)_ | `LABEL=longterm` — auto: STABLE_RELEASE→stable, linux-next→linux-next, else mainline |
 | `STABLE_RC_BRANCH` | _(from preset)_ | Branch for `make fetch-stable-rc`; set in `presets/kernel-test-stable-rc.mk` |
 | `SUBSYSTEM` | _(none)_ | `SUBSYSTEM=pinctrl` — required by `make kconfig-check/kconfig-build` |
@@ -92,7 +93,6 @@ make warnings-baseline                                # pin latest run as warnin
 `lib/warnings.sh` runs automatically at the end of every `make all`/`make smoke`/`make full`/`make ns-smoke`. Writes per-combo `warnings-<config>-<arch>.txt`, `warnings-summary.txt` (counts + divergence vs x86_64 + new/fixed vs prev run), `warnings-diff-prev.txt`. Informational only.
 
 ### Config archive
-
 ```sh
 make config-archive   # scan DATA_REPO/reports/, populate DATA_REPO/configs/archive_{passed,failed}/; auto-commits to data repo
 ```
@@ -138,7 +138,7 @@ make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagno
 
 ```sh
 make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=clang] [CLEAN=1]
-make dmesg [DMESG_LABEL=stable]   # capture+analyse host kernel dmesg
+make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host kernel
 ```
 
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.
