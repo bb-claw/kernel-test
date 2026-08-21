@@ -1,83 +1,86 @@
 ---
-name: CI — lint and test
+name: CI
 
 "on":
-  push:
-    branches:
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
-      - "docs/**"
-      - "refactor/**"
-      - "test/**"
   pull_request:
     branches:
       - main
 
-# Cancel in-progress runs on the same branch when a new commit is pushed.
+# Cancel in-progress runs on the same PR when a new commit is pushed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  ci:
+    name: lint → ci-test → programs
+    runs-on: ubuntu-22.04
 
-  # ── Detect which paths changed ─────────────────────────────────────────────
-  detect-changes:
-    name: Detect changed files
-    runs-on: ubuntu-latest
-    outputs:
-      tier2: ${{ steps.check.outputs.tier2 }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check for Tier 2 path changes
-        id: check
+      - name: Install dependencies
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="origin/${{ github.base_ref }}"
-          else
-            # Push — compare all branch commits against main
-            BASE="origin/main"
-          fi
-          changed=$(git diff --name-only "${BASE}..HEAD" 2>/dev/null || echo "")
-          tier2=$(echo "$changed" | grep -E \
-            '^(lib/|scripts/|tests/ci/|Makefile$)' || true)
-          if [[ -n "$tier2" ]]; then
-            echo "tier2=true"  >> "$GITHUB_OUTPUT"
-            echo "Tier 2 paths changed — ci-test will run"
-          else
-            echo "tier2=false" >> "$GITHUB_OUTPUT"
-            echo "No Tier 2 paths changed — ci-test skipped"
-          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            shellcheck \
+            gcc musl-tools \
+            gcc-aarch64-linux-gnu libc6-dev-arm64-cross \
+            gcc-riscv64-linux-gnu libc6-dev-riscv64-cross \
+            clang lld llvm \
+            socat
 
-  # ── Tier 1: static lint checks ────────────────────────────────────────────
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Create musl-clang wrapper
+        run: |
+          sudo tee /usr/local/bin/musl-clang > /dev/null << 'EOF'
+          #!/bin/sh
+          exec clang \
+              --target=x86_64-unknown-linux-musl \
+              -isystem /usr/include/x86_64-linux-musl \
+              -B/usr/lib/x86_64-linux-musl \
+              -L/usr/lib/x86_64-linux-musl \
+              -static-libgcc \
+              "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/musl-clang
 
-      - name: Run make lint
-        run: make lint
-
-  # ── Tier 2: harness self-tests (path-gated) ───────────────────────────────
-  ci-test:
-    name: Harness tests (Tier 2)
-    runs-on: ubuntu-latest
-    needs: [lint, detect-changes]
-    if: needs.detect-changes.outputs.tier2 == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install test dependencies
-        run: sudo apt-get install -y socat
-
-      - name: Configure git identity for test commits
+      - name: Configure git identity
         run: |
           git config --global user.name  "CI"
           git config --global user.email "ci@kernel-test.local"
 
-      - name: Run make ci-test
+      - name: Read TOYBOX_VERSION
+        id: toybox
+        run: |
+          ver=$(grep '^TOYBOX_VERSION' Makefile | head -1 | sed 's/.*?= *//')
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Toybox binaries
+        uses: actions/cache@v4
+        with:
+          path: cache/
+          key: toybox-${{ steps.toybox.outputs.version }}
+
+      - name: Download Toybox
+        run: |
+          mkdir -p cache
+          for arch in x86_64 i686 aarch64 riscv64; do
+            dest="cache/toybox-${arch}"
+            if [[ -f "$dest" && -x "$dest" ]]; then
+              echo "toybox-${arch}: cached"
+              continue
+            fi
+            url="https://www.landley.net/toybox/downloads/binaries/${{ steps.toybox.outputs.version }}/toybox-${arch}"
+            echo "Downloading toybox-${arch}..."
+            curl -fsSL --output "$dest" "$url"
+            chmod +x "$dest"
+          done
+
+      - name: make lint
+        run: make lint
+
+      - name: make ci-test
         run: make ci-test
+
+      - name: make programs
+        run: make programs ARCHES="x86_64 arm64 riscv"
