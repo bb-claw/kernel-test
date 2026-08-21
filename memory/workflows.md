@@ -146,5 +146,5 @@ make valgrind                                   # run all C programs under Valgr
 **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
 ### CI / linting / dev-test
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → ci-test → programs, i386 excluded). GitHub Actions: `lint → ci-test → programs` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu).
-`make dev-test` — ≤6-min branch gate; >70% of 36 paths (≥72% from fixed core C1–C9 alone); random draw samples remaining VM combos for bonus coverage; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
+`make dev-test` — ≤6-min branch gate; >70% of 39 paths (fixed core C1–C9 covers 28/39); random draw samples remaining VM combos for bonus coverage; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.
