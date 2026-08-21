@@ -44,6 +44,7 @@ NO_BUILD      ?= 0
 LINUX_NEXT    ?= 0
 TOYBOX_VERSION ?= 0.8.14
 DMESG_LABEL    ?= mainline
+SNAPSHOT       ?= 1
 LABEL          ?=
 CONFIG_FILE    ?=
 SEED_CONFIG    ?=
@@ -119,7 +120,7 @@ export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
-export TOYBOX_VERSION LABEL
+export TOYBOX_VERSION LABEL SNAPSHOT
 export SEED_CONFIG
 export SUBSYSTEM DRIVER VERIFY DRY_RUN PASS2 SKIP_CFGS GATE_CFGS CANARY
 export FILES BASE COMPILER VERIFY_ARCHS CLEAN BOARD_CONFIG BOARD_ARCH BOARD_TTY TFTP_DIR \
@@ -688,7 +689,7 @@ Targets:
   warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
-  dmesg            Capture host kernel dmesg, analyse errors/hardware, diff vs previous (writes DATA_REPO/dmesg/)
+  dmesg            Capture host kernel dmesg, analyse errors/hardware, run snapshot, diff both vs previous (writes DATA_REPO/dmesg/)
   init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)
   config-archive   Scan DATA_REPO/reports/ and populate DATA_REPO/configs/archive_*/; auto-commits to data repo
   consolidate-index  Merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}
@@ -741,6 +742,7 @@ Variables (current values):
   LINUX_NEXT          = $(LINUX_NEXT)  (set to 1 by presets/kernel-test-next.mk; redirects fetch to make fetch-next)
   TOYBOX_VERSION      = $(TOYBOX_VERSION)  (Toybox release pinned in cache/toybox-{x86_64,i686,aarch64})
   DMESG_LABEL         = $(DMESG_LABEL)  (label for make dmesg: mainline/stable/longterm/linux-next)
+  SNAPSHOT            = $(SNAPSHOT)  (set to 0 to skip snapshot step in make dmesg)
   LABEL               = $(if $(LABEL),$(LABEL),(auto: STABLE_RELEASE→stable, linux-next tree→linux-next, vX.Y.Z→stable, else mainline))  (report dir prefix; set LABEL=longterm to override)
   CONFIG_FILE         = $(if $(CONFIG_FILE),$(CONFIG_FILE),(not set — used by: make replay/bisect CONFIG_FILE=<archive-path>))
   SEED_CONFIG         = $(if $(SEED_CONFIG),$(SEED_CONFIG),(not set — set automatically by make replay; seeds build.sh config step from archived .config))

@@ -3,6 +3,9 @@ set -euo pipefail
 
 VALID_LABELS=(mainline stable longterm linux-next)
 L="${1:-mainline}"
+SNAPSHOT="${SNAPSHOT:-1}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SNAPSHOT_BIN="$REPO_ROOT/tests/programs/snapshot/bin/x86_64/snapshot"
 
 valid=0
 for lbl in "${VALID_LABELS[@]}"; do
@@ -186,6 +189,62 @@ run_analysis() {
 run_analysis | tee "$A"
 
 printf '\nanalysis written to %s\n' "$A"
+
+# ── Snapshot ───────────────────────────────────────────────────────────────────
+
+SNAPSHOT_DIFF_FIELDS=(HOSTNAME INIT FLAGS PAGESIZE CLOCKSOURCE FS LSM ASLR
+    DMESG_RESTRICT KPTR_RESTRICT ENTROPY '#MODULES' TAINTED CMDLINE ISSUES)
+
+run_snapshot() {
+    [[ "$SNAPSHOT" != "1" ]] && return 0
+
+    if [[ ! -x "$SNAPSHOT_BIN" ]]; then
+        printf '\nsnapshot binary not found, building...\n'
+        if ! make -C "$REPO_ROOT/tests/programs/snapshot" >/dev/null 2>&1; then
+            printf 'snapshot build failed, skipping\n'
+            return 0
+        fi
+    fi
+
+    local sf="$DMESG_DIR/snapshot-${L}-${V}-${D}-${R}.txt"
+
+    printf '\n======================================================================\n'
+    printf 'snapshot\n'
+    printf '======================================================================\n'
+    "$SNAPSHOT_BIN" | tee "$sf"
+
+    local prev_snap
+    prev_snap=$(find "$DMESG_DIR" -maxdepth 1 -name "snapshot-${L}-*.txt" \
+            ! -name "${sf##*/}" \
+            -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | awk '{ sub(/^[^ ]+ /, ""); print }' \
+        || true)
+
+    printf '\n── Snapshot diff vs previous ────────────────────────────────────────\n'
+    if [[ -n "$prev_snap" ]]; then
+        printf 'previous: %s\n\n' "${prev_snap##*/}"
+        local field changed=0
+        for field in "${SNAPSHOT_DIFF_FIELDS[@]}"; do
+            local cur prev_val
+            cur=$(grep -E "^[[:space:]]*${field}:" "$sf" \
+                | sed "s/.*${field}:[[:space:]]*//" || true)
+            prev_val=$(grep -E "^[[:space:]]*${field}:" "$prev_snap" \
+                | sed "s/.*${field}:[[:space:]]*//" || true)
+            if [[ "$cur" != "$prev_val" ]]; then
+                printf '  %-16s  - %s\n' "$field" "$prev_val"
+                printf '  %-16s  + %s\n' "$field" "$cur"
+                changed=$((changed + 1))
+            fi
+        done
+        [[ $changed -eq 0 ]] && printf 'no change\n'
+    else
+        printf 'no previous snapshot for label "%s" — skipping diff\n' "$L"
+    fi
+
+    printf '\nsnapshot written to %s\n' "$sf"
+}
+
+run_snapshot
 
 grep -q '^VERDICT=ERRORS' "$A" && exit 1
 exit 0
