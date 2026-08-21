@@ -193,6 +193,7 @@ ci9_tests=(
     "F2:test-ns-configs.sh"
     "F3:test-ns-scripts.sh"
     "F4:test-ns-build.sh"
+    "G1:test-valgrind.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
