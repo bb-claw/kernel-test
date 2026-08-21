@@ -137,7 +137,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci-test dev-test hook-dev-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -197,6 +197,11 @@ lint-context:
 # 'make test' already targets the kernel VM tests — this target is separate.
 ci-test:
 	$(Q)scripts/ci-run-tests.sh
+
+# Mirror the GitHub Actions pipeline locally: lint → ci-test → programs.
+# i386 excluded — gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu.
+ci: lint ci-test
+	$(MAKE) programs ARCHES="x86_64 arm64 riscv"
 
 # ≤5-minute branch verification gate: fixed core (lint + C build + 4 CI tests +
 # tinyconfig/defconfig/localconfig VM smokes) + random weighted draw.
@@ -695,6 +700,7 @@ Targets:
   verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
   lint             Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
   ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
+  ci               Run the full GitHub Actions pipeline locally: lint → ci-test → programs (i386 excluded)
   dev-test         ≤5-min branch verification gate: ≥50% of 35 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
   hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
   clean            Remove build/ and cache/

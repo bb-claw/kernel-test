@@ -38,9 +38,12 @@ zero infrastructure cost using ubuntu-latest runners.
 
 Files/components changed:
 - `.github/workflows/ci.yml` — new workflow file
-- (optional) `.github/workflows/` directory created
-
-No changes to: Makefile, lib scripts, test scripts, memory files, configs.
+- `tests/ci/test-arena-test.sh` — main build x86_64-only; graceful i386 skip test added
+- `tests/ci/test-perf-event.sh` — same
+- `tests/ci/test-snapshot.sh` — same
+- `tests/ci/test-syscall-tests.sh` — same (pre-existing `st-i386-build` test fixed to trigger its own build)
+- `Makefile` — `make ci` target added (mirrors GitHub Actions pipeline locally)
+- `memory/workflows.md`, `docs/github-actions-ci-plan.md`, `CLAUDE.md` — documentation updated
 
 ---
 
@@ -69,13 +72,16 @@ Alternative considered: parallel jobs per target — rejected because the 3 step
 together take ~90s total; parallelism adds workflow complexity for negligible wall-clock
 savings, and lint failures make ci-test results meaningless anyway.
 
-### ubuntu-latest runner
+### ubuntu-22.04 runner
 
-Sufficient for all three targets. `make lint` needs only bash + shellcheck. `make ci-test`
-runs tests/ci/test-*.sh (no QEMU). `make programs` needs cross-compilers + musl; these
-are available via `apt` on ubuntu-latest (`gcc-aarch64-linux-gnu`, `gcc-riscv64-linux-gnu`,
-`gcc-multilib`, `musl-tools`). musl-clang wrapper must be created manually (same as
-`make bootstrap` does on Debian — a thin shell wrapper pointing clang at musl headers).
+`make lint` needs only bash + shellcheck. `make ci-test` runs tests/ci/test-*.sh (no QEMU).
+`make programs` needs cross-compilers + musl. ubuntu-22.04 is used instead of ubuntu-latest
+because `gcc-multilib` (needed for i386 `-m32`) conflicts with `gcc-aarch64-linux-gnu` and
+`gcc-riscv64-linux-gnu` at the package level on Ubuntu — both cannot be installed simultaneously.
+i386 is excluded from the CI programs build (`ARCHES="x86_64 arm64 riscv"`); the per-test-file
+i386 build tests in tests/ci/test-*.sh skip gracefully when `gcc -m32` is unavailable.
+musl-clang wrapper must be created manually (same as `make bootstrap` does on Debian — a thin
+shell wrapper pointing clang at musl headers). `socat` is also required by tests/ci/test-*.sh.
 
 ### Toybox cache
 
@@ -99,14 +105,14 @@ safe to run on ubuntu-latest without kernel build deps.
 
 ---
 
-## Package install list (ubuntu-latest)
+## Package install list (ubuntu-22.04)
 
 ```
 # Lint
 shellcheck
 
-# C programs build — x86_64 + i386
-gcc gcc-multilib musl-tools
+# C programs build — x86_64 (no gcc-multilib: conflicts with aarch64/riscv cross-compilers)
+gcc musl-tools
 
 # C programs build — arm64
 gcc-aarch64-linux-gnu libc6-dev-arm64-cross
@@ -115,12 +121,19 @@ gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 gcc-riscv64-linux-gnu libc6-dev-riscv64-cross
 
 # clang quality gate (musl-clang wrapper)
-clang llvm lld
+clang lld llvm
+
+# ci-test (serial-capture test fixture)
+socat
 ```
 
+i386 excluded: `gcc-multilib` conflicts with `gcc-aarch64-linux-gnu` / `gcc-riscv64-linux-gnu`
+on Ubuntu at the package level. programs build uses `ARCHES="x86_64 arm64 riscv"`.
+tests/ci/test-*.sh skip i386 build tests gracefully when `gcc -m32` is unavailable.
+
 musl-clang: `musl-tools` provides `musl-gcc` but not `musl-clang`. Wrapper script
-must be created at `/usr/local/bin/musl-clang` (same approach as `make bootstrap` on
-Debian) pointing clang at `/usr/lib/x86_64-linux-musl/`.
+created at `/usr/local/bin/musl-clang` (same approach as `make bootstrap` on Debian)
+pointing clang at `/usr/lib/x86_64-linux-musl/`.
 
 ---
 

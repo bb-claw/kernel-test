@@ -15,6 +15,7 @@ jobs:
   ci:
     name: lint → ci-test → programs
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4

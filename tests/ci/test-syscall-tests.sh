@@ -48,7 +48,7 @@ if command -v gcc &>/dev/null && gcc -m32 -x c -o /dev/null - </dev/null 2>/dev/
     fi
 else
     printf '  skip  gcc -m32 not available — i386 binary not checked\n'
-    pass "i386 cross-compile notice logged"
+    pass "i386 build skipped — gcc -m32 unavailable"
 fi
 
 # ── Behavioral: run each subcommand on host ───────────────────────────────────
