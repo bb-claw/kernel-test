@@ -139,10 +139,10 @@ make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagno
 ```sh
 make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=clang] [CLEAN=1]
 make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host kernel
+make valgrind                                   # run all C programs under Valgrind (local only; logs in valgrind/)
 ```
 
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.
-
 **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
 ### CI / linting / dev-test
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → ci-test → programs, i386 excluded). GitHub Actions: `lint → ci-test → programs` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu).

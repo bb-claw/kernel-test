@@ -37,7 +37,13 @@ CFLAGS_COMMON_CLANG := \
 # -Wno-unsafe-buffer-usage: argv[N] indexing and buf+off pointer arithmetic
 #   are demonstrably bounds-correct; no safer C11 API exists for these patterns.
 
-.PHONY: all clean
+CC_VALGRIND    := gcc
+CFLAGS_VALGRIND := -std=c11 -g -O1 -D_DEFAULT_SOURCE -static \
+                   -Wno-declaration-after-statement \
+                   -Wno-implicit-function-declaration \
+                   -Wall -Wextra -Wpedantic -Werror
+
+.PHONY: all clean valgrind
 
 all: $(BIN_GCC) $(BIN)
 
@@ -51,6 +57,12 @@ $(BIN): $(SRC) | bin
 
 bin:
 	mkdir -p bin
+
+valgrind: bin/serial-capture-valgrind
+
+bin/serial-capture-valgrind: $(SRC) | bin
+	@printf '[serial-capture] gcc   %s (valgrind/glibc)\n' $@
+	$(CC_VALGRIND) $(CFLAGS_VALGRIND) -o $@ $<
 
 clean:
 	rm -rf bin/

@@ -31,7 +31,13 @@ CFLAGS_COMMON_CLANG := -Weverything -Werror \
 
 CC_CLANG := musl-clang
 
-.PHONY: all clean
+CC_VALGRIND    := gcc
+CFLAGS_VALGRIND := -std=c11 -g -O1 -D_DEFAULT_SOURCE -static \
+                   -Wno-declaration-after-statement \
+                   -Wno-implicit-function-declaration \
+                   -Wall -Wextra -Wpedantic -Werror
+
+.PHONY: all clean valgrind
 
 all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-clang
 
@@ -48,6 +54,12 @@ bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
 	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_COMMON_CLANG) $(CFLAGS_x86_64) -o $@ $<
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+
+valgrind: bin/x86_64/$(BIN)-valgrind
+
+bin/x86_64/$(BIN)-valgrind: $(SRC) | bin/x86_64
+	@printf '[arena] %-6s %s (valgrind/glibc)\n' x86_64 $(BIN)
+	$(CC_VALGRIND) $(CFLAGS_VALGRIND) -o $@ $<
 
 clean:
 	rm -rf bin/

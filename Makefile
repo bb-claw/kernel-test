@@ -138,7 +138,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -530,6 +530,11 @@ warnings-baseline:
 dmesg:
 	$(Q)lib/dmesg.sh "$(DMESG_LABEL)"
 
+# Run all C programs under Valgrind (local only; builds glibc/static variants).
+# Logs written to valgrind/ (gitignored). ENOSYS exits counted as skip.
+valgrind:
+	$(Q)scripts/valgrind.sh
+
 # Install built kernel(s) to /boot and update mkinitcpio + GRUB.
 # Designed for daily-driver use with CONFIGS=localconfig ARCHS=x86_64.
 # Runs olddefconfig (handles version-change config drift), builds modules
@@ -690,6 +695,7 @@ Targets:
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
   dmesg            Capture host kernel dmesg, analyse errors/hardware, run snapshot, diff both vs previous (writes DATA_REPO/dmesg/)
+  valgrind         Run all C programs under Valgrind (local only; glibc/static build; logs in valgrind/)
   init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)
   config-archive   Scan DATA_REPO/reports/ and populate DATA_REPO/configs/archive_*/; auto-commits to data repo
   consolidate-index  Merge DATA_REPO/consolidation/<source>/archive_failed/index.txt → DATA_REPO/consolidation/index.{txt,html}

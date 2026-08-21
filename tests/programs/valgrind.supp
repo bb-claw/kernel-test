@@ -1,0 +1,60 @@
+# Shared Valgrind suppressions for kernel-test C programs.
+#
+# All entries here are glibc false positives — they are NOT bugs in our programs.
+# Suppressions are intentionally broad (fun-level only) to remain valid across
+# minor glibc version changes.
+#
+# Why these are false positives:
+#   AVX2/SSE2 string functions (__strcmp_avx2, __strncmp_avx2, __strstr_sse2_unaligned)
+#   operate on 32- or 16-byte aligned chunks. They may read past the null terminator
+#   for alignment, but the comparison result is derived only from bytes up to '\0'.
+#   Valgrind sees the aligned over-read as a conditional jump on uninitialised memory.
+#
+#   NSS module functions (__nss_module_allocate, __nss_action_parse,
+#   __nss_module_get_function) read and parse /etc/nsswitch.conf. glibc's NSS
+#   machinery does not zero-init internal module state before use, producing
+#   spurious uninitialised-value reports unrelated to our code.
+
+# ── AVX2 strcmp ───────────────────────────────────────────────────────────────
+
+{
+   glibc_avx2_strcmp
+   Memcheck:Cond
+   fun:__strcmp_avx2
+}
+
+# ── AVX2 strncmp ──────────────────────────────────────────────────────────────
+
+{
+   glibc_avx2_strncmp
+   Memcheck:Cond
+   fun:__strncmp_avx2
+}
+
+# ── SSE2 strstr ───────────────────────────────────────────────────────────────
+
+{
+   glibc_sse2_strstr
+   Memcheck:Cond
+   fun:__strstr_sse2_unaligned
+}
+
+# ── NSS module loader (getpwuid, passwd lookup) ───────────────────────────────
+
+{
+   glibc_nss_module_allocate
+   Memcheck:Cond
+   fun:__nss_module_allocate
+}
+
+{
+   glibc_nss_action_parse
+   Memcheck:Cond
+   fun:__nss_action_parse
+}
+
+{
+   glibc_nss_module_get_function
+   Memcheck:Cond
+   fun:__nss_module_get_function
+}
