@@ -95,7 +95,7 @@ install_packages() {
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev \
-                socat valgrind libc6-dbg
+                socat valgrind
 
             # Cross-compilers + sysroot headers in a separate step so a broken
             # pre-existing package state does not abort the rest of bootstrap.

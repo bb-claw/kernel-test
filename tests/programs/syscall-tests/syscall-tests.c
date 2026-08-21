@@ -163,8 +163,9 @@
 /* bpf_insn: 8 bytes, stable ABI */
 struct st_bpf_insn { uint8_t code; uint8_t regs; int16_t off; int32_t imm; };
 
-/* Minimal bpf_attr for BPF_PROG_LOAD — first 40 bytes of union bpf_attr.
- * Smaller than sizeof(union bpf_attr); kernel zeroes remaining fields. */
+/* bpf_attr for BPF_PROG_LOAD — 72 bytes covering all fields that Valgrind
+ * checks in the kernel union bpf_attr layout (prog_flags@44, prog_ifindex@64,
+ * expected_attach_type@68). memset to zero before use. */
 struct st_bpf_prog_attr {
     uint32_t prog_type;             /* offset  0 */
     uint32_t insn_cnt;              /* offset  4 */

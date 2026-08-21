@@ -35,7 +35,7 @@ done
 # ── Run helpers ────────────────────────────────────────────────────────────────
 
 record() {
-    local rc="$1" name="$2" log="$3" on_nonzero="$4"
+    local rc="$1" log="$2" on_nonzero="$3"
     if [[ $rc -eq 0 ]]; then
         printf 'PASS\n'; PASS=$((PASS+1))
     elif [[ $rc -eq 99 ]]; then
@@ -55,7 +55,7 @@ run_vg() {
     printf '[valgrind] %-36s ' "$name"
     local rc=0
     valgrind "${VG_FLAGS[@]}" --log-file="$log" "$@" > /dev/null 2>&1 || rc=$?
-    record "$rc" "$name" "$log" "$on_nonzero"
+    record "$rc" "$log" "$on_nonzero"
 }
 
 # Run serial-capture via a socat PTY pair.
@@ -77,7 +77,14 @@ run_vg_serial() {
     socat PTY,rawer,link="$pty" EXEC:"printf 'HELLO\\n'; sleep 2" \
         > /dev/null 2>&1 &
     local socat_pid=$!
-    sleep 0.2  # let socat create the symlink
+    # Poll for the symlink instead of a fixed sleep — reliable on loaded systems.
+    local i=0
+    until [[ -L "$pty" ]] || [[ $i -ge 20 ]]; do sleep 0.05; i=$((i+1)); done
+    if [[ ! -L "$pty" ]]; then
+        printf 'skip  (socat PTY not ready)\n'; SKIP=$((SKIP+1))
+        kill "$socat_pid" 2>/dev/null || true; wait "$socat_pid" 2>/dev/null || true
+        return 0
+    fi
 
     local rc=0
     valgrind "${VG_FLAGS[@]}" --log-file="$log" \
@@ -94,7 +101,7 @@ run_vg_serial() {
     wait "$socat_pid" 2>/dev/null || true
     rm -f "$pty" "$cap"
 
-    record "$rc" "$name" "$log" "fail"
+    record "$rc" "$log" "fail"
 }
 
 # ── arena-test ────────────────────────────────────────────────────────────────
