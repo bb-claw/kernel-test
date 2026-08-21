@@ -14,6 +14,13 @@
 #   __nss_module_get_function) read and parse /etc/nsswitch.conf. glibc's NSS
 #   machinery does not zero-init internal module state before use, producing
 #   spurious uninitialised-value reports unrelated to our code.
+#
+#   glibc's _int_free() uses SIMD in static builds and reads the adjacent chunk
+#   header in 32-byte aligned loads, touching bytes not tracked by Valgrind.
+#   Scoped to specific callers to avoid masking real use-after-free bugs.
+#
+#   perror() triggers glibc locale/gettext initialisation (__dcigettext) which
+#   calls free() on lazily-allocated internal state that was never zero-init'd.
 
 # ── AVX2 strcmp ───────────────────────────────────────────────────────────────
 
@@ -57,4 +64,23 @@
    glibc_nss_module_get_function
    Memcheck:Cond
    fun:__nss_module_get_function
+}
+
+# ── _int_free() SIMD over-read (arena_destroy) ────────────────────────────
+
+{
+   glibc_free_arena_destroy
+   Memcheck:Cond
+   fun:free
+   fun:arena_destroy
+}
+
+# ── dcigettext/locale init via perror() ──────────────────────────────────
+# Triggered by perf-event (ENOSYS perror) and serial-capture (read perror).
+
+{
+   glibc_dcigettext_free
+   Memcheck:Cond
+   fun:free
+   fun:__dcigettext
 }

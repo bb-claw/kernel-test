@@ -166,14 +166,19 @@ struct st_bpf_insn { uint8_t code; uint8_t regs; int16_t off; int32_t imm; };
 /* Minimal bpf_attr for BPF_PROG_LOAD — first 40 bytes of union bpf_attr.
  * Smaller than sizeof(union bpf_attr); kernel zeroes remaining fields. */
 struct st_bpf_prog_attr {
-    uint32_t prog_type;   /* offset  0 */
-    uint32_t insn_cnt;    /* offset  4 */
-    uint64_t insns;       /* offset  8 */
-    uint64_t license;     /* offset 16 */
-    uint32_t log_level;   /* offset 24 */
-    uint32_t log_size;    /* offset 28 */
-    uint64_t log_buf;     /* offset 32 */
-};                        /* sizeof = 40 */
+    uint32_t prog_type;             /* offset  0 */
+    uint32_t insn_cnt;              /* offset  4 */
+    uint64_t insns;                 /* offset  8 */
+    uint64_t license;               /* offset 16 */
+    uint32_t log_level;             /* offset 24 */
+    uint32_t log_size;              /* offset 28 */
+    uint64_t log_buf;               /* offset 32 */
+    uint32_t kern_version;          /* offset 40 */
+    uint32_t prog_flags;            /* offset 44 */
+    char     prog_name[16];         /* offset 48 */
+    uint32_t prog_ifindex;          /* offset 64 */
+    uint32_t expected_attach_type;  /* offset 68 */
+};                                  /* sizeof = 72 */
 
 /* ── Output helpers ─────────────────────────────────────────────────────── */
 
@@ -710,6 +715,7 @@ static int test_sysvipc_msg(void)
     ok("msgget: message queue created");
 
     struct { long mtype; char text[16]; } msg;
+    memset(&msg, 0, sizeof(msg));
     msg.mtype = 1;
     memcpy(msg.text, "kernel-test", 12);
 
