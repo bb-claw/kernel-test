@@ -58,6 +58,8 @@ make hw BOARD_TTY=/dev/ttyUSB0                # build → hw-deploy → hw-test 
 | `kernel-test` | latest `v*-rc*` tag via `git ls-remote --depth=1` |
 | `kernel-test-stable` | latest `vX.Y.*` tag (`STABLE_RELEASE=X.Y` set by preset) |
 | `kernel-test-stable-rc` | `git fetch origin linux-X.Y.y` + `git reset --hard FETCH_HEAD` |
+| `kernel-test-stable-rc-7.1` | same — pinned to `linux-7.1.y` via preset |
+| `kernel-test-stable-rc-7.2` | same — pinned to `linux-7.2.y` via preset |
 | `kernel-test-next` | **error** — use `make fetch-next` (linux-next has no rc tags) |
 
 ---

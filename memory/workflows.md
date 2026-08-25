@@ -71,7 +71,7 @@ make hw BOARD_TTY=/dev/ttyUSB0                        # build → hw-deploy → 
 make hw-full BOARD_TTY=/dev/ttyUSB0                   # build → test (QEMU) → hw-deploy → hw-test → report
 ```
 
-`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
+`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps. Per-series clones: `kernel-test-stable-rc-7.1` (`linux-stable-rc-7.1`, `linux-7.1.y`) and `kernel-test-stable-rc-7.2` (`linux-stable-rc-7.2`, `linux-7.2.y`) are version-pinned. Rolling `kernel-test-stable-rc` now tracks `linux-7.2.y` via `linux-stable-rc-7.2`.
 
 ### Regression diff / baseline
 
@@ -147,4 +147,4 @@ make valgrind                                   # run all C programs under Valgr
 ### CI / linting / dev-test
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → ci-test → programs, i386 excluded). GitHub Actions: `lint → ci-test → programs` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu).
 `make dev-test` — ≤6-min branch gate; >70% of 39 paths (fixed core C1–C9 covers 28/39); random draw samples remaining VM combos for bonus coverage; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`.
-**Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.1.4-rc2` is the rolling `linux-7.1.y` branch tip; use `make fetch-stable-rc`.
+**Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.2.1-rc1` is the rolling `linux-7.2.y` branch tip; use `make fetch-stable-rc`.
