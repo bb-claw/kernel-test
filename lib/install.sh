@@ -37,7 +37,22 @@ BUILT_TREE=$(grep '^KERNEL_TREE=' "$STATUS_FILE" | cut -d= -f2-)
 [[ -n $BUILT_TREE ]] && KERNEL_TREE="$BUILT_TREE"
 
 KVER=$(cat "$OUT_DIR/include/config/kernel.release")
-BOOT_SUFFIX="${CONFIG}-${ARCH}"     # e.g. localconfig-x86_64
+MAJOR_MINOR=$(grep -oE '^[0-9]+\.[0-9]+' <<< "$KVER")
+
+# Derive LABEL if not set by preset (mirrors report.sh auto-detection).
+if [[ -z ${LABEL:-} ]]; then
+    if [[ -n ${STABLE_RELEASE:-} ]]; then
+        LABEL=stable
+    elif [[ $KERNEL_TREE == *linux-next* ]]; then
+        LABEL=linux-next
+    elif [[ ! $KVER =~ -rc ]]; then
+        LABEL=stable
+    else
+        LABEL=mainline
+    fi
+fi
+
+BOOT_SUFFIX="${LABEL}-${MAJOR_MINOR}"   # e.g. mainline-7.2, stable-rc-7.1
 NPROC=$(nproc 2>/dev/null || echo 1)
 
 # ccache: reuse the build cache for the modules compile
@@ -47,8 +62,8 @@ export CCACHE_DIR="$PWD/$CACHE_DIR"
 info "Kernel version : $KVER"
 info "vmlinuz        : /boot/vmlinuz-$BOOT_SUFFIX"
 info "Modules        : /lib/modules/$KVER/"
-info "mkinitcpio conf: /etc/mkinitcpio.d/$CONFIG.conf  (system conf, MODULES cleared)"
-info "Preset         : /etc/mkinitcpio.d/$CONFIG.preset"
+info "mkinitcpio conf: /etc/mkinitcpio.d/$BOOT_SUFFIX.conf  (system conf, MODULES cleared)"
+info "Preset         : /etc/mkinitcpio.d/$BOOT_SUFFIX.preset"
 info "Initramfs      : /boot/initramfs-$BOOT_SUFFIX.img"
 
 # ── Step 1: resolve any config drift silently ─────────────────────────────────
@@ -95,13 +110,13 @@ sudo cp "$OUT_DIR/System.map"            "/boot/System.map-$BOOT_SUFFIX"
 # Write a per-kernel mkinitcpio conf derived from the system default but with
 # MODULES cleared — the autodetect hook selects in-tree modules automatically;
 # DKMS out-of-tree modules (nvidia, vbox, …) are installed in step 5.
-CONF_FILE="/etc/mkinitcpio.d/$CONFIG.conf"
+CONF_FILE="/etc/mkinitcpio.d/$BOOT_SUFFIX.conf"
 info "Writing $CONF_FILE (sudo)..."
 sudo bash -c "sed 's/^MODULES=.*/MODULES=()/' /etc/mkinitcpio.conf > '$CONF_FILE'"
 
-info "Writing /etc/mkinitcpio.d/$CONFIG.preset (sudo)..."
-sudo tee "/etc/mkinitcpio.d/$CONFIG.preset" > /dev/null <<EOF
-# mkinitcpio preset for kernel-test '$CONFIG' profile
+info "Writing /etc/mkinitcpio.d/$BOOT_SUFFIX.preset (sudo)..."
+sudo tee "/etc/mkinitcpio.d/$BOOT_SUFFIX.preset" > /dev/null <<EOF
+# mkinitcpio preset for kernel-test '$BOOT_SUFFIX'
 # Kernel version: $KVER
 
 ALL_kver="/boot/vmlinuz-$BOOT_SUFFIX"
@@ -135,8 +150,8 @@ else
 fi
 
 # ── Step 7: generate initramfs ────────────────────────────────────────────────
-info "Generating initramfs (sudo mkinitcpio -p $CONFIG)..."
-sudo mkinitcpio -p "$CONFIG"
+info "Generating initramfs (sudo mkinitcpio -p $BOOT_SUFFIX)..."
+sudo mkinitcpio -p "$BOOT_SUFFIX"
 
 # ── Step 8: update GRUB ───────────────────────────────────────────────────────
 info "Updating GRUB (sudo grub-mkconfig)..."
@@ -179,13 +194,13 @@ info "      the simple 'Manjaro Linux' entry and will boot by default."
 info "      To pin your previous kernel as default:"
 info "        sudo grub-set-default '<Advanced submenu entry ID>'"
 info ""
-info "Reboot and select '$BOOT_SUFFIX' from the GRUB menu to test."
+info "Reboot and select 'vmlinuz-$BOOT_SUFFIX' from the GRUB menu to test."
 info ""
 info "To remove this kernel later:"
 info "  sudo dkms remove --all -k $KVER   # remove DKMS modules first"
 info "  sudo rm /boot/vmlinuz-$BOOT_SUFFIX /boot/initramfs-$BOOT_SUFFIX.img \\"
 info "          /boot/System.map-$BOOT_SUFFIX \\"
-info "          /etc/mkinitcpio.d/$CONFIG.preset /etc/mkinitcpio.d/$CONFIG.conf \\"
+info "          /etc/mkinitcpio.d/$BOOT_SUFFIX.preset /etc/mkinitcpio.d/$BOOT_SUFFIX.conf \\"
 info "          /etc/sysctl.d/99-sysrq.conf"
 info "  sudo rm -rf /lib/modules/$KVER/"
 info "  sudo grub-mkconfig -o /boot/grub/grub.cfg"
