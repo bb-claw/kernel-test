@@ -71,7 +71,7 @@ make hw BOARD_TTY=/dev/ttyUSB0                        # build → hw-deploy → 
 make hw-full BOARD_TTY=/dev/ttyUSB0                   # build → test (QEMU) → hw-deploy → hw-test → report
 ```
 
-`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps.
+`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps. Per-series clones: `kernel-test-stable-rc-7.1` (`linux-stable-rc-7.1`, `linux-7.1.y`) and `kernel-test-stable-rc-7.2` (`linux-stable-rc-7.2`, `linux-7.2.y`; branch not yet live) use version-pinned presets.
 
 ### Regression diff / baseline
 
