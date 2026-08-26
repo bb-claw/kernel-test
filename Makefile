@@ -693,7 +693,7 @@ Targets:
   baseline         Pin the latest report dir as the regression baseline; auto-diff will compare against it
   warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
-  install          Install built kernel to /boot; olddefconfig + SHA256 refresh + dkms autoinstall + mkinitcpio + GRUB; warns if kernel untested (needs sudo, x86_64 only)
+  install          Install built kernel to /boot as vmlinuz-<config>-<label>-<major.minor>-<arch>; writes /etc/grub.d/06_kernel-test for explicit GRUB menu entries; olddefconfig + modules + dkms + mkinitcpio + grub-mkconfig (needs sudo, x86_64 only)
   dmesg            Capture host kernel dmesg, analyse errors/hardware, run snapshot, diff both vs previous (writes DATA_REPO/dmesg/)
   valgrind         Run all C programs under Valgrind (local only; glibc/static build; logs in valgrind/)
   init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)

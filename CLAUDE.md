@@ -38,7 +38,7 @@ make ci                                        # full GitHub Actions pipeline lo
 make dev-test                                  # branch gate: ≤6 min, >70% of 39 decision paths; SEED=N replays, BUDGET=N cap
 make hook-dev-test                             # toggle dev-test in .githooks/pre-push (opt-in; run again removes)
 make bootstrap                                 # install deps, download Toybox, activate git hooks
-make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot (Arch/Manjaro only)
+make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-localconfig-<label>-<major.minor>-x86_64; writes /etc/grub.d/06_kernel-test
 make info                                      # show currently checked-out kernel
 make diff                                      # diff latest vs previous run
 make baseline                                  # pin a reference run for regression comparison
