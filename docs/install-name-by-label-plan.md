@@ -24,10 +24,10 @@ kernel name encoding its series and major.minor.
 
 ## Goals
 
-1. `make install` in `kernel-test` (mainline 7.2) → `/boot/vmlinuz-mainline-7.2`
-2. `make install` in `kernel-test-stable-rc-7.1` → `/boot/vmlinuz-stable-rc-7.1`
-3. `make install` in `kernel-test-stable-rc-7.2` → `/boot/vmlinuz-stable-rc-7.2`
-4. `make install` in `kernel-test-stable` → `/boot/vmlinuz-stable-7.1` (or current minor)
+1. `make install` in `kernel-test` (mainline 7.2) → `/boot/vmlinuz-localconfig-mainline-7.2-x86_64`
+2. `make install` in `kernel-test-stable-rc-7.1` → `/boot/vmlinuz-localconfig-stable-rc-7.1-x86_64`
+3. `make install` in `kernel-test-stable-rc-7.2` → `/boot/vmlinuz-localconfig-stable-rc-7.2-x86_64`
+4. `make install` in `kernel-test-stable` → `/boot/vmlinuz-localconfig-stable-7.1-x86_64`
 5. Matching initramfs, System.map, mkinitcpio preset names use the same suffix
 6. No `x86_64` suffix needed (install is x86_64-only, enforced by the script)
 

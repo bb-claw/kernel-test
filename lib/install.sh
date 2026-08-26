@@ -52,7 +52,7 @@ if [[ -z ${LABEL:-} ]]; then
     fi
 fi
 
-BOOT_SUFFIX="${LABEL}-${MAJOR_MINOR}"   # e.g. mainline-7.2, stable-rc-7.1
+BOOT_SUFFIX="${CONFIG}-${LABEL}-${MAJOR_MINOR}-${ARCH}"   # e.g. localconfig-mainline-7.2-x86_64
 NPROC=$(nproc 2>/dev/null || echo 1)
 
 # ccache: reuse the build cache for the modules compile
