@@ -523,3 +523,122 @@ Each finding has a status: `[ ]` open, `[x]` resolved, `[-]` won't fix, `[~]` re
   4. **Accept as won't-fix** if 1 and 2 don't pan out.
      The crashes are in throwaway subprocesses; all test outcomes remain correct.
      No harness change is required to maintain accurate test reporting.
+
+---
+
+## 2026-08-26 — Code Review on feat/install-name-by-label: Toybox sh Bugs and Serial Parsing
+
+Bugs identified during code review; Bugs 1–2 from this review (install.sh) were fixed on the
+branch. The three below remain open and require separate fix branches.
+
+### High — Test Correctness
+
+- [ ] **`170_pipe.sh`: elif + leading underscore cause false FAIL on 1 MiB pipe test**
+  **File:** `tests/custom/170_pipe.sh` lines 43–58
+
+  Two Toybox sh bugs compound to produce a false FAIL on any config with `/dev/zero`
+  (defconfig, kunitconfig, randdefconfig, …):
+
+  1. **elif bug** (Toybox 0.8.9): when the `if` condition is true, the `else` body also
+     executes. `/dev/zero` exists → `_large_src=/dev/zero` (if body) then `_large_src=`
+     (else body) run in sequence — the variable is cleared.
+
+  2. **Leading underscore** (`$_varname`): Toybox parses `"$_large_src"` as `$_`
+     (last-arg special var) concatenated with the literal string `large_src`. If `$_` is
+     empty, `"$_large_src"` expands to `"large_src"` (non-empty), so `[ -n "$_large_src" ]`
+     passes. `head -c 1048576 "large_src"` then fails (no such file), `wc -c` returns 0,
+     and the test reports: `FAIL: pipe data loss: expected 1048576 bytes, got 0`.
+
+  **Impact:** On any config with `/dev/zero`, the 1 MiB pipe test always false-FAILs,
+  polluting defconfig, kunitconfig, randdefconfig, and kunitrandconfig results.
+
+  **Fix:** Replace `elif+else` with nested `if/else/fi`; rename `_large_src` → `large_src`:
+  ```sh
+  if [ -e /dev/zero ]; then
+      large_src=/dev/zero
+  else
+      if [ -e /dev/urandom ]; then
+          large_src=/dev/urandom
+      else
+          large_src=
+      fi
+  fi
+  if [ -n "$large_src" ]; then
+      bytes=$(head -c 1048576 "$large_src" | wc -c)
+      ...
+  ```
+
+  **Test:** Run defconfig x86_64 and verify `ok: 1 MiB through pipe intact` (not FAIL).
+
+---
+
+### Medium — Reporting Correctness
+
+- [ ] **`common.sh`: `\r` not stripped from FAILED_TESTS, corrupting vm.status**
+  **File:** `lib/common.sh` line 149 (inside `parse_serial_output`)
+
+  QEMU serial output (`-serial file:`) captures raw TTY bytes. The kernel console TTY
+  layer has `onlcr` set, converting `\n` → `\r\n`. KUnit pass/fail counting already strips
+  `\r` with `sed 's/\r//'`, but the `FAILED_TESTS` extraction does not:
+  ```bash
+  FAILED_TESTS=$(grep '^< TEST FAIL:' "$dmesg_file" 2>/dev/null \
+      | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
+  ```
+  After `tr '\n' ' '`, each test name retains its trailing `\r`:
+  `170_pipe\r 040_check-devnodes\r`.
+
+  **Impact:**
+  - `vm.status` contains `FAILED_TESTS=170_pipe\r 040_check-devnodes\r`
+  - Shell comparisons on test names silently never match
+  - Terminal output from `warn "  FAIL: $_ft"` has `\r`, overwriting the line start
+  - HTML report may display garbage characters
+
+  **Fix:** Add `\r` stripping consistent with KUnit counting:
+  ```bash
+  FAILED_TESTS=$(grep '^< TEST FAIL:' "$dmesg_file" 2>/dev/null \
+      | sed 's/\r//; s/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
+  ```
+
+  **Test:** Add a `tests/ci/` fixture with a synthetic dmesg.txt containing
+  `\r\n`-terminated `< TEST FAIL:` lines; assert `parse_serial_output` produces
+  `FAILED_TESTS` with no `\r` characters.
+
+---
+
+### Low — Test Output Contamination
+
+- [ ] **`040_check-devnodes.sh`: elif emits spurious skip output**
+  **File:** `tests/custom/040_check-devnodes.sh` lines 45–56
+
+  Same Toybox 0.8.9 elif bug. Structure:
+  ```sh
+  if [ -e /dev/urandom ]; then   # always true
+      ...ok or fail...
+  elif [ -e /dev/random ]; then
+      ok "..."
+  else
+      skip "..."                 # also executes when if was true
+  fi
+  ```
+  When `/dev/urandom` exists (always), the `else` body (`skip "/dev/urandom and
+  /dev/random not present"`) executes alongside the normal ok/fail line.
+
+  **Impact:** Every run produces a spurious `skip: /dev/urandom and /dev/random not
+  present` in test output. Does not cause a false FAIL (`skip` does not increment
+  `fails`), but contaminates output and could confuse automated parsers.
+
+  **Fix:** Replace `elif+else` with nested `if/else/fi`:
+  ```sh
+  if [ -e /dev/urandom ]; then
+      ...ok or fail...
+  else
+      if [ -e /dev/random ]; then
+          ok "/dev/random present (urandom absent)"
+      else
+          skip "/dev/urandom and /dev/random not present"
+      fi
+  fi
+  ```
+
+  **Test:** Run any config x86_64, grep test output for `040_check-devnodes` — verify
+  exactly one urandom-related line, no spurious skip.

@@ -1,4 +1,4 @@
-KERNEL_TREE      ?= ~/git/linux-stable-rc-7.2
+KERNEL_TREE      ?= ~/git/linux-stable-rc
 LABEL            ?= stable-rc
 GCC              ?= gcc-15
 BUILD_TIMEOUT    ?= 3600

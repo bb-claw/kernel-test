@@ -137,7 +137,7 @@ Fragment pins:
 - `CONFIG_LOCALVERSION="-localconfig"` — distinguishes from distro kernel in uname -r
 
 Build time: 15–25 min on 16 cores (full Manjaro config). Use `BUILD_TIMEOUT=0`.
-Install: `make install CONFIGS=localconfig ARCHS=x86_64` → modules, vmlinuz, mkinitcpio preset, GRUB.
+Install: `make install CONFIGS=localconfig ARCHS=x86_64` → `/boot/vmlinuz-localconfig-<label>-<major.minor>-x86_64`; preset `/etc/mkinitcpio.d/localconfig-<label>-<major.minor>-x86_64.preset`; writes `/etc/grub.d/06_kernel-test` for explicit GRUB menu entries labelled `kernel-test: localconfig-<label>-<major.minor>-x86_64`.
 
 ---
 
