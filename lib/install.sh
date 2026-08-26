@@ -185,9 +185,9 @@ for vmlinuz in /boot/vmlinuz-localconfig-*-x86_64; do
         "${GRUB_CMDLINE_LINUX:-}"
     ucode=
     for _u in /boot/amd-ucode.img /boot/intel-ucode.img; do
-        [ -f "$_u" ] && ucode="$ucode $_u"
+        [ -f "$_u" ] && ucode="${ucode:+$ucode }$_u"
     done
-    printf "\tinitrd\t%s %s\n" "$ucode" "$initramfs"
+    printf "\tinitrd\t%s%s\n" "${ucode:+$ucode }" "$initramfs"
     printf "}\n"
 done
 GRUBSCRIPT
