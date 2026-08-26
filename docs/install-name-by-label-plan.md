@@ -102,9 +102,11 @@ make dev-test
 
 # After make local in kernel-test-stable-rc-7.2:
 make install CONFIGS=localconfig ARCHS=x86_64
-# Expected: /boot/vmlinuz-stable-rc-7.2  /boot/initramfs-stable-rc-7.2.img
+# Expected: /boot/vmlinuz-localconfig-stable-rc-7.2-x86_64
+#           /boot/initramfs-localconfig-stable-rc-7.2-x86_64.img
 
 # In kernel-test (mainline):
 make install CONFIGS=localconfig ARCHS=x86_64
-# Expected: /boot/vmlinuz-mainline-7.2  /boot/initramfs-mainline-7.2.img
+# Expected: /boot/vmlinuz-localconfig-mainline-7.2-x86_64
+#           /boot/initramfs-localconfig-mainline-7.2-x86_64.img
 ```
