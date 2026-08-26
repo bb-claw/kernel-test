@@ -36,7 +36,7 @@ kernel name encoding its series and major.minor.
 ## Scope
 
 Files changed:
-- `lib/install.sh` — compute `BOOT_SUFFIX` from `LABEL + major.minor` instead of `CONFIG-ARCH`
+- `lib/install.sh` — compute `BOOT_SUFFIX` from `CONFIG-LABEL-major.minor-ARCH`; write `/etc/grub.d/06_kernel-test` for explicit GRUB menu labels
 
 No changes to: `Makefile`, presets, config fragments, build pipeline, QEMU test pipeline.
 
@@ -66,10 +66,24 @@ LABEL auto-detection logic as `report.sh` (STABLE_RELEASE→stable, linux-next�
 
 `install.sh` already enforces x86_64-only. The arch is implicit and adds noise to `/boot` filenames.
 
+**Updated**: user explicitly requested `x86_64` retained — `BOOT_SUFFIX="${CONFIG}-${LABEL}-${MAJOR_MINOR}-${ARCH}"`.
+
 ### mkinitcpio preset renamed to BOOT_SUFFIX
 
-`mkinitcpio -p mainline-7.2` reads `/etc/mkinitcpio.d/mainline-7.2.preset`. Existing
+`mkinitcpio -p localconfig-mainline-7.2-x86_64` reads `/etc/mkinitcpio.d/localconfig-mainline-7.2-x86_64.preset`. Existing
 `localconfig.preset` is not touched — it remains valid for kernels installed before this change.
+
+### Explicit GRUB menu entries via `/etc/grub.d/06_kernel-test`
+
+`grub-mkconfig` derives menu labels from `uname -r` embedded in the vmlinuz binary, not the filename.
+All localconfig kernels share `LOCALVERSION="-localconfig"`, so auto-generated entries are identical
+(e.g., two entries both labelled `Manjaro Linux (Kernel: 7.2-x86_64)`).
+
+`install.sh` writes `/etc/grub.d/06_kernel-test` — an executable shell script run by `grub-mkconfig` on
+every invocation — that iterates `/boot/vmlinuz-localconfig-*-x86_64` and emits explicit `menuentry`
+blocks labelled `kernel-test: localconfig-<label>-<major.minor>-x86_64`. This file persists across
+`grub-mkconfig` regenerations and is self-maintaining (entries disappear automatically when their
+vmlinuz is deleted from `/boot`).
 
 ---
 

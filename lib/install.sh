@@ -153,6 +153,40 @@ fi
 info "Generating initramfs (sudo mkinitcpio -p $BOOT_SUFFIX)..."
 sudo mkinitcpio -p "$BOOT_SUFFIX"
 
+# ── Step 7b: write persistent GRUB menu entries ───────────────────────────────
+# grub-mkconfig derives menu labels from the uname -r string embedded in each
+# vmlinuz binary, not the filename. All localconfig kernels share the same
+# LOCALVERSION ("-localconfig"), so auto-generated entries are indistinguishable.
+# Write /etc/grub.d/06_kernel-test — executed by grub-mkconfig on every run —
+# to emit explicit entries labelled with the full filename (e.g. localconfig-stable-rc-7.2-x86_64).
+GRUB_SCRIPT=/etc/grub.d/06_kernel-test
+info "Writing $GRUB_SCRIPT (sudo)..."
+sudo tee "$GRUB_SCRIPT" > /dev/null <<'GRUBSCRIPT'
+#!/bin/sh
+# kernel-test custom GRUB entries — managed by lib/install.sh; do not edit by hand.
+. /etc/default/grub 2>/dev/null || true
+ROOT_UUID=$(grub-probe -t fs_uuid / 2>/dev/null || true)
+[ -n "$ROOT_UUID" ] || exit 0
+
+for vmlinuz in /boot/vmlinuz-localconfig-*-x86_64; do
+    [ -f "$vmlinuz" ] || continue
+    suffix="${vmlinuz#/boot/vmlinuz-}"
+    initramfs="/boot/initramfs-${suffix}.img"
+    [ -f "$initramfs" ] || continue
+
+    printf "menuentry 'kernel-test: %s' --class gnu-linux {\n" "$suffix"
+    printf "\tload_video\n"
+    printf "\tset gfxpayload=keep\n"
+    printf "\tlinux\t%s root=UUID=%s rw %s %s\n" \
+        "$vmlinuz" "$ROOT_UUID" \
+        "${GRUB_CMDLINE_LINUX_DEFAULT:-}" \
+        "${GRUB_CMDLINE_LINUX:-}"
+    printf "\tinitrd\t/boot/amd-ucode.img %s\n" "$initramfs"
+    printf "}\n"
+done
+GRUBSCRIPT
+sudo chmod 755 "$GRUB_SCRIPT"
+
 # ── Step 8: update GRUB ───────────────────────────────────────────────────────
 info "Updating GRUB (sudo grub-mkconfig)..."
 sudo grub-mkconfig -o /boot/grub/grub.cfg
@@ -203,4 +237,6 @@ info "          /boot/System.map-$BOOT_SUFFIX \\"
 info "          /etc/mkinitcpio.d/$BOOT_SUFFIX.preset /etc/mkinitcpio.d/$BOOT_SUFFIX.conf \\"
 info "          /etc/sysctl.d/99-sysrq.conf"
 info "  sudo rm -rf /lib/modules/$KVER/"
+info "  # Remove GRUB script only when no other kernel-test kernels remain:"
+info "  # sudo rm /etc/grub.d/06_kernel-test"
 info "  sudo grub-mkconfig -o /boot/grub/grub.cfg"
