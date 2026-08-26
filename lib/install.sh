@@ -45,6 +45,8 @@ if [[ -z ${LABEL:-} ]]; then
         LABEL=stable
     elif [[ $KERNEL_TREE == *linux-next* ]]; then
         LABEL=linux-next
+    elif [[ $KERNEL_TREE == *stable-rc* ]]; then
+        LABEL=stable-rc
     elif [[ ! $KVER =~ -rc ]]; then
         LABEL=stable
     else
@@ -181,7 +183,11 @@ for vmlinuz in /boot/vmlinuz-localconfig-*-x86_64; do
         "$vmlinuz" "$ROOT_UUID" \
         "${GRUB_CMDLINE_LINUX_DEFAULT:-}" \
         "${GRUB_CMDLINE_LINUX:-}"
-    printf "\tinitrd\t/boot/amd-ucode.img %s\n" "$initramfs"
+    ucode=
+    for _u in /boot/amd-ucode.img /boot/intel-ucode.img; do
+        [ -f "$_u" ] && ucode="$ucode $_u"
+    done
+    printf "\tinitrd\t%s %s\n" "$ucode" "$initramfs"
     printf "}\n"
 done
 GRUBSCRIPT
