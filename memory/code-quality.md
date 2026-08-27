@@ -9,7 +9,7 @@
 | `pre-commit` | every commit | shellcheck on staged `.sh` files; executable bit on staged `tests/**/*.sh`; guard against staged `build/` `cache/` `reports/` |
 | `commit-msg` | every commit | conventional commit format: `<type>[(<scope>)]: <desc>` |
 | `pre-push` | every push | shellcheck on all tracked `.sh` files; executable bit on all `tests/**/*.sh`; test-inventory coverage; design doc on `feat/*`/`fix/*` branches; context size (CLAUDE.md ≤ 150 lines, memory/*.md ≤ 150 lines); `awk` ban in VM test scripts |
-
+| `ci-test` | `make ci-test` | `tests/ci/test-toybox-pitfalls.sh`: static grep bans `elif`, `$_varname`, bare `sh -c` in all `tests/custom/*.sh` and `tests/001_smoke.sh` |
 Skip in emergencies only: `git commit --no-verify` / `git push --no-verify`
 
 ---
@@ -88,8 +88,6 @@ CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-unknown-warning-option -Wno-disabl
 ---
 
 ## Toybox sh 0.8.9 Pitfalls (test scripts)
-
-- **`$_x` leading-underscore vars** → Toybox parses as `$_` + literal; use plain names (`fails`, not `_fails`)
 - **`trap`** → not a builtin; use `/bin/kill` for cleanup
 - **`kill` builtin** → only `kill -0 $$` works; use `/bin/kill` for all other signals
 - **`sleep N` on i386** → Toybox i686 sleep exits non-zero; guard with `if sleep N; then ... else skip ...; fi`
@@ -97,7 +95,9 @@ CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-unknown-warning-option -Wno-disabl
 - **`while true; do true; done` busyloop** → `true` is a Toybox applet (external cmd); each iteration forks+execs, zombie accumulation fills all guest RAM (485 MiB in 512M, 977 MiB in 1G VM). Use `while :; do :; done` — `:` is a special builtin, no fork per iteration, CPU-bound so signals are delivered in TCG.
 - **`sleep N &` target in arm64 QEMU TCG** → blocking `nanosleep` cannot receive signals in TCG mode; `wait $pid` hangs until VM timeout. Use CPU-busy `:` busyloop instead.
 - **any `fork()` in arm64 QEMU TCG** → child immediately faults in parent's full COW RSS (~1G anon-rss); OOM-killed; affects `sh -c '...' &`, `( ... ) &` subshell, and exec variants. Fix: detect `aarch64` via `uname -m` and skip tests that need background processes.
-- **`elif`** → Toybox sh 0.8.9 bug: specifically when `if...elif...else...fi` is used and the `if` condition is true, both the `if` body and the `else` body execute (double output). `if...elif...fi` with no `else` is safe. Fix: use nested `if/else/fi` inside the `else` branch instead of `elif`.
+- **`elif`** → Toybox sh 0.8.9 bug: when `if...elif...else...fi` is used and `if` is true, both the `if` body and the `else` body execute. Fix: nested `if/else/fi`. **Enforced by `test-toybox-pitfalls.sh`.**
+- **`$_varname` leading underscore** → Toybox sh parses `$_name` as `$_` (last-arg special var) + literal `name`. Rename to a plain name (`src` not `_src`). **Enforced by `test-toybox-pitfalls.sh`.**
+- **bare `sh -c`** → NOFORK in Toybox 0.8.11+: runs via longjmp, no fork/exec. Applies to `unshare`/`nsenter` args too. Always use `/bin/sh -c` (path forces fork+exec). **Enforced by `test-toybox-pitfalls.sh`.**
 - **`dd if=FILE bs=N count=N`** → Toybox dd ignores key=value args; use `head -c N` instead
 - **`awk`** → not compiled into the prebuilt Toybox 0.8.9 binary; use `grep | cut -f2` for tab-delimited `/proc` files, or `cut -d: -f2` for colon-delimited. Caught by pre-push hook (check 6).
 - **`if out=$(cmd); then`** → Toybox sh bug: a variable assignment always exits 0, so the command's real exit code is swallowed and the branch always evaluates as true. Use `cmd > /tmp/out.txt 2>&1` to redirect to a file; check `$?`; read the file for diagnostics.

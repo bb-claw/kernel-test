@@ -533,7 +533,7 @@ branch. The three below remain open and require separate fix branches.
 
 ### High — Test Correctness
 
-- [ ] **`170_pipe.sh`: elif + leading underscore cause false FAIL on 1 MiB pipe test**
+- [x] **`170_pipe.sh`: elif + leading underscore cause false FAIL on 1 MiB pipe test** ✅ resolved 2026-08-27
   **File:** `tests/custom/170_pipe.sh` lines 43–58
 
   Two Toybox sh bugs compound to produce a false FAIL on any config with `/dev/zero`
@@ -574,7 +574,7 @@ branch. The three below remain open and require separate fix branches.
 
 ### High — Reporting Correctness / LKML Report Corruption
 
-- [ ] **`common.sh`: `\r` not stripped from FAILED_TESTS, corrupting vm.status and LKML reports**
+- [x] **`common.sh`: `\r` not stripped from FAILED_TESTS, corrupting vm.status and LKML reports** ✅ resolved 2026-08-27
   **File:** `lib/common.sh` line 149 (inside `parse_serial_output`)
 
   QEMU serial output (`-serial file:`) captures raw TTY bytes. The kernel console TTY
@@ -616,7 +616,7 @@ branch. The three below remain open and require separate fix branches.
 
 ### High — Silent Test Coverage Gap
 
-- [ ] **`150_mmap.sh`: bare `sh` (NOFORK) means fork+exec VMA stability is never tested**
+- [x] **`150_mmap.sh`: bare `sh` (NOFORK) means fork+exec VMA stability is never tested** ✅ resolved 2026-08-27
   **File:** `tests/custom/150_mmap.sh` line 40
 
   The test intends to verify that a parent process's VMA table is not disturbed by a
@@ -668,7 +668,7 @@ branch. The three below remain open and require separate fix branches.
 
 ### Low — Test Output Contamination
 
-- [ ] **`040_check-devnodes.sh`: elif emits spurious skip output**
+- [x] **`040_check-devnodes.sh`: elif emits spurious skip output** ✅ resolved 2026-08-27
   **File:** `tests/custom/040_check-devnodes.sh` lines 45–56
 
   Same Toybox 0.8.9 elif bug. Structure:
