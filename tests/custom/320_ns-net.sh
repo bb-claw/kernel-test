@@ -27,7 +27,7 @@ fi
 # ── Toybox unshare -n: inode changes ─────────────────────────────────────
 
 self_inode=$(readlink /proc/self/ns/net 2>/dev/null)
-child_inode=$(unshare -n sh -c 'readlink /proc/self/ns/net' 2>/dev/null)
+child_inode=$(unshare -n /bin/sh -c 'readlink /proc/self/ns/net' 2>/dev/null)
 if [ -n "$child_inode" ] && [ "$child_inode" != "$self_inode" ]; then
     ok "net: inode changes in new net ns (unshare -n)"
 else

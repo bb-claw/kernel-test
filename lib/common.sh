@@ -146,7 +146,7 @@ parse_serial_output() {
     FAIL_COUNT=${FAIL_COUNT:-0}
     TESTS_TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
     FAILED_TESTS=$(grep '^< TEST FAIL:' "$dmesg_file" 2>/dev/null \
-        | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
+        | sed 's/\r//; s/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
     FAILED_TESTS=${FAILED_TESTS:-}
 
     # CANARY marker: always scan; distinguish reached/missing/absent.

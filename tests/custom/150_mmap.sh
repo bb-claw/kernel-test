@@ -35,9 +35,10 @@ else
     skip "anonymous VMA check inconclusive"
 fi
 
-# Fork+exec must not disturb the parent's VMA table
+# Fork+exec must not disturb the parent's VMA table.
+# /bin/sh (full path) forces fork+exec; bare 'sh' is NOFORK in Toybox 0.8.11+.
 maps_before=$(wc -l < /proc/self/maps)
-sh -c 'exit 0'
+/bin/sh -c 'exit 0'
 maps_after=$(wc -l < /proc/self/maps)
 if [ "$maps_before" -eq "$maps_after" ]; then
     ok "parent VMA table stable after fork/exec ($maps_before entries)"

@@ -572,14 +572,14 @@ branch. The three below remain open and require separate fix branches.
 
 ---
 
-### Medium — Reporting Correctness
+### High — Reporting Correctness / LKML Report Corruption
 
-- [ ] **`common.sh`: `\r` not stripped from FAILED_TESTS, corrupting vm.status**
+- [ ] **`common.sh`: `\r` not stripped from FAILED_TESTS, corrupting vm.status and LKML reports**
   **File:** `lib/common.sh` line 149 (inside `parse_serial_output`)
 
   QEMU serial output (`-serial file:`) captures raw TTY bytes. The kernel console TTY
-  layer has `onlcr` set, converting `\n` → `\r\n`. KUnit pass/fail counting already strips
-  `\r` with `sed 's/\r//'`, but the `FAILED_TESTS` extraction does not:
+  layer has `onlcr` set, converting `\n` → `\r\n`. KUnit pass/fail counting (lines 163–166)
+  already strips `\r` with `sed 's/\r//'`, but the `FAILED_TESTS` extraction does not:
   ```bash
   FAILED_TESTS=$(grep '^< TEST FAIL:' "$dmesg_file" 2>/dev/null \
       | sed 's/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
@@ -587,21 +587,82 @@ branch. The three below remain open and require separate fix branches.
   After `tr '\n' ' '`, each test name retains its trailing `\r`:
   `170_pipe\r 040_check-devnodes\r`.
 
-  **Impact:**
-  - `vm.status` contains `FAILED_TESTS=170_pipe\r 040_check-devnodes\r`
-  - Shell comparisons on test names silently never match
-  - Terminal output from `warn "  FAIL: $_ft"` has `\r`, overwriting the line start
-  - HTML report may display garbage characters
+  **Root cause:** The `\r` stripping already applied to KUnit counting was not applied
+  symmetrically to the `FAILED_TESTS` extraction path, which was written separately.
 
-  **Fix:** Add `\r` stripping consistent with KUnit counting:
+  **Impact — affects every run with any test failure, across all configs and arches:**
+  - `vm.status` contains `FAILED_TESTS=170_pipe\r 040_check-devnodes\r` (persisted to disk)
+  - `report.sh` "Failed tests:" block (`printf '  %-16s %-8s %s\n'`): the `\r` at the end
+    of each `$t` causes the terminal cursor to jump to column 0, overwriting the
+    `cfg` and `arch` columns — the printed line shows only the test name
+  - `summary.txt` and `summary.mail.txt` sent to LKML contain the same garbled lines
+    (the file is written by the same printf path, not just rendered to a terminal)
+  - `diff.sh` regression/fix labels (`PASS → FAIL`, `FAIL → PASS`) also embed `\r`
+    in the test name portion; when printed they overwrite the diff prefix text
+  - Shell equality comparisons against test names from `FAILED_TESTS` silently never
+    match the clean string (e.g., `[[ "$t" == "170_pipe" ]]` fails when `$t="170_pipe\r"`)
+
+  **Fix:** Add `\r` stripping consistent with KUnit counting (one `sed` expression added):
   ```bash
   FAILED_TESTS=$(grep '^< TEST FAIL:' "$dmesg_file" 2>/dev/null \
       | sed 's/\r//; s/^< TEST FAIL: //' | tr '\n' ' ' | sed 's/ $//' || true)
   ```
 
-  **Test:** Add a `tests/ci/` fixture with a synthetic dmesg.txt containing
-  `\r\n`-terminated `< TEST FAIL:` lines; assert `parse_serial_output` produces
-  `FAILED_TESTS` with no `\r` characters.
+  **Test coverage:** Add a `tests/ci/` fixture with a synthetic dmesg.txt containing
+  `\r\n`-terminated `< TEST FAIL:` lines; assert that `parse_serial_output` produces
+  a `FAILED_TESTS` value with no `\r` characters (`printf '%s' "$FAILED_TESTS" | od -c`
+  must not show `\r`). Run on defconfig x86_64 with a known-failing test and inspect
+  `vm.status` and `summary.txt` for clean test names.
+
+### High — Silent Test Coverage Gap
+
+- [ ] **`150_mmap.sh`: bare `sh` (NOFORK) means fork+exec VMA stability is never tested**
+  **File:** `tests/custom/150_mmap.sh` line 40
+
+  The test intends to verify that a parent process's VMA table is not disturbed by a
+  `fork()+exec()` call. The implementation:
+  ```sh
+  maps_before=$(wc -l < /proc/self/maps)
+  sh -c 'exit 0'
+  maps_after=$(wc -l < /proc/self/maps)
+  if [ "$maps_before" -eq "$maps_after" ]; then
+      ok "parent VMA table stable after fork/exec ($maps_before entries)"
+  ```
+  **Root cause:** `sh` (bare name, no path) is a NOFORK builtin in Toybox 0.8.11+
+  (current pin: 0.8.14). Toybox executes `sh -c 'exit 0'` via internal command recursion
+  (longjmp) inside the same process — no `fork()` occurs, no new process is created, and
+  no VMA table changes happen. The check `maps_before -eq maps_after` is trivially true
+  because it compares the same process to itself.
+
+  This is an instance of the documented pitfall: *"always use `/bin/sh script.sh`
+  (full path) — `/bin/sh` has a `/` in the path, which forces fork+exec"* (`code-quality.md`).
+
+  **Impact:**
+  - Fork+exec VMA stability is **never exercised** by this test on Toybox 0.8.11+
+  - A kernel regression in `fork()`, `do_fork()`, or COW VMA handling that modifies the
+    parent's address space would pass this test silently
+  - The test always reports `ok: parent VMA table stable after fork/exec` regardless of
+    whether fork/exec works at all
+  - Test comment and ok-message claim fork+exec was performed when it was not; this
+    misleads anyone reading the test log to investigate a suspected mm/ regression
+
+  **Fix:** Replace bare `sh` with `/bin/sh` (full path forces fork+exec):
+  ```sh
+  maps_before=$(wc -l < /proc/self/maps)
+  /bin/sh -c 'exit 0'
+  maps_after=$(wc -l < /proc/self/maps)
+  ```
+  After this fix, an actual `fork()+exec()` occurs. The parent's VMA count should be
+  equal before and after on a healthy kernel (fork does not modify the parent's VMAs;
+  exec in the child does not affect the parent). The assertion remains correct; it now
+  actually tests what it claims to test.
+
+  **Test coverage:** Run `make all NO_FETCH=1 CONFIGS=defconfig ARCHS=x86_64` after the
+  fix and verify `150_mmap` still produces `ok: parent VMA table stable after fork/exec`.
+  To confirm fork+exec now occurs, add a temporary `strace -f -e clone,execve` wrapper or
+  check that `/proc/self/maps` line count is non-zero and consistent (not zero-vs-N).
+  Add a `tests/ci/` unit test that verifies the script file does not contain bare `sh `
+  (space after sh) adjacent to a `-c` argument — a static grep check enforcing the pitfall.
 
 ---
 

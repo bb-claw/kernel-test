@@ -49,10 +49,12 @@ if [ -e /dev/urandom ]; then
     else
         fail "/dev/urandom: read failed"
     fi
-elif [ -e /dev/random ]; then
-    ok "/dev/random present (urandom absent)"
 else
-    skip "/dev/urandom and /dev/random not present"
+    if [ -e /dev/random ]; then
+        ok "/dev/random present (urandom absent)"
+    else
+        skip "/dev/urandom and /dev/random not present"
+    fi
 fi
 
 # /dev/kmsg — kernel message interface

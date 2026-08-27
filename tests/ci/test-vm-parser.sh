@@ -59,6 +59,45 @@ begin_test "parse: CANARY=0 and marker absent — CANARY_EARLY empty"
 CANARY=0 parse_serial_output "$FX/transcript-pass.txt"
 assert_eq "$CANARY_EARLY" "" "CANARY_EARLY empty"
 
+# ── parse_serial_output: CRLF line endings ───────────────────────────────────
+# Simulate raw QEMU serial capture: kernel TTY onlcr maps \n → \r\n.
+# FAILED_TESTS must contain no \r characters after parsing.
+
+begin_test "parse: CRLF transcript — FAILED_TESTS has no carriage-return"
+tmpdir
+crlf_tx="$_LAST_TMPDIR/transcript-crlf.txt"
+printf '[    0.000000] Linux version 7.2.0-rc6\r\n' > "$crlf_tx"
+printf 'BOOT_OK: kernel reached init\r\n'            >> "$crlf_tx"
+printf '> TEST RUN: 010_check-proc\r\n'              >> "$crlf_tx"
+printf 'ok: /proc/version readable\r\n'              >> "$crlf_tx"
+printf '< TEST PASS: 010_check-proc\r\n'             >> "$crlf_tx"
+printf '> TEST RUN: 170_pipe\r\n'                    >> "$crlf_tx"
+printf 'FAIL: pipe data loss\r\n'                    >> "$crlf_tx"
+printf '< TEST FAIL: 170_pipe\r\n'                   >> "$crlf_tx"
+printf '> TEST RUN: 040_check-devnodes\r\n'          >> "$crlf_tx"
+printf 'FAIL: /dev/urandom missing\r\n'              >> "$crlf_tx"
+printf '< TEST FAIL: 040_check-devnodes\r\n'         >> "$crlf_tx"
+printf 'TEST_DONE\r\n'                               >> "$crlf_tx"
+parse_serial_output "$crlf_tx"
+assert_eq "$PASS_COUNT" "1" "PASS_COUNT"
+assert_eq "$FAIL_COUNT" "2" "FAIL_COUNT"
+assert_not_contains "$FAILED_TESTS" $'\r' "no \\r in FAILED_TESTS"
+assert_contains     "$FAILED_TESTS" "170_pipe"          "170_pipe name clean"
+assert_contains     "$FAILED_TESTS" "040_check-devnodes" "040 name clean"
+
+begin_test "parse: CRLF transcript — write_run_status stores clean FAILED_TESTS"
+tmpdir
+crlf_tx2="$_LAST_TMPDIR/transcript-crlf2.txt"
+printf 'BOOT_OK: kernel reached init\r\n' > "$crlf_tx2"
+printf '< TEST FAIL: 170_pipe\r\n'       >> "$crlf_tx2"
+printf 'TEST_DONE\r\n'                   >> "$crlf_tx2"
+parse_serial_output "$crlf_tx2"
+determine_boot_status "$crlf_tx2" 0 0
+write_run_status "$_LAST_TMPDIR/vm.status" "2026-08-27T10:00:00Z" 5
+vm_status_content=$(cat "$_LAST_TMPDIR/vm.status")
+assert_not_contains "$vm_status_content" $'\r' "no \\r in vm.status"
+assert_contains     "$vm_status_content" "FAILED_TESTS=170_pipe" "test name in vm.status"
+
 # ── determine_boot_status ─────────────────────────────────────────────────────
 
 begin_test "boot-status: PASS on clean boot with TEST_DONE"
