@@ -1,7 +1,7 @@
 #!/bin/bash
 # Static bug-hunt checks not covered by existing CI tests.
 # Detects: dead Toybox sh skip guards, dev-test/coverage-map drift,
-# and build.sh stale-status sentinel absence.
+# build.sh stale-status sentinel absence, and \r stripping gaps in serial parsing.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=tests/ci/lib.sh
@@ -107,6 +107,30 @@ elif [[ $sentinel_line -lt $ccache_die_line ]]; then
     pass "build.sh: STATUS_FILE sentinel at line $sentinel_line precedes ccache die at line $ccache_die_line"
 else
     fail "build.sh: STATUS_FILE sentinel at line $sentinel_line is AFTER ccache die at line $ccache_die_line"
+fi
+
+# ── Check 5: common.sh FAILED_TESTS pipeline strips \r ───────────────────────
+# QEMU serial output uses \r\n line endings. The FAILED_TESTS extraction pipeline
+# must include sed 's/\r//' — without it each test name in vm.status retains a
+# trailing \r, corrupting report output, diff.sh labels, and shell equality
+# comparisons. This was a production bug (2026-08-26 FINDINGS.md); this check
+# prevents recurrence.
+
+begin_test "common-sh-failed-tests-strips-cr"
+
+common_sh="$REPO/lib/common.sh"
+ft_line=$(grep -n 'FAILED_TESTS=\$(grep' "$common_sh" | head -1 | cut -d: -f1)
+
+if [[ -z $ft_line ]]; then
+    fail "common.sh: FAILED_TESTS=\$(grep ...) assignment not found — structure changed"
+else
+    # The pipeline spans at most 3 lines (backslash continuation). Check for \r stripping.
+    window=$(sed -n "${ft_line},$((ft_line + 3))p" "$common_sh")
+    if printf '%s\n' "$window" | grep -qF "s/\r/"; then
+        pass "common.sh: FAILED_TESTS pipeline strips \\r (line $ft_line)"
+    else
+        fail "common.sh: FAILED_TESTS pipeline at line $ft_line missing sed 's/\\r//' — test names in vm.status/reports will contain \\r, corrupting output and string comparisons"
+    fi
 fi
 
 finish

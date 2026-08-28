@@ -47,4 +47,4 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | F4  | tests/ns/ C source + Makefile: file presence, license headers, optional build  | fixed core via C9 (test-ns-build.sh)          | F-ns        |
 | G1  | Valgrind infra: script+supp file, Makefile scan/valgrind targets, -fanalyzer   | fixed core via C9 (test-valgrind.sh)          | G-valgrind  |
 | G2  | Toybox sh pitfalls: no elif, no $_varname, no bare sh -c in test scripts       | fixed core via C9 (test-toybox-pitfalls.sh)   | G-valgrind  |
-| G3  | Static analysis: dead var=$(cmd)|| guard, total_paths drift, build.sh sentinel | fixed core via C9 (test-static-analysis.sh)   | G-valgrind  |
+| G3  | Static analysis: dead assignment guard, total_paths drift, build.sh sentinel, \r stripping | fixed core via C9 (test-static-analysis.sh) | G-valgrind |
