@@ -99,7 +99,7 @@ printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"   # cleared if build succeeds
 
 ## Tool Design: `tests/ci/test-static-analysis.sh`
 
-A new Tier 2 CI test that runs three static checks not covered by existing tests:
+A new Tier 2 CI test that runs five static checks not covered by existing tests:
 
 1. **Dead-guard check**: scan all VM test scripts for `var=$(cmd) || fallback`
    where the `||` would be silently swallowed by the Toybox sh assignment bug.
@@ -110,6 +110,11 @@ A new Tier 2 CI test that runs three static checks not covered by existing tests
 
 3. **Build-status sentinel check**: verify that `build.sh` writes `build.status`
    (or explicitly clears it) before any `die` that follows `mkdir -p "$OUT_DIR"`.
+
+4. **`\r` stripping check**: verify that the `FAILED_TESTS` extraction pipeline
+   in `lib/common.sh` includes `sed 's/\r//'` — QEMU serial uses `\r\n` and
+   without stripping, test names in `vm.status` and LKML reports are corrupted
+   (FINDINGS.md 2026-08-26).
 
 ---
 
