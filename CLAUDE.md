@@ -83,6 +83,7 @@ Pre-push hook enforces all of the following — fix before pushing:
 VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 
 - **No `if out=$(cmd); then`** — Toybox sh bug: the variable assignment always exits 0, silently masking the command's real exit code. Use `cmd > /tmp/out.txt 2>&1` (file redirect) to capture output.
+- **No `out=$(cmd) || fallback`** — same Toybox bug: `||` never fires because assignment exits 0. Use file redirect + size check: `cmd > /tmp/out.txt 2>/dev/null; [ -s /tmp/out.txt ] || { skip; exit 0; }`
 - **No `awk`** — not in Toybox; use `grep | cut`
 - **No `[[ ]]`** — use `[ ]` (POSIX)
 - **No `elif`** — Toybox 0.8.9 bug: both branches execute; use nested `if/else/fi`

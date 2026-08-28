@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-39 functional decision paths across 7 groups.
-Fixed core (C1–C9) guarantees >70% coverage (28/39 paths, 27/39 without /proc/config.gz).
+41 functional decision paths across 7 groups.
+Fixed core (C1–C9) guarantees >70% coverage (30/41 paths, 29/41 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -47,3 +47,4 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | F4  | tests/ns/ C source + Makefile: file presence, license headers, optional build  | fixed core via C9 (test-ns-build.sh)          | F-ns        |
 | G1  | Valgrind infra: script+supp file, Makefile scan/valgrind targets, -fanalyzer   | fixed core via C9 (test-valgrind.sh)          | G-valgrind  |
 | G2  | Toybox sh pitfalls: no elif, no $_varname, no bare sh -c in test scripts       | fixed core via C9 (test-toybox-pitfalls.sh)   | G-valgrind  |
+| G3  | Static analysis: dead var=$(cmd)|| guard, total_paths drift, build.sh sentinel | fixed core via C9 (test-static-analysis.sh)   | G-valgrind  |

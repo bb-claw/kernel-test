@@ -42,6 +42,7 @@ NPROC=$(nproc 2>/dev/null || echo 1)
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
+printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 
