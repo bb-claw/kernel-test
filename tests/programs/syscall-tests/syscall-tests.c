@@ -691,7 +691,18 @@ static int test_sysvipc_sem(void)
 
     /* V: increment semaphore 0 by 1 */
     struct sembuf v_op = { 0, 1, 0 };
-    if (semop(id, &v_op, 1) < 0) { fail("semop V"); semctl(id, 0, IPC_RMID); return 1; }
+    if (semop(id, &v_op, 1) < 0) {
+        if (errno == ENOSYS) {
+            /* musl i386 routes semop through SYS_ipc(SEMTIMEDOP), which needs
+             * CONFIG_COMPAT_32BIT_TIME (depends on CONFIG_POSIX_TIMERS). */
+            skip("semop ENOSYS: CONFIG_POSIX_TIMERS absent (i386 musl/semtimedop routing)");
+            semctl(id, 0, IPC_RMID);
+            return 0;
+        }
+        fail("semop V");
+        semctl(id, 0, IPC_RMID);
+        return 1;
+    }
     ok("semop V: incremented to 1");
 
     /* P: decrement semaphore 0 by 1 (non-blocking since value is 1) */

@@ -30,6 +30,12 @@ on every run; one silently negates the coverage value of a test.
    Toybox 0.8.11+. No fork/exec occurs; the VMA-stability assertion is trivially true.
    The test claims to verify fork+exec VMA behaviour but tests nothing of the sort.
 
+4. **`500_sysvipc` ENOSYS on tinynsconfig/i386** — musl's `semop()` routes through
+   `SYS_ipc(SEMTIMEDOP=4)`. On 32-bit kernels, that subcommand requires
+   `CONFIG_COMPAT_32BIT_TIME` (which depends on `CONFIG_POSIX_TIMERS`). tinyconfig
+   has `CONFIG_POSIX_TIMERS=n`, so `semop` returns ENOSYS even though `CONFIG_SYSVIPC=y`.
+   Found during ns-smoke validation of this branch.
+
 ---
 
 ## Goals
@@ -38,6 +44,7 @@ on every run; one silently negates the coverage value of a test.
 2. `vm.status FAILED_TESTS` and `summary.txt` contain no `\r` characters when tests fail
 3. `150_mmap.sh` performs an actual `fork()+exec()` before measuring VMA stability
 4. CI catches future regressions of all three bug classes via static checks + fixture tests
+5. `500_sysvipc` passes (or skips cleanly) on tinynsconfig/i386 — no false FAIL from semop ENOSYS
 
 ---
 
@@ -57,7 +64,12 @@ Files changed:
   bare `sh` before `-c`)
 - `tests/ci/coverage-map.md` — add entry for the new pitfalls CI test
 
-No changes to: Makefile, presets, config fragments, initramfs, lib/vm.sh, lib/report.sh,
+Also changed (found during ns-smoke validation):
+- `configs/namespaces.config` — add `CONFIG_POSIX_TIMERS=y` (fixes semop ENOSYS on i386)
+- `tests/programs/syscall-tests/syscall-tests.c` — skip semop ENOSYS in `test_sysvipc_sem`
+  (defensive: reports the capability gap without failing when POSIX_TIMERS is absent)
+
+No changes to: Makefile, presets, initramfs, lib/vm.sh, lib/report.sh,
 lib/diff.sh, lib/install.sh, or any other test script.
 
 ---
