@@ -138,7 +138,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -215,6 +215,11 @@ dev-test:
 # Running this target a second time removes what it added.
 hook-dev-test:
 	@scripts/hook-dev-test.sh
+
+# Bug hunt: invoke Claude Code to find 3 high-severity bugs (read-only; results in bug-hunt/).
+# Requires the claude CLI (https://claude.ai/code). Override: MAX_MINUTES=30 MAX_TURNS=80.
+bug-hunt:
+	$(Q)MAX_MINUTES="$(MAX_MINUTES)" MAX_TURNS="$(MAX_TURNS)" scripts/bug-hunt.sh
 
 hooks:
 	@git config core.hooksPath .githooks
@@ -710,6 +715,7 @@ Targets:
   ci               Run the full GitHub Actions pipeline locally: lint → ci-test → programs (i386 excluded)
   dev-test         ≤6-min branch verification gate: >70% of 41 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
   hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
+  bug-hunt         Claude Code bug hunt: find 3 high-severity bugs; results in bug-hunt/ (MAX_MINUTES=30 MAX_TURNS=80; requires claude CLI)
   clean            Remove build/ and cache/
   distclean        Remove build/ and cache/ (reports/archives in DATA_REPO — manage separately)
   help             Show this message
@@ -780,6 +786,8 @@ Variables (current values):
   HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
   SEED                = $(if $(SEED),$(SEED),(not set — make dev-test SEED=N for reproducible random draw))
   BUDGET              = $(if $(BUDGET),$(BUDGET),(not set — make dev-test BUDGET=N overrides 300s time cap; default: 300))
+  MAX_MINUTES         = $(if $(MAX_MINUTES),$(MAX_MINUTES),(not set — make bug-hunt MAX_MINUTES=N overrides 30 min time cap))
+  MAX_TURNS           = $(if $(MAX_TURNS),$(MAX_TURNS),(not set — make bug-hunt MAX_TURNS=N overrides 80 agent turn cap))
 
 Note: always use 'make all NO_FETCH=1 ...' rather than chaining 'build test report'
   individually — chaining stops at the first failure, so tests and the report
