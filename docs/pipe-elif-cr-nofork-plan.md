@@ -65,11 +65,14 @@ Files changed:
 - `tests/ci/coverage-map.md` — add entry for the new pitfalls CI test
 
 Also changed (found during ns-smoke validation):
-- `configs/namespaces.config` — add `CONFIG_POSIX_TIMERS=y` (fixes semop ENOSYS on i386)
-- `tests/programs/syscall-tests/syscall-tests.c` — skip semop ENOSYS in `test_sysvipc_sem`
-  (defensive: reports the capability gap without failing when POSIX_TIMERS is absent)
+- `tests/programs/syscall-tests/syscall-tests.c` — skip semop ENOSYS in `test_sysvipc_sem`:
+  on tinynsconfig/i386, `CONFIG_POSIX_TIMERS=n` means `SYS_ipc(SEMTIMEDOP)` returns ENOSYS
+  even with `CONFIG_SYSVIPC=y`; skip rather than fail (accurate config-limitation report).
+  Note: adding `CONFIG_POSIX_TIMERS=y` to namespaces.config was tried but rejected — it
+  pulled in `CONFIG_PERF_EVENTS=y` as a side effect, causing 400_perf-events to fail on
+  tinynsconfig/i386 where the full perf infrastructure is absent.
 
-No changes to: Makefile, presets, initramfs, lib/vm.sh, lib/report.sh,
+No changes to: Makefile, presets, config fragments, initramfs, lib/vm.sh, lib/report.sh,
 lib/diff.sh, lib/install.sh, or any other test script.
 
 ---
