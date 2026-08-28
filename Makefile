@@ -204,9 +204,9 @@ ci-test:
 ci: lint ci-test
 	$(MAKE) programs ARCHES="x86_64 arm64 riscv"
 
-# ≤5-minute branch verification gate: fixed core (lint + C build + 4 CI tests +
+# ≤6-minute branch verification gate: fixed core (lint + C build + 13 CI tests +
 # tinyconfig/defconfig/localconfig VM smokes) + random weighted draw.
-# Covers ≥50% of 35 identified decision paths every run.
+# Covers >70% of 41 identified decision paths every run.
 # SEED=N makes the random selection reproducible; BUDGET=N overrides the 300s soft cap.
 dev-test:
 	@SEED="$(SEED)" BUDGET="$(BUDGET)" scripts/dev-test.sh
@@ -708,7 +708,7 @@ Targets:
   lint             Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
   ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
   ci               Run the full GitHub Actions pipeline locally: lint → ci-test → programs (i386 excluded)
-  dev-test         ≤5-min branch verification gate: ≥50% of 35 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
+  dev-test         ≤6-min branch verification gate: >70% of 41 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
   hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
   clean            Remove build/ and cache/
   distclean        Remove build/ and cache/ (reports/archives in DATA_REPO — manage separately)
