@@ -40,15 +40,19 @@ fi
 # forcing the writer to block and the reader to wake it.
 # head -c instead of dd: Toybox 0.8.9 dd does not parse key=value options.
 # /dev/zero absent on tinyconfig; fall back to /dev/urandom, then skip.
+# No elif: Toybox 0.8.9 bug executes else body even when if is true.
+# No leading underscore: Toybox parses $_name as $_ + literal "name".
 if [ -e /dev/zero ]; then
-    _large_src=/dev/zero
-elif [ -e /dev/urandom ]; then
-    _large_src=/dev/urandom
+    large_src=/dev/zero
 else
-    _large_src=
+    if [ -e /dev/urandom ]; then
+        large_src=/dev/urandom
+    else
+        large_src=
+    fi
 fi
-if [ -n "$_large_src" ]; then
-    bytes=$(head -c 1048576 "$_large_src" | wc -c)
+if [ -n "$large_src" ]; then
+    bytes=$(head -c 1048576 "$large_src" | wc -c)
     if [ "$bytes" -eq 1048576 ]; then
         ok "1 MiB through pipe intact ($bytes bytes)"
     else

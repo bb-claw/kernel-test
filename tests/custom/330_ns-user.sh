@@ -27,7 +27,7 @@ fi
 # ── Toybox unshare -U: inode changes ─────────────────────────────────────
 
 self_inode=$(readlink /proc/self/ns/user 2>/dev/null)
-child_inode=$(unshare -U sh -c 'readlink /proc/self/ns/user' 2>/dev/null)
+child_inode=$(unshare -U /bin/sh -c 'readlink /proc/self/ns/user' 2>/dev/null)
 if [ -n "$child_inode" ] && [ "$child_inode" != "$self_inode" ]; then
     ok "user: inode changes in new user ns (unshare -U)"
 else
@@ -40,7 +40,7 @@ fi
 
 # ── appears as uid 0 inside user ns via -U -r ────────────────────────────
 
-uid_in_ns=$(unshare -U -r sh -c 'id -u' 2>/dev/null)
+uid_in_ns=$(unshare -U -r /bin/sh -c 'id -u' 2>/dev/null)
 if [ "$uid_in_ns" = "0" ]; then
     ok "user: appears as uid 0 inside user ns (unshare -U -r)"
 else

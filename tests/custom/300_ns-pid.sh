@@ -27,7 +27,7 @@ fi
 # ── Toybox unshare -fp: new PID namespace inode ───────────────────────────
 
 self_inode=$(readlink /proc/self/ns/pid 2>/dev/null)
-child_inode=$(unshare -fp sh -c 'readlink /proc/self/ns/pid' 2>/dev/null)
+child_inode=$(unshare -fp /bin/sh -c 'readlink /proc/self/ns/pid' 2>/dev/null)
 if [ -n "$child_inode" ] && [ "$child_inode" != "$self_inode" ]; then
     ok "PID: inode changes in new pid ns (unshare -fp)"
 else

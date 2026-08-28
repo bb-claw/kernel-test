@@ -51,7 +51,7 @@ done
 # ── UTS: hostname isolation (Toybox unshare) ─────────────────────────────────
 
 orig=$(hostname)
-result=$(unshare -u sh -c 'hostname ns-test-290; hostname' 2>/dev/null)
+result=$(unshare -u /bin/sh -c 'hostname ns-test-290; hostname' 2>/dev/null)
 if [ "$result" = "ns-test-290" ]; then
     ok "UTS: hostname isolated in unshare -u"
 else

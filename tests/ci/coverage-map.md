@@ -46,3 +46,4 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | F3  | 290–360 ns test scripts: structure, skip guards, shellcheck compliance         | fixed core via C9 (test-ns-scripts.sh)        | F-ns        |
 | F4  | tests/ns/ C source + Makefile: file presence, license headers, optional build  | fixed core via C9 (test-ns-build.sh)          | F-ns        |
 | G1  | Valgrind infra: script+supp file, Makefile scan/valgrind targets, -fanalyzer   | fixed core via C9 (test-valgrind.sh)          | G-valgrind  |
+| G2  | Toybox sh pitfalls: no elif, no $_varname, no bare sh -c in test scripts       | fixed core via C9 (test-toybox-pitfalls.sh)   | G-valgrind  |
