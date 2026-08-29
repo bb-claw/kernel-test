@@ -35,8 +35,9 @@ make extended                                  # full then ns-full (10 configs);
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → ci-test → programs (no i386)
-make dev-test                                  # branch gate: ≤6 min, >70% of 39 decision paths; SEED=N replays, BUDGET=N cap
+make dev-test                                  # branch gate: ≤6 min, >70% of 41 decision paths; SEED=N replays, BUDGET=N cap
 make hook-dev-test                             # toggle dev-test in .githooks/pre-push (opt-in; run again removes)
+make bug-hunt                                  # Claude Code bug hunt: find 3 high-severity bugs; results in bug-hunt/ (requires claude CLI)
 make bootstrap                                 # install deps, download Toybox, activate git hooks
 make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-localconfig-<label>-<major.minor>-x86_64; writes /etc/grub.d/06_kernel-test
 make info                                      # show currently checked-out kernel
@@ -83,6 +84,7 @@ Pre-push hook enforces all of the following — fix before pushing:
 VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 
 - **No `if out=$(cmd); then`** — Toybox sh bug: the variable assignment always exits 0, silently masking the command's real exit code. Use `cmd > /tmp/out.txt 2>&1` (file redirect) to capture output.
+- **No `out=$(cmd) || fallback`** — same Toybox bug: `||` never fires because assignment exits 0. Use file redirect + size check: `cmd > /tmp/out.txt 2>/dev/null; [ -s /tmp/out.txt ] || { skip; exit 0; }`
 - **No `awk`** — not in Toybox; use `grep | cut`
 - **No `[[ ]]`** — use `[ ]` (POSIX)
 - **No `elif`** — Toybox 0.8.9 bug: both branches execute; use nested `if/else/fi`

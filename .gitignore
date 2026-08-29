@@ -30,6 +30,9 @@ dmesg/
 # Valgrind run logs and temporary PTY files
 valgrind/
 
+# Bug hunt findings — run output from make bug-hunt / scripts/bug-hunt.sh
+bug-hunt/
+
 # Claude Code local settings (contains user-specific paths and permissions)
 .claude/
 

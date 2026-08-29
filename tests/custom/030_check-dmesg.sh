@@ -13,7 +13,14 @@ if ! command -v dmesg >/dev/null 2>&1; then
     exit 0
 fi
 
-KLOG=$(dmesg 2>/dev/null) || { skip "dmesg not readable"; exit 0; }
+# Redirect to a file so the exit code is testable without the Toybox sh
+# var=$(cmd) assignment bug (assignments always exit 0, || never fires).
+dmesg > /tmp/dmesg-klog.txt 2>/dev/null
+if [ ! -s /tmp/dmesg-klog.txt ]; then
+    skip "dmesg produced no output"
+    exit 0
+fi
+KLOG=$(cat /tmp/dmesg-klog.txt)
 
 # BUG: — kernel assertion failure, always a hard failure
 if printf '%s\n' "$KLOG" | grep -q "BUG:"; then
