@@ -14,11 +14,15 @@
 #   CFLAGS_riscv_EXTRA  :=                (e.g. -Wno-pointer-to-int-cast)
 #   CFLAGS_i386_EXTRA   :=
 #   LOG_TAG             := $(BIN)         (build log prefix)
+#   OPTIMIZATION        := speed|size|debug  (default: speed = -O2)
 #
 # Modes (set before including):
 #   (default)    cross-compiled: 4 arches + Clang x86_64 quality gate
 #   HOST_ONLY=1  x86_64 only; GCC = quality gate, Clang = shipped binary
 #   FLAGS_ONLY=1 variables only — no build rules (for multi-binary Makefiles)
+#   EMULATOR=1   host clang build with ASAN/UBSAN; provides CC RM MD
+#                CFLAGS_OBJ CFLAGS_EXE (combine with FLAGS_ONLY=1)
+#                Knobs: OPTIMIZATION=DEBUG|SIZE|NO  STATIC=1  NOSTD=1
 #
 # Targets: all  clean  valgrind  scan
 
@@ -50,7 +54,15 @@ CFLAGS_riscv_EXTRA  ?=
 CFLAGS_GCC_EXTRA    ?=
 CFLAGS_CLANG_EXTRA  ?=
 
-CFLAGS_COMMON ?= -std=c17 -O2 -D_DEFAULT_SOURCE \
+ifeq ($(OPTIMIZATION),size)
+_OPT_COMMON := -Os
+else ifeq ($(OPTIMIZATION),debug)
+_OPT_COMMON := -O0 -g
+else
+_OPT_COMMON := -O2
+endif
+
+CFLAGS_COMMON ?= -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE \
     -Wno-declaration-after-statement \
     -Wno-implicit-function-declaration
 
@@ -71,6 +83,98 @@ CFLAGS_VALGRIND_FLAGS ?= -std=c17 -g -O1 -D_DEFAULT_SOURCE -static \
     -fanalyzer -Wall -Wextra -Wpedantic -Werror
 
 LOG_TAG ?= $(BIN)
+
+ifeq ($(EMULATOR),1)
+
+# ── Emulator mode ──────────────────────────────────────────────────────────────
+# Host-only clang build with ASAN/UBSAN.  Always active regardless of
+# FLAGS_ONLY.  Provides: CC  RM  MD  CFLAGS_OBJ  CFLAGS_EXE
+
+ifeq ($(origin CC),default)
+CC := clang
+endif
+
+RM ?= rm -f
+MD ?= mkdir -p
+
+OPTIMIZATION ?= DEBUG
+STATIC       ?= 0
+NOSTD        ?= 0
+
+# Normalize to uppercase so SIZE/size/Size all work the same way.
+override OPTIMIZATION := $(shell echo '$(OPTIMIZATION)' | tr '[:lower:]' '[:upper:]')
+
+_RDYNAMIC :=
+_ASAN     := -fsanitize=address,undefined
+_LOPT     :=
+
+ifeq ($(strip $(OPTIMIZATION)),SIZE)
+# Release build: optimize for size, strip debug info, no sanitizers.
+_OPT      := -Os -g0 -ffunction-sections -fdata-sections \
+             -fno-asynchronous-unwind-tables
+_LOPT     := -Wl,--gc-sections
+_ASAN     :=
+else ifeq ($(strip $(OPTIMIZATION)),ULTRA)
+# Smallest possible binary: Oz > Os for size, LTO eliminates dead code across
+# TU boundaries, unwind tables removed, gc-sections drops unused sections.
+_OPT      := -Oz -g0 -flto -ffunction-sections -fdata-sections \
+             -fno-asynchronous-unwind-tables -fno-unwind-tables
+_LOPT     := -Wl,--gc-sections
+_ASAN     :=
+else ifeq ($(strip $(OPTIMIZATION)),DEBUG)
+_OPT      := -Og -g
+_RDYNAMIC := -rdynamic
+else ifeq ($(strip $(OPTIMIZATION)),NO)
+_OPT      := -O0
+else
+_OPT      := -O2
+endif
+
+ifeq ($(strip $(STATIC)),1)
+_LINK := -static
+else
+_LINK :=
+endif
+
+ifeq ($(strip $(NOSTD)),1)
+_NOSTD := -nostdlib -ffreestanding
+else
+_NOSTD :=
+endif
+
+_CFLAGS_WARN := -Wall -Wextra -Wpedantic -Werror \
+    -Wformat=2 -Wno-unused-parameter -Wshadow \
+    -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+    -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
+
+_CFLAGS_BASE := -std=c17 -D_DEFAULT_SOURCE $(_OPT) $(_ASAN) $(_NOSTD)
+
+CFLAGS_OBJ := $(_CFLAGS_WARN) $(_CFLAGS_BASE) -Wno-unused-command-line-argument -c
+CFLAGS_EXE := $(_CFLAGS_WARN) $(_CFLAGS_BASE) $(_LINK) $(_RDYNAMIC) $(_LOPT)
+
+else  # EMULATOR != 1
+
+# ── Non-emulator fallback ──────────────────────────────────────────────────────
+# Plain optimized build without sanitizers; used when EMULATOR=0 is passed.
+# Provides the same CC/RM/MD/CFLAGS_OBJ/CFLAGS_EXE interface so downstream
+# Makefiles always have valid compiler settings.
+
+ifeq ($(origin CC),default)
+CC := clang
+endif
+
+RM ?= rm -f
+MD ?= mkdir -p
+
+_CFLAGS_WARN := -Wall -Wextra -Wpedantic -Werror \
+    -Wformat=2 -Wno-unused-parameter -Wshadow \
+    -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+    -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
+
+CFLAGS_OBJ := $(_CFLAGS_WARN) -std=c17 -D_DEFAULT_SOURCE -O2 -c
+CFLAGS_EXE := $(_CFLAGS_WARN) -std=c17 -D_DEFAULT_SOURCE -O2
+
+endif  # EMULATOR
 
 ifneq ($(FLAGS_ONLY),1)
 
