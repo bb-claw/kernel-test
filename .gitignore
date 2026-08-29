@@ -62,6 +62,9 @@ modules/*/modules.order
 modules/*/.*.cmd
 modules/*/.module-common.o
 
+# clangd / compiler-explorer tool output
+compiler-options.json
+
 # Scratch / ad-hoc output files
 *.out
 todos

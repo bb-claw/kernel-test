@@ -181,7 +181,7 @@ fi
 
 # ── C9: remaining CI tests (E1–F4 paths) ─────────────────────────────────────
 # These weight-1 entries used to live in the random pool; promoting them to
-# fixed core raises the guaranteed floor from 44% to >70% (30/41 paths).
+# fixed core raises the guaranteed floor from 44% to >70% (32/43 paths).
 ci9_tests=(
     "E1:test-arch-scripts.sh"
     "E2:test-common.sh"
@@ -196,6 +196,7 @@ ci9_tests=(
     "G1:test-valgrind.sh"
     "G2:test-toybox-pitfalls.sh"
     "G3:test-static-analysis.sh"
+    "H1:test-programs-build.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
@@ -302,7 +303,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=41
+total_paths=43
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)

@@ -95,7 +95,7 @@ static int cmd_offset(void)
 }
 
 /* Thread stack for clone()-based thread */
-static char _thread_stack[4096 * 4];
+static char thread_stack[4096 * 4];
 
 static int thread_fn(void *arg)
 {
@@ -172,7 +172,7 @@ static int cmd_setns_mt(void)
 
 	/* Step 3: create a CLONE_THREAD thread — makes us multi-threaded */
 	pid_t tid = clone(thread_fn,
-			  _thread_stack + sizeof(_thread_stack),
+			  thread_stack + sizeof(thread_stack),
 			  CLONE_VM | CLONE_FS | CLONE_FILES |
 			  CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM,
 			  NULL);
