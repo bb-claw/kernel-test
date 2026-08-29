@@ -107,14 +107,24 @@ static int cmd_nested_6(void)
 	gid_t gid = getgid();
 	int to_child[2], from_child[2];
 
-	if (pipe(to_child) < 0 || pipe(from_child) < 0) {
+	if (pipe(to_child) < 0) {
 		fprintf(stderr, "nested-6: pipe: %s\n", strerror(errno));
+		return 1;
+	}
+	if (pipe(from_child) < 0) {
+		fprintf(stderr, "nested-6: pipe: %s\n", strerror(errno));
+		close(to_child[0]);
+		close(to_child[1]);
 		return 1;
 	}
 
 	pid_t child = fork();
 	if (child < 0) {
 		fprintf(stderr, "nested-6: fork: %s\n", strerror(errno));
+		close(to_child[0]);
+		close(to_child[1]);
+		close(from_child[0]);
+		close(from_child[1]);
 		return 1;
 	}
 

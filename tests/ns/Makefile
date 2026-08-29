@@ -11,7 +11,7 @@ ARCHES := x86_64 i386 arm64 riscv
 FLAGS_ONLY := 1
 include ../common.mk
 
-.PHONY: all clean
+.PHONY: all clean valgrind
 
 all: $(foreach a,$(ARCHES),$(foreach b,$(BINS),bin/$(a)/$(b))) \
      $(foreach b,$(BINS),bin/x86_64/$(b)-clang)
@@ -33,6 +33,16 @@ endef
 $(foreach b,$(BINS),$(eval $(call build_rule_clang,$(b))))
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+
+define valgrind_rule
+bin/x86_64/$(1)-valgrind: $(1).c | bin/x86_64
+	@printf '[ns]  %-6s %s (valgrind/glibc)\n' x86_64 $(1)
+	$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $$@ $$<
+endef
+
+$(foreach b,$(BINS),$(eval $(call valgrind_rule,$(b))))
+
+valgrind: $(foreach b,$(BINS),bin/x86_64/$(b)-valgrind)
 
 clean:
 	rm -rf bin/

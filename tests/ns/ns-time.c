@@ -122,13 +122,23 @@ static int cmd_setns_mt(void)
 
 	/* Step 1: fork a child that creates a new time namespace to use as target */
 	int sync_to[2], sync_from[2];
-	if (pipe(sync_to) < 0 || pipe(sync_from) < 0) {
+	if (pipe(sync_to) < 0) {
 		fprintf(stderr, "setns-mt: pipe: %s\n", strerror(errno));
+		return 1;
+	}
+	if (pipe(sync_from) < 0) {
+		fprintf(stderr, "setns-mt: pipe: %s\n", strerror(errno));
+		close(sync_to[0]);
+		close(sync_to[1]);
 		return 1;
 	}
 	pid_t ns_child = fork();
 	if (ns_child < 0) {
 		fprintf(stderr, "setns-mt: fork: %s\n", strerror(errno));
+		close(sync_to[0]);
+		close(sync_to[1]);
+		close(sync_from[0]);
+		close(sync_from[1]);
 		return 1;
 	}
 	if (ns_child == 0) {
