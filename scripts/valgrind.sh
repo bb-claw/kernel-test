@@ -6,6 +6,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROGRAMS_DIR="$REPO_ROOT/tests/programs"
+NS_DIR="$REPO_ROOT/tests/ns"
 SUPP="$PROGRAMS_DIR/valgrind.supp"
 LOG_DIR="$REPO_ROOT/valgrind"
 D=$(date +%Y-%m-%d_%H-%M-%S)
@@ -45,8 +46,9 @@ done
 
 info "building glibc/static valgrind variants..."
 for prog in arena-test perf-event syscall-tests snapshot serial-capture; do
-    make -C "$PROGRAMS_DIR/$prog" valgrind > /dev/null
+    make -C "$PROGRAMS_DIR/$prog" valgrind-build > /dev/null
 done
+make -C "$NS_DIR" valgrind-build > /dev/null
 
 # ── Run helpers ────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,29 @@ run_vg "snapshot" "fail" \
 
 # ── serial-capture ────────────────────────────────────────────────────────────
 run_vg_serial
+
+# ── ns-* ──────────────────────────────────────────────────────────────────────
+# Each binary takes a subcommand; exit codes other than 99 treated as skip
+# (namespace syscall unavailable, missing capability, EPERM, etc.).
+# ns-uts setns requires a live namespace path argument — skipped here.
+NS="$NS_DIR/bin/x86_64"
+run_vg "ns-uts/clone"            "skip" "$NS/ns-uts-valgrind"    clone
+run_vg "ns-ipc/clone"            "skip" "$NS/ns-ipc-valgrind"    clone
+run_vg "ns-ipc/semop"            "skip" "$NS/ns-ipc-valgrind"    semop
+run_vg "ns-pid/clone"            "skip" "$NS/ns-pid-valgrind"    clone
+run_vg "ns-pid/init-death"       "skip" "$NS/ns-pid-valgrind"    init-death
+run_vg "ns-mount/move"           "skip" "$NS/ns-mount-valgrind"  move
+run_vg "ns-mount/mknod"          "skip" "$NS/ns-mount-valgrind"  mknod
+run_vg "ns-mount/propagate"      "skip" "$NS/ns-mount-valgrind"  propagate
+run_vg "ns-mount/pivot"          "skip" "$NS/ns-mount-valgrind"  pivot
+run_vg "ns-net/clone"            "skip" "$NS/ns-net-valgrind"    clone
+run_vg "ns-net/proc-net"         "skip" "$NS/ns-net-valgrind"    proc-net
+run_vg "ns-user/idmap"           "skip" "$NS/ns-user-valgrind"   idmap
+run_vg "ns-user/nested-6"        "skip" "$NS/ns-user-valgrind"   nested-6
+run_vg "ns-cgroup/scoping"       "skip" "$NS/ns-cgroup-valgrind" scoping
+run_vg "ns-cgroup/release-agent" "skip" "$NS/ns-cgroup-valgrind" release-agent
+run_vg "ns-time/offset"          "skip" "$NS/ns-time-valgrind"   offset
+run_vg "ns-time/setns-mt"        "skip" "$NS/ns-time-valgrind"   setns-mt
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'

@@ -1,7 +1,7 @@
 # Top-level convenience target: build all test programs.
 # Calls each program's own Makefile; used by tests/ci/test-*.sh and locally.
 
-.PHONY: all clean valgrind fmt arena-test perf-event serial-capture syscall-tests snapshot
+.PHONY: all clean valgrind valgrind-build fmt arena-test perf-event serial-capture syscall-tests snapshot
 
 all: arena-test perf-event serial-capture syscall-tests snapshot
 
@@ -27,12 +27,14 @@ clean:
 	$(MAKE) -C syscall-tests clean
 	$(MAKE) -C snapshot clean
 
-valgrind:
-	$(MAKE) -C arena-test valgrind
-	$(MAKE) -C perf-event valgrind
-	$(MAKE) -C serial-capture valgrind
-	$(MAKE) -C syscall-tests valgrind
-	$(MAKE) -C snapshot valgrind
+valgrind-build:
+	$(MAKE) -C arena-test valgrind-build
+	$(MAKE) -C perf-event valgrind-build
+	$(MAKE) -C serial-capture valgrind-build
+	$(MAKE) -C syscall-tests valgrind-build
+	$(MAKE) -C snapshot valgrind-build
+
+valgrind: valgrind-build
 
 fmt:
 	$(MAKE) -C arena-test fmt

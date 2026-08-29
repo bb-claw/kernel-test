@@ -82,9 +82,24 @@ _OPT_COMMON := -Oz -g0 -flto -ffunction-sections -fdata-sections \
                -fno-asynchronous-unwind-tables -fno-unwind-tables
 else ifeq ($(OPTIMIZATION),none)
 _OPT_COMMON := -O0
+else ifeq ($(OPTIMIZATION),valgrind)
+_OPT_COMMON := -O0 -g
 else
 # speed (default)
-_OPT_COMMON := -O2
+_OPT_COMMON := -O2 -ffunction-sections -fdata-sections
+endif
+
+# Linker optimization flags, shared across all modes.
+# speed: gc-sections + print-gc-sections for dead-code removal and size feedback.
+# size/ultra: gc-sections only (sections already minimal; print is too verbose).
+ifeq ($(OPTIMIZATION),speed)
+_LOPT_COMMON := -Wl,--gc-sections -Wl,--print-gc-sections
+else ifeq ($(OPTIMIZATION),size)
+_LOPT_COMMON := -Wl,--gc-sections
+else ifeq ($(OPTIMIZATION),ultra)
+_LOPT_COMMON := -Wl,--gc-sections
+else
+_LOPT_COMMON :=
 endif
 
 # Strip flags for shipped binaries in all non-debug modes.
@@ -103,7 +118,8 @@ endif
 
 CFLAGS_COMMON ?= -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE \
     -Wno-declaration-after-statement \
-    -Wno-implicit-function-declaration
+    -Wno-implicit-function-declaration \
+    $(_LOPT_COMMON)
 
 CFLAGS_GCC ?= -Wall -Wextra -Wpedantic -Werror \
     -Wformat=2 -Wno-unused-parameter -Wshadow \
@@ -141,18 +157,19 @@ NOSTD  ?= 0
 
 _RDYNAMIC :=
 _ASAN     := -fsanitize=address,undefined
-_LOPT     :=
+_LOPT     := $(_LOPT_COMMON)
 
 ifeq ($(OPTIMIZATION),size)
 _ASAN :=
-_LOPT := -Wl,--gc-sections
 else ifeq ($(OPTIMIZATION),ultra)
 _ASAN :=
-_LOPT := -Wl,--gc-sections
 else ifeq ($(OPTIMIZATION),debug)
 _RDYNAMIC := -rdynamic
 else ifeq ($(OPTIMIZATION),none)
 _ASAN :=
+else ifeq ($(OPTIMIZATION),valgrind)
+_ASAN :=
+_RDYNAMIC := -rdynamic
 endif
 
 ifeq ($(strip $(STATIC)),1)
@@ -208,7 +225,7 @@ ifeq ($(HOST_ONLY),1)
 # ── Host-only mode ────────────────────────────────────────────────────────────
 # GCC = quality gate (not shipped); Clang = shipped binary. x86_64 only.
 
-.PHONY: all clean valgrind
+.PHONY: all clean valgrind valgrind-build
 
 all: bin/$(BIN)-gcc bin/$(BIN)
 
@@ -224,7 +241,8 @@ bin/$(BIN): $(SRC) | bin
 bin:
 	mkdir -p bin
 
-valgrind: bin/$(BIN)-valgrind
+valgrind-build: bin/$(BIN)-valgrind
+valgrind: valgrind-build
 
 bin/$(BIN)-valgrind: $(SRC) | bin
 	@printf '[$(LOG_TAG)] gcc   %s (valgrind/glibc)\n' $@
@@ -238,7 +256,7 @@ else
 # ── Cross-compiled mode ───────────────────────────────────────────────────────
 # GCC shipped for all 4 arches; Clang x86_64 quality gate (not shipped).
 
-.PHONY: all clean valgrind
+.PHONY: all clean valgrind valgrind-build
 
 all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-gcc bin/x86_64/$(BIN)-clang
 
@@ -261,7 +279,8 @@ bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
 
-valgrind: bin/x86_64/$(BIN)-valgrind
+valgrind-build: bin/x86_64/$(BIN)-valgrind
+valgrind: valgrind-build
 
 bin/x86_64/$(BIN)-valgrind: $(SRC) | bin/x86_64
 	@printf '[$(LOG_TAG)] %-6s %s (valgrind/glibc)\n' x86_64 $(BIN)

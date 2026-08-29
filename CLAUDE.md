@@ -125,3 +125,5 @@ VM tests run under Toybox sh (POSIX only). Critical pitfalls:
 @memory/test-inventory.md
 @memory/code-quality.md
 @memory/patch-workflow.md
+
+@/home/benni/.claude/RTK.md

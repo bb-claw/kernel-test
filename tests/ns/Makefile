@@ -11,7 +11,7 @@ ARCHES := x86_64 i386 arm64 riscv
 FLAGS_ONLY := 1
 include ../common.mk
 
-.PHONY: all clean valgrind
+.PHONY: all clean valgrind valgrind-build
 
 all: $(foreach a,$(ARCHES),$(foreach b,$(BINS),bin/$(a)/$(b))) \
      $(foreach b,$(BINS),bin/x86_64/$(b)-gcc) \
@@ -51,7 +51,38 @@ endef
 
 $(foreach b,$(BINS),$(eval $(call valgrind_rule,$(b))))
 
-valgrind: $(foreach b,$(BINS),bin/x86_64/$(b)-valgrind)
+valgrind-build: $(foreach b,$(BINS),bin/x86_64/$(b)-valgrind)
+
+# VG uses the shared suppression file from tests/programs/.
+# _TESTS_DIR (tests/) is set by the common.mk include above.
+VG := valgrind --error-exitcode=99 --leak-check=full --show-leak-kinds=all \
+      --errors-for-leak-kinds=all --track-origins=yes --track-fds=yes \
+      --suppressions=$(_TESTS_DIR)programs/valgrind.supp
+
+# Exit 99 = valgrind memory error → fail. Any other non-zero = EPERM/ENOSYS → skip.
+define run_ns
+	$(VG) bin/x86_64/$(1)-valgrind $(2) || { rc=$$?; [ $$rc -ne 99 ] || exit 1; }
+endef
+
+# ns-uts setns requires a live namespace path argument — skipped here.
+valgrind: valgrind-build
+	$(call run_ns,ns-uts,clone)
+	$(call run_ns,ns-ipc,clone)
+	$(call run_ns,ns-ipc,semop)
+	$(call run_ns,ns-pid,clone)
+	$(call run_ns,ns-pid,init-death)
+	$(call run_ns,ns-mount,move)
+	$(call run_ns,ns-mount,mknod)
+	$(call run_ns,ns-mount,propagate)
+	$(call run_ns,ns-mount,pivot)
+	$(call run_ns,ns-net,clone)
+	$(call run_ns,ns-net,proc-net)
+	$(call run_ns,ns-user,idmap)
+	$(call run_ns,ns-user,nested-6)
+	$(call run_ns,ns-cgroup,scoping)
+	$(call run_ns,ns-cgroup,release-agent)
+	$(call run_ns,ns-time,offset)
+	$(call run_ns,ns-time,setns-mt)
 
 clean:
 	rm -rf bin/
