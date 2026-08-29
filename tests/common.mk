@@ -25,6 +25,10 @@
 # Absolute path to this file's directory (tests/); used to locate .clang-format.
 _TESTS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
+# Prevent fmt/scan from becoming the default goal when FLAGS_ONLY=1 skips
+# the all: target inside the guard (first target wins in make).
+.DEFAULT_GOAL := all
+
 ARCHES ?= x86_64 i386 arm64 riscv
 
 CC_x86_64   ?= musl-gcc
