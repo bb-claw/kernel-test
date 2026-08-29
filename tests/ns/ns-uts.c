@@ -22,7 +22,8 @@ static int cmd_clone(void)
 {
 	unsigned long before = ns_inode("/proc/self/ns/uts");
 	if (before == 0) {
-		fprintf(stderr, "stat /proc/self/ns/uts: %s\n", strerror(errno));
+		fprintf(stderr, "stat /proc/self/ns/uts: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	if (unshare(CLONE_NEWUTS) < 0) {
@@ -31,14 +32,15 @@ static int cmd_clone(void)
 	}
 	unsigned long after = ns_inode("/proc/self/ns/uts");
 	if (before == after) {
-		fprintf(stderr, "inode unchanged after unshare (%lu)\n", before);
+		fprintf(stderr, "inode unchanged after unshare (%lu)\n",
+			before);
 		return 1;
 	}
 	if (sethostname("ns-uts-test", 11) < 0) {
 		fprintf(stderr, "sethostname: %s\n", strerror(errno));
 		return 1;
 	}
-	char buf[64] = {0};
+	char buf[64] = { 0 };
 	gethostname(buf, sizeof(buf) - 1);
 	if (strcmp(buf, "ns-uts-test") != 0) {
 		fprintf(stderr, "hostname mismatch: got '%s'\n", buf);
@@ -68,7 +70,8 @@ static int cmd_setns(const char *ns_path)
 	close(fd);
 	unsigned long got = ns_inode("/proc/self/ns/uts");
 	if (got != target) {
-		fprintf(stderr, "setns: inode mismatch target=%lu got=%lu\n", target, got);
+		fprintf(stderr, "setns: inode mismatch target=%lu got=%lu\n",
+			target, got);
 		return 1;
 	}
 	printf("setns: inode %lu matches\n", got);

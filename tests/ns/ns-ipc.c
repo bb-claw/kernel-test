@@ -24,7 +24,8 @@ static int cmd_clone(void)
 {
 	unsigned long before = ns_inode("/proc/self/ns/ipc");
 	if (before == 0) {
-		fprintf(stderr, "stat /proc/self/ns/ipc: %s\n", strerror(errno));
+		fprintf(stderr, "stat /proc/self/ns/ipc: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	if (unshare(CLONE_NEWIPC) < 0) {
@@ -33,7 +34,8 @@ static int cmd_clone(void)
 	}
 	unsigned long after = ns_inode("/proc/self/ns/ipc");
 	if (before == after) {
-		fprintf(stderr, "inode unchanged after unshare (%lu)\n", before);
+		fprintf(stderr, "inode unchanged after unshare (%lu)\n",
+			before);
 		return 1;
 	}
 	printf("clone: inode %lu->%lu ok\n", before, after);

@@ -35,13 +35,16 @@ static int cmd_move(void)
 		return 1;
 	}
 	/* Bind-mount src onto itself to create a proper mount point */
-	if (mount("/tmp/ns-move-src", "/tmp/ns-move-src", NULL, MS_BIND, NULL) < 0) {
+	if (mount("/tmp/ns-move-src", "/tmp/ns-move-src", NULL, MS_BIND, NULL) <
+	    0) {
 		fprintf(stderr, "bind mount: %s\n", strerror(errno));
 		return 1;
 	}
 	/* MS_MOVE: 5.1 regression returned EINVAL across userns boundary */
-	if (mount("/tmp/ns-move-src", "/tmp/ns-move-dst", NULL, MS_MOVE, NULL) < 0) {
-		fprintf(stderr, "MS_MOVE: %s (regression: kernel 5.1 returned EINVAL)\n",
+	if (mount("/tmp/ns-move-src", "/tmp/ns-move-dst", NULL, MS_MOVE, NULL) <
+	    0) {
+		fprintf(stderr,
+			"MS_MOVE: %s (regression: kernel 5.1 returned EINVAL)\n",
 			strerror(errno));
 		return 1;
 	}
@@ -76,13 +79,15 @@ static int cmd_mknod(void)
 	 * filesystem directories even when uid_map maps to uid 0.
 	 */
 	if (mkdir("/tmp/ns-mknod-mnt", 0755) < 0 && errno != EEXIST) {
-		fprintf(stderr, "mkdir /tmp/ns-mknod-mnt: %s\n", strerror(errno));
+		fprintf(stderr, "mkdir /tmp/ns-mknod-mnt: %s\n",
+			strerror(errno));
 		return 1;
 	}
 
 	if (unshare(CLONE_NEWUSER) < 0) {
 		if (errno == EPERM || errno == EINVAL) {
-			printf("mknod: SKIP CONFIG_USER_NS not available (%s)\n", strerror(errno));
+			printf("mknod: SKIP CONFIG_USER_NS not available (%s)\n",
+			       strerror(errno));
 			return 0;
 		}
 		fprintf(stderr, "unshare CLONE_NEWUSER: %s\n", strerror(errno));
@@ -104,7 +109,8 @@ static int cmd_mknod(void)
 		return 1;
 	}
 	/* mknod a null device — should succeed in our user-ns-owned tmpfs */
-	if (mknod("/tmp/ns-mknod-mnt/null", S_IFCHR | 0666, makedev(1, 3)) < 0) {
+	if (mknod("/tmp/ns-mknod-mnt/null", S_IFCHR | 0666, makedev(1, 3)) <
+	    0) {
 		int saved_errno = errno;
 		umount2("/tmp/ns-mknod-mnt", MNT_DETACH);
 		if (saved_errno == EPERM) {
@@ -112,7 +118,8 @@ static int cmd_mknod(void)
 			printf("mknod: SKIP mknod EPERM (CAP_MKNOD or env restriction, not SB_I_NODEV)\n");
 			return 0;
 		}
-		fprintf(stderr, "mknod: %s (regression: kernel 4.18 set SB_I_NODEV on userns mounts)\n",
+		fprintf(stderr,
+			"mknod: %s (regression: kernel 4.18 set SB_I_NODEV on userns mounts)\n",
 			strerror(saved_errno));
 		return 1;
 	}
@@ -139,20 +146,23 @@ static int cmd_propagate(void)
 		       strerror(errno));
 	}
 	/* Bind-mount a to create a shared mount point */
-	if (mount("/tmp/ns-prop-a", "/tmp/ns-prop-a", NULL, MS_BIND, NULL) < 0) {
+	if (mount("/tmp/ns-prop-a", "/tmp/ns-prop-a", NULL, MS_BIND, NULL) <
+	    0) {
 		fprintf(stderr, "bind /tmp/ns-prop-a: %s\n", strerror(errno));
 		return 1;
 	}
 	mount(NULL, "/tmp/ns-prop-a", NULL, MS_SHARED, NULL);
 	/* Bind-mount b as slave of a's group */
-	if (mount("/tmp/ns-prop-b", "/tmp/ns-prop-b", NULL, MS_BIND, NULL) < 0) {
+	if (mount("/tmp/ns-prop-b", "/tmp/ns-prop-b", NULL, MS_BIND, NULL) <
+	    0) {
 		fprintf(stderr, "bind /tmp/ns-prop-b: %s\n", strerror(errno));
 		umount2("/tmp/ns-prop-a", MNT_DETACH);
 		return 1;
 	}
 	mount(NULL, "/tmp/ns-prop-b", NULL, MS_SLAVE, NULL);
 	/* Mount something on top of the slave — CVE-2022-50280 triggered here */
-	if (mount("/tmp/ns-prop-a", "/tmp/ns-prop-b/sub", NULL, MS_BIND, NULL) < 0) {
+	if (mount("/tmp/ns-prop-a", "/tmp/ns-prop-b/sub", NULL, MS_BIND, NULL) <
+	    0) {
 		fprintf(stderr, "bind onto slave: %s\n", strerror(errno));
 		umount2("/tmp/ns-prop-b", MNT_DETACH);
 		umount2("/tmp/ns-prop-a", MNT_DETACH);
@@ -177,7 +187,8 @@ static int cmd_pivot(void)
 		return 1;
 	}
 	/* new_root must be a mount point — bind-mount it onto itself */
-	if (mount("/tmp/ns-pivot-new", "/tmp/ns-pivot-new", NULL, MS_BIND, NULL) < 0) {
+	if (mount("/tmp/ns-pivot-new", "/tmp/ns-pivot-new", NULL, MS_BIND,
+		  NULL) < 0) {
 		fprintf(stderr, "bind new root: %s\n", strerror(errno));
 		return 1;
 	}
@@ -203,10 +214,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ns-mount move|mknod|propagate|pivot\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "move"))      return cmd_move();
-	if (!strcmp(argv[1], "mknod"))     return cmd_mknod();
-	if (!strcmp(argv[1], "propagate")) return cmd_propagate();
-	if (!strcmp(argv[1], "pivot"))     return cmd_pivot();
+	if (!strcmp(argv[1], "move"))
+		return cmd_move();
+	if (!strcmp(argv[1], "mknod"))
+		return cmd_mknod();
+	if (!strcmp(argv[1], "propagate"))
+		return cmd_propagate();
+	if (!strcmp(argv[1], "pivot"))
+		return cmd_pivot();
 	fprintf(stderr, "unknown command: %s\n", argv[1]);
 	return 1;
 }

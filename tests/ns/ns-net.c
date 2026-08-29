@@ -21,7 +21,8 @@ static int cmd_clone(void)
 {
 	unsigned long before = ns_inode("/proc/self/ns/net");
 	if (before == 0) {
-		fprintf(stderr, "stat /proc/self/ns/net: %s\n", strerror(errno));
+		fprintf(stderr, "stat /proc/self/ns/net: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	if (unshare(CLONE_NEWNET) < 0) {
@@ -30,7 +31,8 @@ static int cmd_clone(void)
 	}
 	unsigned long after = ns_inode("/proc/self/ns/net");
 	if (before == after) {
-		fprintf(stderr, "inode unchanged after unshare (%lu)\n", before);
+		fprintf(stderr, "inode unchanged after unshare (%lu)\n",
+			before);
 		return 1;
 	}
 	printf("clone: inode %lu->%lu ok\n", before, after);
@@ -44,8 +46,8 @@ static int cmd_clone(void)
  * init_net interfaces leaking in.  Whitelist them so randdefconfig (which
  * forces modules off, turning =m into =y) does not produce false positives.
  */
-static const char * const perns_admin_ifaces[] = {
-	"lo:", "sit0:", "ip6tnl0:", "ip_vti0:", "ip6gre0:",
+static const char *const perns_admin_ifaces[] = {
+	"lo:",	 "sit0:",    "ip6tnl0:",    "ip_vti0:", "ip6gre0:",
 	"gre0:", "gretap0:", "ip6erspan0:", "erspan0:", NULL,
 };
 
@@ -78,16 +80,21 @@ static int cmd_proc_net(void)
 	int found_lo = 0, found_host = 0;
 	char host_iface[64] = "";
 	while (fgets(line, sizeof(line), f)) {
-		if (headers < 2) { headers++; continue; }
+		if (headers < 2) {
+			headers++;
+			continue;
+		}
 		data_lines++;
 		if (!is_perns_admin_iface(line)) {
 			found_host = 1;
 			if (!host_iface[0]) {
 				/* capture first unexpected interface name */
 				const char *p = line;
-				while (*p == ' ') p++;
+				while (*p == ' ')
+					p++;
 				int i = 0;
-				while (*p && *p != ':' && i < (int)sizeof(host_iface) - 1)
+				while (*p && *p != ':' &&
+				       i < (int)sizeof(host_iface) - 1)
 					host_iface[i++] = *p++;
 				host_iface[i] = '\0';
 			}
@@ -100,7 +107,8 @@ static int cmd_proc_net(void)
 	if (found_host) {
 		fprintf(stderr,
 			"proc-net: host interface '%s' visible in new net ns "
-			"(regression: init_net leak)\n", host_iface);
+			"(regression: init_net leak)\n",
+			host_iface);
 		return 1;
 	}
 	printf("proc-net: %d interface(s), lo=%d, no host leak ok\n",
@@ -114,8 +122,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ns-net clone|proc-net\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "clone"))    return cmd_clone();
-	if (!strcmp(argv[1], "proc-net")) return cmd_proc_net();
+	if (!strcmp(argv[1], "clone"))
+		return cmd_clone();
+	if (!strcmp(argv[1], "proc-net"))
+		return cmd_proc_net();
 	fprintf(stderr, "unknown command: %s\n", argv[1]);
 	return 1;
 }

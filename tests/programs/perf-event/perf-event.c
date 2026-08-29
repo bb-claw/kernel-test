@@ -19,44 +19,45 @@
 #define PERF_COUNT_SW_TASK_CLOCK 1ULL
 
 struct perf_event_attr {
-  uint32_t type;
-  uint32_t size;
-  uint64_t config;
-  uint8_t pad[120]; /* remaining fields unused; size field informs kernel */
+	uint32_t type;
+	uint32_t size;
+	uint64_t config;
+	uint8_t pad[120]; /* remaining fields unused; size field informs kernel */
 };
 
-int main(void) {
-  struct perf_event_attr attr;
-  uint64_t count = 0;
-  int fd;
-  volatile int i;
+int main(void)
+{
+	struct perf_event_attr attr;
+	uint64_t count = 0;
+	int fd;
+	volatile int i;
 
-  memset(&attr, 0, sizeof(attr));
-  attr.type = PERF_TYPE_SOFTWARE;
-  attr.config = PERF_COUNT_SW_TASK_CLOCK;
-  attr.size = sizeof(attr);
+	memset(&attr, 0, sizeof(attr));
+	attr.type = PERF_TYPE_SOFTWARE;
+	attr.config = PERF_COUNT_SW_TASK_CLOCK;
+	attr.size = sizeof(attr);
 
-  fd = (int)syscall(SYS_perf_event_open, &attr, 0, -1, -1, 0);
-  if (fd < 0) {
-    perror("perf_event_open");
-    return 1;
-  }
+	fd = (int)syscall(SYS_perf_event_open, &attr, 0, -1, -1, 0);
+	if (fd < 0) {
+		perror("perf_event_open");
+		return 1;
+	}
 
-  for (i = 0; i < 100000; i++) {
-  }
+	for (i = 0; i < 100000; i++) {
+	}
 
-  /* Force a scheduler pass so update_curr() commits sum_exec_runtime.
+	/* Force a scheduler pass so update_curr() commits sum_exec_runtime.
    * Without CONFIG_HIGH_RES_TIMERS, task accounting only updates on ticks
    * (HZ=250 → 4 ms); the loop finishes in <1 ms and TASK_CLOCK reads 0. */
-  sched_yield();
+	sched_yield();
 
-  if (read(fd, &count, sizeof(count)) != (ssize_t)sizeof(count)) {
-    perror("read");
-    close(fd);
-    return 1;
-  }
-  close(fd);
+	if (read(fd, &count, sizeof(count)) != (ssize_t)sizeof(count)) {
+		perror("read");
+		close(fd);
+		return 1;
+	}
+	close(fd);
 
-  printf("%llu\n", (unsigned long long)count);
-  return count > 0 ? 0 : 1;
+	printf("%llu\n", (unsigned long long)count);
+	return count > 0 ? 0 : 1;
 }
