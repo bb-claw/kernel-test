@@ -118,8 +118,7 @@ endif
 
 CFLAGS_COMMON ?= -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE \
     -Wno-declaration-after-statement \
-    -Wno-implicit-function-declaration \
-    $(_LOPT_COMMON)
+    -Wno-implicit-function-declaration
 
 CFLAGS_GCC ?= -Wall -Wextra -Wpedantic -Werror \
     -Wformat=2 -Wno-unused-parameter -Wshadow \
@@ -231,11 +230,11 @@ all: bin/$(BIN)-gcc bin/$(BIN)
 
 bin/$(BIN)-gcc: $(SRC) | bin
 	@printf '[$(LOG_TAG)] gcc   %s\n' $@
-	$(CC_GCC) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) -static -o $@ $<
+	$(CC_GCC) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
 
 bin/$(BIN): $(SRC) | bin
 	@printf '[$(LOG_TAG)] clang %s\n' $@
-	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) -static -o $@ $<
+	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
 	$(if $(_STRIP_FLAGS),$(STRIP_x86_64) $(_STRIP_FLAGS) $@)
 
 bin:
@@ -263,7 +262,7 @@ all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-gcc bin/x86_64/$(B
 define build_rule
 bin/$(1)/$(BIN): $(SRC) | bin/$(1)
 	@printf '[$(LOG_TAG)] %-6s %s\n' $(1) $(BIN)
-	$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) -o $$@ $$<
+	$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
 	$(if $(_STRIP_FLAGS),$(STRIP_$(1)) $(_STRIP_FLAGS) $$@)
 endef
 
@@ -271,11 +270,11 @@ $(foreach a,$(ARCHES),$(eval $(call build_rule,$(a))))
 
 bin/x86_64/$(BIN)-gcc: $(SRC) | bin/x86_64
 	@printf '[$(LOG_TAG)] %-6s %s (gcc quality gate)\n' x86_64 $(BIN)
-	$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) -o $@ $<
+	$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
 bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
 	@printf '[$(LOG_TAG)] %-6s %s (clang quality gate)\n' x86_64 $(BIN)
-	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) -o $@ $<
+	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
 
