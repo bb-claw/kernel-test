@@ -1,7 +1,7 @@
 # Cross-compile ns-* test binaries for all 4 kernel-test arches.
 # Called unconditionally by lib/bootstrap.sh so binaries are always available.
 # Output: bin/<arch>/ns-{uts,ipc,pid,mount,net,user,cgroup,time}
-# Quality: same C17 + extended warning set + Clang gate as tests/programs/.
+# Quality: same C17 + extended warning set + GCC + Clang gates as tests/programs/.
 
 SRCS  := ns-uts.c ns-ipc.c ns-pid.c ns-mount.c ns-net.c ns-user.c ns-cgroup.c ns-time.c
 BINS  := $(SRCS:%.c=%)
@@ -14,6 +14,7 @@ include ../common.mk
 .PHONY: all clean valgrind
 
 all: $(foreach a,$(ARCHES),$(foreach b,$(BINS),bin/$(a)/$(b))) \
+     $(foreach b,$(BINS),bin/x86_64/$(b)-gcc) \
      $(foreach b,$(BINS),bin/x86_64/$(b)-clang)
 
 define build_rule
@@ -23,6 +24,14 @@ bin/$(1)/$(2): $(2).c | bin/$(1)
 endef
 
 $(foreach a,$(ARCHES),$(foreach b,$(BINS),$(eval $(call build_rule,$(a),$(b)))))
+
+define build_rule_gcc
+bin/x86_64/$(1)-gcc: $(1).c | bin/x86_64
+	@printf '[ns]  %-6s %s (gcc quality gate)\n' x86_64 $(1)
+	$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) -o $$@ $$<
+endef
+
+$(foreach b,$(BINS),$(eval $(call build_rule_gcc,$(b))))
 
 define build_rule_clang
 bin/x86_64/$(1)-clang: $(1).c | bin/x86_64
