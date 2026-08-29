@@ -1,17 +1,17 @@
 /* ns-time: time namespace regression tests.
  * Subcommands:
  *   offset    — unshare CLONE_NEWTIME, set CLOCK_MONOTONIC offset, verify
- *   setns-mt  — create a kernel thread, then setns into time ns; must EINVAL
+ *   setns-mt  — create a pthread, then setns into time ns; must EINVAL
  *               (CVE-2023-23586: io_uring workers bypassed current_is_single_threaded())
  */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -98,14 +98,11 @@ static int cmd_offset(void)
 	return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 }
 
-/* Thread stack for clone()-based thread */
-static char thread_stack[4096 * 4];
-
-static int thread_fn(void *arg)
+static void *thread_pause(void *arg)
 {
 	(void)arg;
 	pause();
-	return 0;
+	return NULL;
 }
 
 static int cmd_setns_mt(void)
@@ -118,9 +115,9 @@ static int cmd_setns_mt(void)
 	 * Note: unshare(CLONE_NEWTIME) is NOT restricted to single-threaded
 	 * processes; only setns(CLONE_NEWTIME) enforces this check.
 	 *
-	 * Test: open a foreign time namespace fd, create a CLONE_THREAD thread
-	 * (multi-threaded process), then call setns(fd, CLONE_NEWTIME) — must
-	 * return EINVAL.
+	 * Test: open a foreign time namespace fd, create a pthread (making the
+	 * process multi-threaded), then call setns(fd, CLONE_NEWTIME) — must
+	 * return EINVAL/EUSERS.
 	 */
 
 	/* Step 1: fork a child that creates a new time namespace to use as target */
@@ -177,14 +174,14 @@ static int cmd_setns_mt(void)
 		return 1;
 	}
 
-	/* Step 3: create a CLONE_THREAD thread — makes us multi-threaded */
-	pid_t tid = clone(thread_fn, thread_stack + sizeof(thread_stack),
-			  CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND |
-				  CLONE_THREAD | CLONE_SYSVSEM,
-			  NULL);
-	if (tid < 0) {
-		fprintf(stderr, "setns-mt: clone thread: %s\n",
-			strerror(errno));
+	/* Step 3: create a POSIX thread — makes us multi-threaded.
+	 * Use pthread_create, not clone(CLONE_THREAD): musl's clone() wrapper
+	 * rejects CLONE_THREAD (returns EINVAL) to reserve it for pthreads.
+	 */
+	pthread_t thread;
+	int pr = pthread_create(&thread, NULL, thread_pause, NULL);
+	if (pr != 0) {
+		fprintf(stderr, "setns-mt: pthread_create: %s\n", strerror(pr));
 		close(ns_fd);
 		write(sync_to[1], "x", 1);
 		close(sync_to[1]);
@@ -193,8 +190,9 @@ static int cmd_setns_mt(void)
 		return 1;
 	}
 
-	if (syscall(SYS_tgkill, getpid(), tid, 0) < 0) {
+	if (pthread_kill(thread, 0) != 0) {
 		printf("setns-mt: SKIP thread exited before setns test (OOM or race)\n");
+		pthread_join(thread, NULL);
 		close(ns_fd);
 		write(sync_to[1], "x", 1);
 		close(sync_to[1]);
@@ -207,15 +205,14 @@ static int cmd_setns_mt(void)
 	int ret = setns(ns_fd, CLONE_NEWTIME);
 	int saved_errno = errno;
 
-	int thread_alive = (syscall(SYS_tgkill, getpid(), tid, 0) == 0);
+	int thread_alive = (pthread_kill(thread, 0) == 0);
 
 	close(ns_fd);
 
 	/*
-	 * Print result before _exit().  The CLONE_THREAD thread shares our
-	 * process and is killed when we call _exit() — do NOT kill it with
-	 * SIGKILL first, as that also kills the calling thread before output
-	 * can be flushed.
+	 * Print result before _exit().  The pthread shares our process and is
+	 * killed when we call _exit() — do NOT kill it with SIGKILL first, as
+	 * that also kills the calling thread before output can be flushed.
 	 */
 	int exit_code;
 	if (ret == 0) {
@@ -250,7 +247,7 @@ static int cmd_setns_mt(void)
 	close(sync_to[1]);
 	int st;
 	waitpid(ns_child, &st, 0);
-	/* _exit terminates the CLONE_THREAD thread too */
+	/* _exit terminates all threads including the pthread */
 	_exit(exit_code);
 }
 
