@@ -139,8 +139,8 @@ scan:
 	clang --analyze -Xanalyzer -analyzer-output=text \
 	    $(CFLAGS_COMMON) -Werror -o /dev/null $(SRC)
 
+endif  # FLAGS_ONLY
+
 .PHONY: fmt
 fmt:
-	clang-format --style=file:$(_TESTS_DIR).clang-format -i $(SRC)
-
-endif  # FLAGS_ONLY
+	clang-format --style=file:$(_TESTS_DIR).clang-format -i $(SRC) $(SRCS)
