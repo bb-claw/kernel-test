@@ -1,4 +1,4 @@
-# tests/programs/common.mk — shared C program build rules
+# tests/common.mk — shared C program build rules
 #
 # Required (set before including):
 #   SRC  := my-program.c
@@ -21,6 +21,9 @@
 #   FLAGS_ONLY=1 variables only — no build rules (for multi-binary Makefiles)
 #
 # Targets: all  clean  valgrind  scan
+
+# Absolute path to this file's directory (tests/); used to locate .clang-format.
+_TESTS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 ARCHES ?= x86_64 i386 arm64 riscv
 
@@ -138,6 +141,6 @@ scan:
 
 .PHONY: fmt
 fmt:
-	clang-format --style=file -i $(SRC)
+	clang-format --style=file:$(_TESTS_DIR).clang-format -i $(SRC)
 
 endif  # FLAGS_ONLY
