@@ -5,4 +5,4 @@ SRC       := serial-capture.c
 BIN       := serial-capture
 HOST_ONLY := 1
 
-include ../common.mk
+include ../../common.mk

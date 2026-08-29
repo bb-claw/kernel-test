@@ -33,7 +33,7 @@ fi
 # each per-program Makefile must include common.mk to inherit them.
 
 begin_test "vg-makefile-targets"
-common_mk="$PROGS_DIR/common.mk"
+common_mk="$REPO/tests/common.mk"
 if [[ ! -f "$common_mk" ]]; then
     fail "common.mk missing"
 else

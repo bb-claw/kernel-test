@@ -7,12 +7,12 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 . "$REPO/tests/ci/lib.sh"
 
 PROG_DIR="$REPO/tests/programs"
-COMMON_MK="$PROG_DIR/common.mk"
+COMMON_MK="$REPO/tests/common.mk"
 
 # ── common.mk exists and has canonical content ────────────────────────────────
 
 begin_test "programs-common-mk-present"
-assert_file_exists "$COMMON_MK" "tests/programs/common.mk present"
+assert_file_exists "$COMMON_MK" "tests/common.mk present"
 cm=$(cat "$COMMON_MK")
 assert_contains "$cm" "-std=c17"                   "CFLAGS_COMMON uses C17"
 assert_contains "$cm" "CFLAGS_GCC ?="              "CFLAGS_GCC defined"
@@ -31,7 +31,7 @@ for prog in arena-test perf-event serial-capture snapshot syscall-tests; do
     mk_path="$PROG_DIR/$prog/Makefile"
     assert_file_exists "$mk_path" "$prog/Makefile present"
     mk=$(cat "$mk_path")
-    assert_contains "$mk" "include ../common.mk" "$prog/Makefile includes common.mk"
+    assert_contains "$mk" "include ../../common.mk" "$prog/Makefile includes common.mk"
     assert_contains "$mk" "SRC" "$prog/Makefile declares SRC"
     assert_contains "$mk" "BIN" "$prog/Makefile declares BIN"
 done
@@ -54,7 +54,7 @@ assert_contains "$at_mk" "CFLAGS_arm64_EXTRA" "arena-test sets arm64 extra flags
 
 begin_test "programs-ns-makefile"
 ns_mk=$(cat "$REPO/tests/ns/Makefile")
-assert_contains "$ns_mk" "include ../programs/common.mk" "ns/Makefile includes common.mk"
+assert_contains "$ns_mk" "include ../common.mk" "ns/Makefile includes common.mk"
 assert_contains "$ns_mk" "FLAGS_ONLY" "ns/Makefile sets FLAGS_ONLY"
 
 # ── Compile check (skipped when compilers absent) ─────────────────────────────

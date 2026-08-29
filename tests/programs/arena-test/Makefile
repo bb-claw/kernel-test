@@ -18,4 +18,4 @@ CFLAGS_x86_64_EXTRA := -nostdlib \
 CFLAGS_arm64_EXTRA := -Wno-pointer-to-int-cast
 CFLAGS_riscv_EXTRA := -Wno-pointer-to-int-cast
 
-include ../common.mk
+include ../../common.mk

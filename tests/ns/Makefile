@@ -9,7 +9,7 @@ ARCHES := x86_64 i386 arm64 riscv
 
 # Import shared compiler + flag variables; no build rules (multi-binary layout).
 FLAGS_ONLY := 1
-include ../programs/common.mk
+include ../common.mk
 
 .PHONY: all clean
 

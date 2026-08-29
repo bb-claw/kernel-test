@@ -5,4 +5,4 @@ SRC     := perf-event.c
 BIN     := perf-event
 LOG_TAG := perf
 
-include ../common.mk
+include ../../common.mk

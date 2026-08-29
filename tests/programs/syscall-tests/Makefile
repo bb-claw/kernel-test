@@ -12,4 +12,4 @@ CFLAGS_CLANG_EXTRA := -Wno-cast-align -Wno-shorten-64-to-32 -Wno-sign-conversion
 CFLAGS_arm64_EXTRA := -Wno-pointer-to-int-cast
 CFLAGS_riscv_EXTRA := -Wno-pointer-to-int-cast
 
-include ../common.mk
+include ../../common.mk

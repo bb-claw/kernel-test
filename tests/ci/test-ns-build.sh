@@ -24,7 +24,7 @@ mk=$(cat "$NS_DIR/Makefile")
 assert_contains "$mk" "ns-uts.c ns-ipc.c ns-pid.c ns-mount.c" "SRCS line (uts/ipc/pid/mount)"
 assert_contains "$mk" "ns-net.c ns-user.c ns-cgroup.c ns-time.c" "SRCS line (net/user/cgroup/time)"
 assert_contains "$mk" "x86_64 i386 arm64 riscv" "ARCHES line"
-assert_contains "$mk" "include ../programs/common.mk" "includes shared common.mk"
+assert_contains "$mk" "include ../common.mk" "includes shared common.mk"
 assert_contains "$mk" "FLAGS_ONLY" "FLAGS_ONLY set (compiler vars from common.mk)"
 
 # ── C source subcommand coverage ──────────────────────────────────────────────

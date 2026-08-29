@@ -46,7 +46,7 @@ tests/ns/bin/
 tests/programs/snapshot/bin/
 
 # clang-format local copy (LLVM style) in snapshot dir — not the kernel style
-tests/programs/snapshot/.clang-format-llvm
+tests/.clang-format-llvm
 
 # Scratch / ad-hoc development directory
 OLD/
