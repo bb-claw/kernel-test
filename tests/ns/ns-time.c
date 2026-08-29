@@ -146,11 +146,15 @@ static int cmd_setns_mt(void)
 		close(sync_from[0]);
 		if (unshare(CLONE_NEWTIME) < 0) {
 			write(sync_from[1], "E", 1);
+			close(sync_from[1]);
+			close(sync_to[0]);
 			_exit(1);
 		}
 		write(sync_from[1], "R", 1); /* ready */
+		close(sync_from[1]);
 		char c;
 		read(sync_to[0], &c, 1); /* wait for parent to finish */
+		close(sync_to[0]);
 		_exit(0);
 	}
 	close(sync_to[0]);
@@ -163,8 +167,7 @@ static int cmd_setns_mt(void)
 
 	if (ns_status != 'R') {
 		printf("setns-mt: SKIP child unshare(CLONE_NEWTIME) failed\n");
-		write(sync_to[1], "x", 1);
-		close(sync_to[1]);
+		close(sync_to[1]); /* child already exited; writing would SIGPIPE */
 		int st;
 		waitpid(ns_child, &st, 0);
 		return 0;
