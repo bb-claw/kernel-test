@@ -1,7 +1,7 @@
 # Top-level convenience target: build all test programs.
 # Calls each program's own Makefile; used by tests/ci/test-*.sh and locally.
 
-.PHONY: all clean arena-test perf-event serial-capture syscall-tests snapshot
+.PHONY: all clean fmt arena-test perf-event serial-capture syscall-tests snapshot
 
 all: arena-test perf-event serial-capture syscall-tests snapshot
 
@@ -26,3 +26,10 @@ clean:
 	$(MAKE) -C serial-capture clean
 	$(MAKE) -C syscall-tests clean
 	$(MAKE) -C snapshot clean
+
+fmt:
+	$(MAKE) -C arena-test fmt
+	$(MAKE) -C perf-event fmt
+	$(MAKE) -C serial-capture fmt
+	$(MAKE) -C syscall-tests fmt
+	$(MAKE) -C snapshot fmt
