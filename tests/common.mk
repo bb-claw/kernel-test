@@ -15,7 +15,7 @@
 #   CFLAGS_riscv_EXTRA  :=                (e.g. -Wno-pointer-to-int-cast)
 #   CFLAGS_i386_EXTRA   :=
 #   LOG_TAG             := $(BIN)         (build log prefix)
-#   OPTIMIZATION        := speed|size|debug|ultra|none  (default: speed; EMULATOR=1 default: debug)
+#   OPTIMIZATION        := speed|size|debug|ultra|none|valgrind  (default: speed; EMULATOR=1 default: debug)
 #
 # Modes (set before including):
 #   (default)    cross-compiled: 4 arches + Clang x86_64 quality gate
@@ -23,9 +23,9 @@
 #   FLAGS_ONLY=1 variables only — no build rules (for multi-binary Makefiles)
 #   EMULATOR=1   host clang build with ASAN/UBSAN; provides CC RM MD
 #                CFLAGS_OBJ CFLAGS_EXE (combine with FLAGS_ONLY=1)
-#                Knobs: OPTIMIZATION=speed|size|debug|ultra|none  STATIC=1  NOSTD=1
+#                Knobs: OPTIMIZATION=speed|size|debug|ultra|none|valgrind  STATIC=1  NOSTD=1
 #
-# Targets: all  clean  valgrind  scan
+# Targets: all  clean  valgrind-build  valgrind  scan
 
 # Absolute path to this file's directory (tests/); used to locate .clang-format.
 _TESTS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
