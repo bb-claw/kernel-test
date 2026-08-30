@@ -24,9 +24,8 @@ mk=$(cat "$NS_DIR/Makefile")
 assert_contains "$mk" "ns-uts.c ns-ipc.c ns-pid.c ns-mount.c" "SRCS line (uts/ipc/pid/mount)"
 assert_contains "$mk" "ns-net.c ns-user.c ns-cgroup.c ns-time.c" "SRCS line (net/user/cgroup/time)"
 assert_contains "$mk" "x86_64 i386 arm64 riscv" "ARCHES line"
-assert_contains "$mk" "CC_arm64" "arm64 compiler defined"
-assert_contains "$mk" "CC_riscv" "riscv compiler defined"
-assert_contains "$mk" "-static"  "static linking flag present"
+assert_contains "$mk" "include ../common.mk" "includes shared common.mk"
+assert_contains "$mk" "FLAGS_ONLY" "FLAGS_ONLY set (compiler vars from common.mk)"
 
 # ── C source subcommand coverage ──────────────────────────────────────────────
 
@@ -56,8 +55,8 @@ assert_contains "$user_src" "CVE-2018-18955" "CVE-2018-18955 comment present"
 # ── Optional: build x86_64 binaries when gcc is available ────────────────────
 
 begin_test "ns-x86_64-build"
-if ! command -v gcc &>/dev/null; then
-    pass "skip: gcc not available — skipping binary build"
+if ! command -v musl-gcc &>/dev/null; then
+    pass "skip: musl-gcc not available — skipping binary build"
 else
     # Build only x86_64 to stay fast; cross-compilers may not be present in CI
     if make -C "$NS_DIR" \

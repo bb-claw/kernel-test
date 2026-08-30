@@ -46,7 +46,7 @@ tests/ns/bin/
 tests/programs/snapshot/bin/
 
 # clang-format local copy (LLVM style) in snapshot dir — not the kernel style
-tests/programs/snapshot/.clang-format-llvm
+tests/.clang-format-llvm
 
 # Scratch / ad-hoc development directory
 OLD/
@@ -61,6 +61,9 @@ modules/*/Module.symvers
 modules/*/modules.order
 modules/*/.*.cmd
 modules/*/.module-common.o
+
+# clangd / compiler-explorer tool output
+compiler-options.json
 
 # Scratch / ad-hoc output files
 *.out

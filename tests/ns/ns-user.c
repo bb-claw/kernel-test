@@ -53,7 +53,8 @@ static int cmd_idmap(void)
 
 	if (unshare(CLONE_NEWUSER) < 0) {
 		if (errno == EPERM || errno == EINVAL) {
-			printf("idmap: SKIP CONFIG_USER_NS not available (%s)\n", strerror(errno));
+			printf("idmap: SKIP CONFIG_USER_NS not available (%s)\n",
+			       strerror(errno));
 			return 0;
 		}
 		fprintf(stderr, "unshare CLONE_NEWUSER: %s\n", strerror(errno));
@@ -74,13 +75,15 @@ static int cmd_idmap(void)
 	while (fgets(line, sizeof(line), f)) {
 		unsigned ns_id, host_id, count;
 		if (sscanf(line, "%u %u %u", &ns_id, &host_id, &count) == 3) {
-			if (ns_id == 0 && host_id == (unsigned)uid && count == 1)
+			if (ns_id == 0 && host_id == (unsigned)uid &&
+			    count == 1)
 				found = 1;
 		}
 	}
 	fclose(f);
 	if (!found) {
-		fprintf(stderr, "idmap: expected '0 %u 1' in uid_map\n", (unsigned)uid);
+		fprintf(stderr, "idmap: expected '0 %u 1' in uid_map\n",
+			(unsigned)uid);
 		return 1;
 	}
 	printf("idmap: uid_map written and verified ok\n");
@@ -103,15 +106,26 @@ static int cmd_nested_6(void)
 	uid_t uid = getuid();
 	gid_t gid = getgid();
 	int to_child[2], from_child[2];
+	ssize_t r;
 
-	if (pipe(to_child) < 0 || pipe(from_child) < 0) {
+	if (pipe(to_child) < 0) {
 		fprintf(stderr, "nested-6: pipe: %s\n", strerror(errno));
+		return 1;
+	}
+	if (pipe(from_child) < 0) {
+		fprintf(stderr, "nested-6: pipe: %s\n", strerror(errno));
+		close(to_child[0]);
+		close(to_child[1]);
 		return 1;
 	}
 
 	pid_t child = fork();
 	if (child < 0) {
 		fprintf(stderr, "nested-6: fork: %s\n", strerror(errno));
+		close(to_child[0]);
+		close(to_child[1]);
+		close(from_child[0]);
+		close(from_child[1]);
 		return 1;
 	}
 
@@ -120,14 +134,19 @@ static int cmd_nested_6(void)
 		close(from_child[0]);
 
 		if (unshare(CLONE_NEWUSER) < 0) {
-			char c = (errno == EPERM || errno == EINVAL) ? 'S' : 'E';
-			write(from_child[1], &c, 1);
+			char c = (errno == EPERM || errno == EINVAL) ? 'S' :
+								       'E';
+			r = write(from_child[1], &c, 1);
+			(void)r;
 			_exit(1);
 		}
-		write(from_child[1], "R", 1);  /* ready: uid_map not yet written */
+		r = write(from_child[1], "R",
+			  1); /* ready: uid_map not yet written */
+		(void)r;
 		/* Wait for parent to write uid_map, then exit */
 		char c;
-		read(to_child[0], &c, 1);
+		r = read(to_child[0], &c, 1);
+		(void)r;
 		close(to_child[0]);
 		close(from_child[1]);
 		_exit(0);
@@ -144,16 +163,20 @@ static int cmd_nested_6(void)
 
 	if (status == 'S') {
 		printf("nested-6: SKIP CONFIG_USER_NS not available\n");
-		write(to_child[1], "x", 1);
+		r = write(to_child[1], "x", 1);
+		(void)r;
 		close(to_child[1]);
-		int st; waitpid(child, &st, 0);
+		int st;
+		waitpid(child, &st, 0);
 		return 0;
 	}
 	if (status != 'R') {
 		fprintf(stderr, "nested-6: child unshare failed\n");
-		write(to_child[1], "x", 1);
+		r = write(to_child[1], "x", 1);
+		(void)r;
 		close(to_child[1]);
-		int st; waitpid(child, &st, 0);
+		int st;
+		waitpid(child, &st, 0);
 		return 1;
 	}
 
@@ -168,28 +191,33 @@ static int cmd_nested_6(void)
 	write_file(path, "deny");
 
 	snprintf(buf, sizeof(buf),
-		"0 %u 1\n1 %u 1\n2 %u 1\n3 %u 1\n4 %u 1\n5 %u 1\n",
-		(unsigned)uid,     (unsigned)uid + 1, (unsigned)uid + 2,
-		(unsigned)uid + 3, (unsigned)uid + 4, (unsigned)uid + 5);
+		 "0 %u 1\n1 %u 1\n2 %u 1\n3 %u 1\n4 %u 1\n5 %u 1\n",
+		 (unsigned)uid, (unsigned)uid + 1, (unsigned)uid + 2,
+		 (unsigned)uid + 3, (unsigned)uid + 4, (unsigned)uid + 5);
 	snprintf(path, sizeof(path), "/proc/%d/uid_map", (int)child);
 	int uid_ok = (write_file(path, buf) == 0);
 	int saved = errno;
 
 	snprintf(buf, sizeof(buf),
-		"0 %u 1\n1 %u 1\n2 %u 1\n3 %u 1\n4 %u 1\n5 %u 1\n",
-		(unsigned)gid,     (unsigned)gid + 1, (unsigned)gid + 2,
-		(unsigned)gid + 3, (unsigned)gid + 4, (unsigned)gid + 5);
+		 "0 %u 1\n1 %u 1\n2 %u 1\n3 %u 1\n4 %u 1\n5 %u 1\n",
+		 (unsigned)gid, (unsigned)gid + 1, (unsigned)gid + 2,
+		 (unsigned)gid + 3, (unsigned)gid + 4, (unsigned)gid + 5);
 	snprintf(path, sizeof(path), "/proc/%d/gid_map", (int)child);
-	write_file(path, buf);  /* gid_map failure is non-fatal for the CVE test */
+	write_file(path,
+		   buf); /* gid_map failure is non-fatal for the CVE test */
 
-	write(to_child[1], "x", 1);
+	r = write(to_child[1], "x", 1);
+	(void)r;
 	close(to_child[1]);
 
-	int st; waitpid(child, &st, 0);
+	int st;
+	waitpid(child, &st, 0);
 
 	if (!uid_ok) {
-		fprintf(stderr, "nested-6: uid_map 6-range write failed: %s "
-			"(regression: CVE-2018-18955)\n", strerror(saved));
+		fprintf(stderr,
+			"nested-6: uid_map 6-range write failed: %s "
+			"(regression: CVE-2018-18955)\n",
+			strerror(saved));
 		return 1;
 	}
 	printf("nested-6: 6-range uid_map accepted ok\n");
@@ -202,8 +230,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ns-user idmap|nested-6\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "idmap"))    return cmd_idmap();
-	if (!strcmp(argv[1], "nested-6")) return cmd_nested_6();
+	if (!strcmp(argv[1], "idmap"))
+		return cmd_idmap();
+	if (!strcmp(argv[1], "nested-6"))
+		return cmd_nested_6();
 	fprintf(stderr, "unknown command: %s\n", argv[1]);
 	return 1;
 }

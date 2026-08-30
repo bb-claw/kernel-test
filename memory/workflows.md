@@ -139,7 +139,7 @@ make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagno
 ```sh
 make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=clang] [CLEAN=1]
 make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host kernel
-make valgrind                                   # run all C programs under Valgrind (local only; logs in valgrind/)
+make valgrind                                   # build + run all C programs AND ns-* subcommands under Valgrind; EPERM→skip, exit 99→fail
 ```
 
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.

@@ -45,7 +45,8 @@ static int cmd_release_agent(void)
 	 */
 	if (unshare(CLONE_NEWUSER) < 0) {
 		if (errno == EPERM || errno == EINVAL) {
-			printf("release-agent: SKIP user ns not available (%s)\n", strerror(errno));
+			printf("release-agent: SKIP user ns not available (%s)\n",
+			       strerror(errno));
 			return 0;
 		}
 		fprintf(stderr, "unshare CLONE_NEWUSER: %s\n", strerror(errno));
@@ -61,7 +62,8 @@ static int cmd_release_agent(void)
 		return 1;
 	}
 	if (unshare(CLONE_NEWCGROUP) < 0) {
-		fprintf(stderr, "unshare CLONE_NEWCGROUP: %s\n", strerror(errno));
+		fprintf(stderr, "unshare CLONE_NEWCGROUP: %s\n",
+			strerror(errno));
 		return 1;
 	}
 
@@ -119,13 +121,15 @@ static int cmd_scoping(void)
 	 * Check that the cgroup.controllers file is present and accessible.
 	 */
 	if (unshare(CLONE_NEWCGROUP) < 0) {
-		fprintf(stderr, "unshare CLONE_NEWCGROUP: %s\n", strerror(errno));
+		fprintf(stderr, "unshare CLONE_NEWCGROUP: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	/* cgroup ns inode must have changed */
 	struct stat st;
 	if (stat("/proc/self/ns/cgroup", &st) < 0) {
-		fprintf(stderr, "stat /proc/self/ns/cgroup: %s\n", strerror(errno));
+		fprintf(stderr, "stat /proc/self/ns/cgroup: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	/* Verify /sys/fs/cgroup is accessible (implies ns remapping is in place) */
@@ -149,8 +153,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ns-cgroup release-agent|scoping\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "release-agent")) return cmd_release_agent();
-	if (!strcmp(argv[1], "scoping"))       return cmd_scoping();
+	if (!strcmp(argv[1], "release-agent"))
+		return cmd_release_agent();
+	if (!strcmp(argv[1], "scoping"))
+		return cmd_scoping();
 	fprintf(stderr, "unknown command: %s\n", argv[1]);
 	return 1;
 }

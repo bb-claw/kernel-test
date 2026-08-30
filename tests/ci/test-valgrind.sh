@@ -29,19 +29,28 @@ else
 fi
 
 # ── Makefile targets present ──────────────────────────────────────────────────
+# scan/valgrind targets and CFLAGS_VALGRIND_FLAGS live in common.mk (shared);
+# each per-program Makefile must include common.mk to inherit them.
 
 begin_test "vg-makefile-targets"
+common_mk="$REPO/tests/common.mk"
+if [[ ! -f "$common_mk" ]]; then
+    fail "common.mk missing"
+else
+    if grep -q '^scan:'             "$common_mk"; then pass "common.mk: scan target present"
+    else fail "common.mk: scan target missing"; fi
+    if grep -q '^valgrind:'        "$common_mk"; then pass "common.mk: valgrind target present"
+    else fail "common.mk: valgrind target missing"; fi
+    if grep -q '\-fanalyzer'       "$common_mk"; then pass "common.mk: -fanalyzer in CFLAGS_VALGRIND_FLAGS"
+    else fail "common.mk: -fanalyzer missing from CFLAGS_VALGRIND_FLAGS"; fi
+fi
 for prog in "${PROGS[@]}"; do
     mk="$PROGS_DIR/$prog/Makefile"
     if [[ ! -f "$mk" ]]; then
         fail "$prog: Makefile missing"; continue
     fi
-    if grep -q '^scan:'     "$mk"; then pass "$prog: scan target present"
-    else fail "$prog: scan target missing"; fi
-    if grep -q '^valgrind:' "$mk"; then pass "$prog: valgrind target present"
-    else fail "$prog: valgrind target missing"; fi
-    if grep -q '\-fanalyzer' "$mk"; then pass "$prog: -fanalyzer in CFLAGS_VALGRIND"
-    else fail "$prog: -fanalyzer missing from CFLAGS_VALGRIND"; fi
+    if grep -q 'include.*common\.mk' "$mk"; then pass "$prog: includes common.mk"
+    else fail "$prog: does not include common.mk"; fi
 done
 
 # ── Valgrind build (glibc/static, x86_64; requires gcc) ──────────────────────

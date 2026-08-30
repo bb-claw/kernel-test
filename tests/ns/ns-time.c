@@ -1,17 +1,17 @@
 /* ns-time: time namespace regression tests.
  * Subcommands:
  *   offset    — unshare CLONE_NEWTIME, set CLOCK_MONOTONIC offset, verify
- *   setns-mt  — create a kernel thread, then setns into time ns; must EINVAL
+ *   setns-mt  — create a pthread, then setns into time ns; must EINVAL
  *               (CVE-2023-23586: io_uring workers bypassed current_is_single_threaded())
  */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -40,7 +40,8 @@ static int cmd_offset(void)
 	/* Verify timens_offsets is readable and starts at zero */
 	FILE *f = fopen("/proc/self/timens_offsets", "r");
 	if (!f) {
-		fprintf(stderr, "/proc/self/timens_offsets: %s\n", strerror(errno));
+		fprintf(stderr, "/proc/self/timens_offsets: %s\n",
+			strerror(errno));
 		return 1;
 	}
 	char line[128];
@@ -50,13 +51,15 @@ static int cmd_offset(void)
 		long long sec;
 		unsigned nsec;
 		if (sscanf(line, "%31s %lld %u", clock, &sec, &nsec) == 3) {
-			if (!strcmp(clock, "monotonic") && sec == 0 && nsec == 0)
+			if (!strcmp(clock, "monotonic") && sec == 0 &&
+			    nsec == 0)
 				found_monotonic = 1;
 		}
 	}
 	fclose(f);
 	if (!found_monotonic) {
-		fprintf(stderr, "offset: timens_offsets missing 'monotonic 0 0' baseline\n");
+		fprintf(stderr,
+			"offset: timens_offsets missing 'monotonic 0 0' baseline\n");
 		return 1;
 	}
 
@@ -81,7 +84,8 @@ static int cmd_offset(void)
 			_exit(1);
 		/* With a +100s offset the time must be at least 100 seconds */
 		if (ts.tv_sec < 100) {
-			fprintf(stderr, "offset: CLOCK_MONOTONIC=%lld expected >=100\n",
+			fprintf(stderr,
+				"offset: CLOCK_MONOTONIC=%lld expected >=100\n",
 				(long long)ts.tv_sec);
 			_exit(1);
 		}
@@ -94,14 +98,11 @@ static int cmd_offset(void)
 	return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 }
 
-/* Thread stack for clone()-based thread */
-static char _thread_stack[4096 * 4];
-
-static int thread_fn(void *arg)
+static void *thread_pause(void *arg)
 {
 	(void)arg;
 	pause();
-	return 0;
+	return NULL;
 }
 
 static int cmd_setns_mt(void)
@@ -114,32 +115,50 @@ static int cmd_setns_mt(void)
 	 * Note: unshare(CLONE_NEWTIME) is NOT restricted to single-threaded
 	 * processes; only setns(CLONE_NEWTIME) enforces this check.
 	 *
-	 * Test: open a foreign time namespace fd, create a CLONE_THREAD thread
-	 * (multi-threaded process), then call setns(fd, CLONE_NEWTIME) — must
-	 * return EINVAL.
+	 * Test: open a foreign time namespace fd, create a pthread (making the
+	 * process multi-threaded), then call setns(fd, CLONE_NEWTIME) — must
+	 * return EINVAL/EUSERS.
 	 */
 
 	/* Step 1: fork a child that creates a new time namespace to use as target */
 	int sync_to[2], sync_from[2];
-	if (pipe(sync_to) < 0 || pipe(sync_from) < 0) {
+	ssize_t r;
+	if (pipe(sync_to) < 0) {
 		fprintf(stderr, "setns-mt: pipe: %s\n", strerror(errno));
+		return 1;
+	}
+	if (pipe(sync_from) < 0) {
+		fprintf(stderr, "setns-mt: pipe: %s\n", strerror(errno));
+		close(sync_to[0]);
+		close(sync_to[1]);
 		return 1;
 	}
 	pid_t ns_child = fork();
 	if (ns_child < 0) {
 		fprintf(stderr, "setns-mt: fork: %s\n", strerror(errno));
+		close(sync_to[0]);
+		close(sync_to[1]);
+		close(sync_from[0]);
+		close(sync_from[1]);
 		return 1;
 	}
 	if (ns_child == 0) {
 		close(sync_to[1]);
 		close(sync_from[0]);
 		if (unshare(CLONE_NEWTIME) < 0) {
-			write(sync_from[1], "E", 1);
+			r = write(sync_from[1], "E", 1);
+			(void)r;
+			close(sync_from[1]);
+			close(sync_to[0]);
 			_exit(1);
 		}
-		write(sync_from[1], "R", 1);  /* ready */
+		r = write(sync_from[1], "R", 1); /* ready */
+		(void)r;
+		close(sync_from[1]);
 		char c;
-		read(sync_to[0], &c, 1);  /* wait for parent to finish */
+		r = read(sync_to[0], &c, 1); /* wait for parent to finish */
+		(void)r;
+		close(sync_to[0]);
 		_exit(0);
 	}
 	close(sync_to[0]);
@@ -152,9 +171,9 @@ static int cmd_setns_mt(void)
 
 	if (ns_status != 'R') {
 		printf("setns-mt: SKIP child unshare(CLONE_NEWTIME) failed\n");
-		write(sync_to[1], "x", 1);
-		close(sync_to[1]);
-		int st; waitpid(ns_child, &st, 0);
+		close(sync_to[1]); /* child already exited; writing would SIGPIPE */
+		int st;
+		waitpid(ns_child, &st, 0);
 		return 0;
 	}
 
@@ -163,34 +182,42 @@ static int cmd_setns_mt(void)
 	snprintf(path, sizeof(path), "/proc/%d/ns/time", (int)ns_child);
 	int ns_fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (ns_fd < 0) {
-		fprintf(stderr, "setns-mt: open %s: %s\n", path, strerror(errno));
-		write(sync_to[1], "x", 1);
+		fprintf(stderr, "setns-mt: open %s: %s\n", path,
+			strerror(errno));
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
-		int st; waitpid(ns_child, &st, 0);
+		int st;
+		waitpid(ns_child, &st, 0);
 		return 1;
 	}
 
-	/* Step 3: create a CLONE_THREAD thread — makes us multi-threaded */
-	pid_t tid = clone(thread_fn,
-			  _thread_stack + sizeof(_thread_stack),
-			  CLONE_VM | CLONE_FS | CLONE_FILES |
-			  CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM,
-			  NULL);
-	if (tid < 0) {
-		fprintf(stderr, "setns-mt: clone thread: %s\n", strerror(errno));
+	/* Step 3: create a POSIX thread — makes us multi-threaded.
+	 * Use pthread_create, not clone(CLONE_THREAD): musl's clone() wrapper
+	 * rejects CLONE_THREAD (returns EINVAL) to reserve it for pthreads.
+	 */
+	pthread_t thread;
+	int pr = pthread_create(&thread, NULL, thread_pause, NULL);
+	if (pr != 0) {
+		fprintf(stderr, "setns-mt: pthread_create: %s\n", strerror(pr));
 		close(ns_fd);
-		write(sync_to[1], "x", 1);
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
-		int st; waitpid(ns_child, &st, 0);
+		int st;
+		waitpid(ns_child, &st, 0);
 		return 1;
 	}
 
-	if (syscall(SYS_tgkill, getpid(), tid, 0) < 0) {
+	if (pthread_kill(thread, 0) != 0) {
 		printf("setns-mt: SKIP thread exited before setns test (OOM or race)\n");
+		pthread_join(thread, NULL);
 		close(ns_fd);
-		write(sync_to[1], "x", 1);
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
-		int st; waitpid(ns_child, &st, 0);
+		int st;
+		waitpid(ns_child, &st, 0);
 		_exit(0);
 	}
 
@@ -198,15 +225,14 @@ static int cmd_setns_mt(void)
 	int ret = setns(ns_fd, CLONE_NEWTIME);
 	int saved_errno = errno;
 
-	int thread_alive = (syscall(SYS_tgkill, getpid(), tid, 0) == 0);
+	int thread_alive = (pthread_kill(thread, 0) == 0);
 
 	close(ns_fd);
 
 	/*
-	 * Print result before _exit().  The CLONE_THREAD thread shares our
-	 * process and is killed when we call _exit() — do NOT kill it with
-	 * SIGKILL first, as that also kills the calling thread before output
-	 * can be flushed.
+	 * Print result before _exit().  The pthread shares our process and is
+	 * killed when we call _exit() — do NOT kill it with SIGKILL first, as
+	 * that also kills the calling thread before output can be flushed.
 	 */
 	int exit_code;
 	if (ret == 0) {
@@ -224,21 +250,25 @@ static int cmd_setns_mt(void)
 		 * kernel/time/namespace.c:timens_install() returns EUSERS (not EINVAL)
 		 * when current_is_single_threaded() fails.
 		 */
-		fprintf(stderr, "setns-mt: expected EINVAL/EUSERS got %d (%s)\n",
+		fprintf(stderr,
+			"setns-mt: expected EINVAL/EUSERS got %d (%s)\n",
 			saved_errno, strerror(saved_errno));
 		exit_code = 1;
 	} else {
 		printf("setns-mt: setns(CLONE_NEWTIME) correctly denied (%s) from "
-		       "multi-threaded process ok\n", strerror(saved_errno));
+		       "multi-threaded process ok\n",
+		       strerror(saved_errno));
 		exit_code = 0;
 	}
 	fflush(stdout);
 	fflush(stderr);
 
-	write(sync_to[1], "x", 1);
+	r = write(sync_to[1], "x", 1);
+	(void)r;
 	close(sync_to[1]);
-	int st; waitpid(ns_child, &st, 0);
-	/* _exit terminates the CLONE_THREAD thread too */
+	int st;
+	waitpid(ns_child, &st, 0);
+	/* _exit terminates all threads including the pthread */
 	_exit(exit_code);
 }
 
@@ -248,8 +278,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ns-time offset|setns-mt\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "offset"))   return cmd_offset();
-	if (!strcmp(argv[1], "setns-mt")) return cmd_setns_mt();
+	if (!strcmp(argv[1], "offset"))
+		return cmd_offset();
+	if (!strcmp(argv[1], "setns-mt"))
+		return cmd_setns_mt();
 	fprintf(stderr, "unknown command: %s\n", argv[1]);
 	return 1;
 }

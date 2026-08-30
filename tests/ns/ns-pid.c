@@ -34,11 +34,13 @@ static int read_nspid(long *last_pid, int *count)
 			*last_pid = -1;
 			char *p = line + 6;
 			while (*p) {
-				while (*p == ' ' || *p == '\t') p++;
+				while (*p == ' ' || *p == '\t')
+					p++;
 				if (*p >= '0' && *p <= '9') {
 					(*count)++;
 					*last_pid = strtol(p, NULL, 10);
-					while (*p >= '0' && *p <= '9') p++;
+					while (*p >= '0' && *p <= '9')
+						p++;
 				} else {
 					break;
 				}
@@ -70,18 +72,23 @@ static int cmd_clone(void)
 		long ns_pid = -1;
 		int ns_count = 0;
 		if (read_nspid(&ns_pid, &ns_count) < 0) {
-			fprintf(stderr, "child: cannot read NSpid from /proc/self/status\n");
+			fprintf(stderr,
+				"child: cannot read NSpid from /proc/self/status\n");
 			_exit(1);
 		}
 		if (ns_pid != 1) {
-			fprintf(stderr, "child: NSpid last=%ld expected 1\n", ns_pid);
+			fprintf(stderr, "child: NSpid last=%ld expected 1\n",
+				ns_pid);
 			_exit(1);
 		}
 		if (ns_count < 2) {
-			fprintf(stderr, "child: NSpid has %d entries, expected >=2\n", ns_count);
+			fprintf(stderr,
+				"child: NSpid has %d entries, expected >=2\n",
+				ns_count);
 			_exit(1);
 		}
-		printf("clone: child NSpid_last=1 NSpid_entries=%d ok\n", ns_count);
+		printf("clone: child NSpid_last=1 NSpid_entries=%d ok\n",
+		       ns_count);
 		_exit(0);
 	}
 	int status;
@@ -122,7 +129,9 @@ static int cmd_init_death(void)
 	int status;
 	waitpid(init, &status, 0);
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-		fprintf(stderr, "init-death: init exited unexpectedly status=%d\n", status);
+		fprintf(stderr,
+			"init-death: init exited unexpectedly status=%d\n",
+			status);
 		return 1;
 	}
 	printf("init-death: ns init exited cleanly, cascade SIGKILL verified\n");

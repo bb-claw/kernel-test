@@ -60,7 +60,7 @@ kernel-test/
 ├── scripts/        on-demand tools: kconfig-check.sh kconfig-enumerate.sh build-kconfig.sh config-archive.sh config-bisect.sh canary-patch.sh migrate-reports.sh dev-test.sh hook-dev-test.sh verify-patch.sh
 ├── tests/
 │   ├── 001_smoke.sh
-│   ├── custom/     001_print-dmesg + 010_ … 480_ (49 scripts)
+│   ├── custom/     001_print-dmesg + 010_ … 500_ (51 scripts)
 │   ├── ci/         host-side harness self-tests (test-*.sh, lib.sh, fixtures/)
 │   ├── ns/         C binaries for namespace regression tests (ns-uts … ns-time, Makefile)
 │   └── programs/   C helper programs injected into the initramfs (perf-event, arena-test, syscall-tests, snapshot)

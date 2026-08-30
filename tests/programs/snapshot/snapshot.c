@@ -228,9 +228,11 @@ static void dump_tainted(void)
 	}
 
 	{
-		int of_unittest = (access("/tests/of-unittest-enabled", F_OK) == 0);
+		int of_unittest =
+			(access("/tests/of-unittest-enabled", F_OK) == 0);
 		for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
-			if (!flags[i].is_issue || !(tainted & (1L << flags[i].bit)))
+			if (!flags[i].is_issue ||
+			    !(tainted & (1L << flags[i].bit)))
 				continue;
 			/* of_unittest deliberately fires WARN_ONCE() in lifecycle tests;
 			 * suppress only when the marker confirms it was built in */
@@ -275,7 +277,8 @@ static void dump_security(void)
 		print_result("ASLR", buf);
 	else
 		print_result("ASLR", "n/a");
-	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) == 0)
+	if (try_read_file(PROC_SYS_KERNEL_DMESG_RESTRICT, buf, sizeof(buf)) ==
+	    0)
 		print_result("DMESG_RESTRICT", buf);
 	else
 		print_result("DMESG_RESTRICT", "n/a");
@@ -414,8 +417,8 @@ static void dump_dmesg(void)
 	print_result("DMESG", str);
 
 	for (int i = 0; i < n_issue_lines; i++)
-		printf("%15s: %.*s\n", "ISSUE_LINE",
-		       MAX_ISSUE_LINE_LEN - 1, issue_lines[i]);
+		printf("%15s: %.*s\n", "ISSUE_LINE", MAX_ISSUE_LINE_LEN - 1,
+		       issue_lines[i]);
 }
 
 static void dump_meminfo(void)

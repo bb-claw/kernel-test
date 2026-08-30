@@ -50,22 +50,22 @@ Examples:
   `setup_git_array` → `reset_to_fetch_head` → `write_kernel_version` (in that order)
 
 ---
-
 ## C Program Compilation Baseline (tests/programs/)
 
-Reference: each program's `Makefile` under `tests/programs/`; `docs/programs-quality-plan.md`
+All programs share `tests/programs/common.mk` (included by thin per-program Makefiles). `tests/ns/Makefile` uses FLAGS_ONLY=1 to import flag variables from common.mk.
 
 ```
-CFLAGS_COMMON       -std=c11 -O2 -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration
-CFLAGS_COMMON_GCC   -Wall -Wextra -Wpedantic -Werror
-CFLAGS_COMMON_CLANG -Weverything -Werror -Wno-unknown-warning-option -Wno-disabled-macro-expansion -Wno-unsafe-buffer-usage
+CFLAGS_COMMON   -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration
+                _LOPT_COMMON (-Wl,--gc-sections etc.) NOT in CFLAGS_COMMON — per link rule only (scan target uses clang --analyze, no link).
+CFLAGS_GCC      -Wall -Wextra -Wpedantic -Werror -Wformat=2 -Wshadow -Wwrite-strings -Wstrict-prototypes -Wold-style-definition -Wredundant-decls -Wnested-externs -Wmissing-include-dirs -Wjump-misses-init -Wlogical-op
+CFLAGS_CLANG    -Weverything -Werror -Wno-unknown-warning-option -Wno-disabled-macro-expansion -Wno-unsafe-buffer-usage
 ```
-
-- **serial-capture (host-only)**: `bin/serial-capture-gcc` (musl-gcc, quality gate) + `bin/serial-capture` (musl-clang, shipped).
-- **arena-test / perf-event (cross-compiled)**: `bin/<arch>/<name>` (GCC, 4 arches, shipped) + `bin/x86_64/<name>-clang` (musl-clang, quality gate; Clang cross for arm64/riscv needs sysroot not in bootstrap). `make -C tests/programs` builds all three.
-- **musl hard-required**: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian); build errors if absent. Clang suppressions: `-Wno-disabled-macro-expansion` — musl `stderr` macro; `-Wno-unsafe-buffer-usage` — pointer arithmetic is bounds-correct.
-- **Sign-conversion on `tcflag_t`**: cast explicitly: `tty.c_cflag &= (tcflag_t)~CSTOPB;` — code fix, not a suppression.
-- **Valgrind builds**: `bin/x86_64/<name>-valgrind` (gcc/static glibc, x86_64-only; `make valgrind`). Suppressions: `tests/programs/valgrind.supp`. `make bootstrap` installs valgrind+socat.
+OPTIMIZATION: `speed` (-O2+gc-sections) | `size` (-Os+gc-sections) | `ultra` (-Oz+LTO+gc-sections) | `debug` (-Og -g) | `none` (-O0) | `valgrind` (-O0 -g -fanalyzer, glibc/static). `valgrind-build` = build only; `valgrind` in ns/ = build + run all subcommands (EPERM→skip, exit 99→fail).
+- **serial-capture (HOST_ONLY=1)**: `bin/serial-capture-gcc` (musl-gcc, quality gate) + `bin/serial-capture` (musl-clang, shipped). termios rules out nolibc.
+- **cross-compiled programs**: `bin/<arch>/<name>` (GCC shipped) + `bin/x86_64/<name>-clang` (musl-clang quality gate). Per-program extras: `CFLAGS_CLANG_EXTRA`, `CFLAGS_arm64_EXTRA`, `CFLAGS_riscv_EXTRA`.
+- **arena-test x86_64**: plain `gcc` + kernel nolibc (`-isystem KERNEL_TREE/tools/include/nolibc -include nolibc.h -nostdlib`); eliminates musl-gcc dep for this binary. Other arches keep glibc cross-compilers.
+- **nolibc not viable for**: perf-event (`SYS_perf_event_open` absent), snapshot (klog/pwd), syscall-tests (socket/eventfd/shm), serial-capture (termios), ns/ (ipc/sem).
+- **musl hard-required** for quality gates: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian). Clang suppressions: `-Wno-disabled-macro-expansion` (musl stderr macro); `-Wno-unsafe-buffer-usage` (bounds-correct pointer arithmetic). Valgrind builds: `bin/x86_64/<name>-valgrind` (gcc/glibc, x86_64-only; `make valgrind-build`). Suppressions: `tests/programs/valgrind.supp`. `make valgrind` in `tests/ns/` builds + runs all ns-* subcommands; EPERM exits are skip (exit ≠ 99), exit 99 = valgrind memory error = fail.
 
 ---
 ## Bash Lib Script Pitfalls
