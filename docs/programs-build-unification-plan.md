@@ -149,6 +149,35 @@ build_rule template for the multi-binary case — more complexity than it remove
 
 ---
 
+## Known valgrind coverage gaps
+
+### Gap 1 — 14 privileged ns-\* subcommands cannot run on the host
+
+`ns-pid/clone`, `ns-mount/move`, `ns-net/clone`, and 11 others require
+`CAP_SYS_ADMIN` (or `CLONE_NEWUSER` to gain it) and skip with exit 1 when run
+unprivileged. They exercise the correct kernel path in the QEMU VM (tests 290–360)
+but not under Valgrind with `--track-fds=yes`. An fd leak of the class fixed in
+`ns-time.c` could exist in these binaries and remain undetected.
+
+Possible remedies (not implemented):
+- Run `make valgrind` inside the QEMU VM (requires valgrind in initramfs — heavy)
+- Wrap each subcommand in `unshare --user --map-root-user` where the namespace
+  type permits it; does not cover mount/pid/net which need real root
+
+### Gap 2 — ns-time/setns-mt likely tests the SKIP path, not the CVE fix
+
+`cmd_setns_mt` forks a child that calls `unshare(CLONE_NEWTIME)`. If that fails
+(EPERM or `CONFIG_TIME_NS` absent), the parent reads `'E'` from the sync pipe,
+prints "SKIP", and exits 0. Valgrind sees exit 0 → PASS, but the `setns` denial
+logic (the CVE-2023-23586 regression guard) is never reached under Valgrind.
+
+The fix is correctly tested by the VM test (350_ns-time), which runs inside a
+kernel built with `CONFIG_TIME_NS=y`. Valgrind coverage of the CVE path requires
+running on a system where `CLONE_NEWTIME` is available unprivileged, or inside
+the VM (see Gap 1 above).
+
+---
+
 ## Testing commands
 
 ```sh

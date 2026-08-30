@@ -18,7 +18,9 @@ PASS=0; FAIL=0; SKIP=0
 # --error-exitcode=99: distinguishes Valgrind memory errors (99) from program
 # errors (1), so ENOSYS/skip exits from perf-event/syscall-tests can be
 # classified as skip rather than fail.
-VG_FLAGS=(--error-exitcode=99 --leak-check=full --suppressions="$SUPP" --quiet)
+# --track-fds=yes: reports fds still open at exit; catches fd leaks on error
+# paths that --leak-check=full misses (heap only).
+VG_FLAGS=(--error-exitcode=99 --leak-check=full --track-fds=yes --suppressions="$SUPP" --quiet)
 
 die()  { printf 'error: %s\n' "$*" >&2; exit 2; }
 info() { printf '[valgrind] %s\n' "$*"; }
@@ -149,6 +151,12 @@ run_vg_serial
 # Each binary takes a subcommand; exit codes other than 99 treated as skip
 # (namespace syscall unavailable, missing capability, EPERM, etc.).
 # ns-uts setns requires a live namespace path argument — skipped here.
+#
+# Coverage gaps (documented in docs/programs-build-unification-plan.md):
+# - 14 subcommands skip unprivileged (need CAP_SYS_ADMIN); covered by VM tests
+#   290–360 but not under --track-fds=yes.
+# - ns-time/setns-mt likely exits via the SKIP path (child unshare EPERM);
+#   the CVE-2023-23586 denial path is only reachable with CONFIG_TIME_NS=y.
 NS="$NS_DIR/bin/x86_64"
 run_vg "ns-uts/clone"            "skip" "$NS/ns-uts-valgrind"    clone
 run_vg "ns-ipc/clone"            "skip" "$NS/ns-ipc-valgrind"    clone
