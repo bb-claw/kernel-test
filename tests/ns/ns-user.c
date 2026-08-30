@@ -206,7 +206,8 @@ static int cmd_nested_6(void)
 	write_file(path,
 		   buf); /* gid_map failure is non-fatal for the CVE test */
 
-	(void)write(to_child[1], "x", 1);
+	r = write(to_child[1], "x", 1);
+	(void)r;
 	close(to_child[1]);
 
 	int st;
