@@ -122,6 +122,7 @@ static int cmd_setns_mt(void)
 
 	/* Step 1: fork a child that creates a new time namespace to use as target */
 	int sync_to[2], sync_from[2];
+	ssize_t r;
 	if (pipe(sync_to) < 0) {
 		fprintf(stderr, "setns-mt: pipe: %s\n", strerror(errno));
 		return 1;
@@ -145,15 +146,18 @@ static int cmd_setns_mt(void)
 		close(sync_to[1]);
 		close(sync_from[0]);
 		if (unshare(CLONE_NEWTIME) < 0) {
-			write(sync_from[1], "E", 1);
+			r = write(sync_from[1], "E", 1);
+			(void)r;
 			close(sync_from[1]);
 			close(sync_to[0]);
 			_exit(1);
 		}
-		write(sync_from[1], "R", 1); /* ready */
+		r = write(sync_from[1], "R", 1); /* ready */
+		(void)r;
 		close(sync_from[1]);
 		char c;
-		read(sync_to[0], &c, 1); /* wait for parent to finish */
+		r = read(sync_to[0], &c, 1); /* wait for parent to finish */
+		(void)r;
 		close(sync_to[0]);
 		_exit(0);
 	}
@@ -180,7 +184,8 @@ static int cmd_setns_mt(void)
 	if (ns_fd < 0) {
 		fprintf(stderr, "setns-mt: open %s: %s\n", path,
 			strerror(errno));
-		write(sync_to[1], "x", 1);
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
 		int st;
 		waitpid(ns_child, &st, 0);
@@ -196,7 +201,8 @@ static int cmd_setns_mt(void)
 	if (pr != 0) {
 		fprintf(stderr, "setns-mt: pthread_create: %s\n", strerror(pr));
 		close(ns_fd);
-		write(sync_to[1], "x", 1);
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
 		int st;
 		waitpid(ns_child, &st, 0);
@@ -207,7 +213,8 @@ static int cmd_setns_mt(void)
 		printf("setns-mt: SKIP thread exited before setns test (OOM or race)\n");
 		pthread_join(thread, NULL);
 		close(ns_fd);
-		write(sync_to[1], "x", 1);
+		r = write(sync_to[1], "x", 1);
+		(void)r;
 		close(sync_to[1]);
 		int st;
 		waitpid(ns_child, &st, 0);
@@ -256,7 +263,8 @@ static int cmd_setns_mt(void)
 	fflush(stdout);
 	fflush(stderr);
 
-	write(sync_to[1], "x", 1);
+	r = write(sync_to[1], "x", 1);
+	(void)r;
 	close(sync_to[1]);
 	int st;
 	waitpid(ns_child, &st, 0);
