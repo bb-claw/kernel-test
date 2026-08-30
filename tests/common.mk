@@ -107,6 +107,8 @@ endif
 # Binary: $(STRIP_<arch>) or $(STRIP_x86_64) for host builds — never bare 'strip'.
 ifeq ($(OPTIMIZATION),debug)
 _STRIP_FLAGS :=
+else ifeq ($(OPTIMIZATION),valgrind)
+_STRIP_FLAGS :=
 else ifeq ($(OPTIMIZATION),ultra)
 _STRIP_FLAGS := --strip-all \
                 -R .comment -R .note.gnu.build-id -R .note.gnu.property \
