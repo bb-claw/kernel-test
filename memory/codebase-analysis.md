@@ -4,7 +4,11 @@
 
 All shell commands are rewritten transparently via the Claude Code hook.
 No explicit invocation needed. Saves ~87% of tokens on grep/find/git output.
-Run `rtk gain` to see current savings.
+Run `rtk gain` to see current savings. Run `rtk verify` to confirm the hook
+is active — measured adoption is 0.3% of commands (Aug 2026), meaning the hook
+fires less often than expected; `git -C <path>` (the dominant pattern in this
+repo) is the single biggest missed opportunity (~396K tokens/month). Run
+`rtk discover` periodically to check what's being missed.
 
 ## codegraph — use only for C source tasks
 
