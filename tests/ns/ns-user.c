@@ -106,6 +106,7 @@ static int cmd_nested_6(void)
 	uid_t uid = getuid();
 	gid_t gid = getgid();
 	int to_child[2], from_child[2];
+	ssize_t r;
 
 	if (pipe(to_child) < 0) {
 		fprintf(stderr, "nested-6: pipe: %s\n", strerror(errno));
@@ -135,14 +136,17 @@ static int cmd_nested_6(void)
 		if (unshare(CLONE_NEWUSER) < 0) {
 			char c = (errno == EPERM || errno == EINVAL) ? 'S' :
 								       'E';
-			(void)write(from_child[1], &c, 1);
+			r = write(from_child[1], &c, 1);
+			(void)r;
 			_exit(1);
 		}
-		(void)write(from_child[1], "R",
-			    1); /* ready: uid_map not yet written */
+		r = write(from_child[1], "R",
+			  1); /* ready: uid_map not yet written */
+		(void)r;
 		/* Wait for parent to write uid_map, then exit */
 		char c;
-		(void)read(to_child[0], &c, 1);
+		r = read(to_child[0], &c, 1);
+		(void)r;
 		close(to_child[0]);
 		close(from_child[1]);
 		_exit(0);
@@ -159,7 +163,8 @@ static int cmd_nested_6(void)
 
 	if (status == 'S') {
 		printf("nested-6: SKIP CONFIG_USER_NS not available\n");
-		(void)write(to_child[1], "x", 1);
+		r = write(to_child[1], "x", 1);
+		(void)r;
 		close(to_child[1]);
 		int st;
 		waitpid(child, &st, 0);
@@ -167,7 +172,8 @@ static int cmd_nested_6(void)
 	}
 	if (status != 'R') {
 		fprintf(stderr, "nested-6: child unshare failed\n");
-		(void)write(to_child[1], "x", 1);
+		r = write(to_child[1], "x", 1);
+		(void)r;
 		close(to_child[1]);
 		int st;
 		waitpid(child, &st, 0);
