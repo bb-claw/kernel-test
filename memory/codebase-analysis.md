@@ -23,5 +23,10 @@ It has no Bash backend — lib/, scripts/, tests/custom/ are invisible to it.
 **When NOT to use:** any Bash task (fetch, build, VM tests, hooks, scripts).
 The memory files already document the architecture — don't re-derive it.
 
+**No multi-language alternative exists.** Verified Aug 2026: @optave/codegraph
+claims 34 languages including Bash but ships extractors for C#/Go/JS/Java/PHP/
+Python/Ruby/Rust only — no Bash, no C. callGraph covers Bash but not C. Use
+`rtk grep` for Bash symbol lookup; it's fast enough.
+
 **Index status:** 16 C files, 298 nodes, 732 edges (`codegraph status`).
 Keep in sync after adding C files: `codegraph sync`.
