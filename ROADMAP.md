@@ -278,6 +278,19 @@ Remaining candidates (next slot: 490_):
 
 ---
 
+## tools/perf Build Check *(stable-rc specific)*
+
+Add a host-side `make perf-build` target that builds `tools/perf` from the kernel source tree
+after each stable-rc kernel build. Catches missing-backport bugs like the ones found in 7.2.6-rc1
+(undeclared `hotkey_act`, undefined `CHECK_INITIALIZED`) before the review cycle closes.
+
+**Scope:** x86_64 host only; one build per stable-rc run; not per-config or per-arch.
+**Not in mainline pipeline** — mainline perf has its own CI; the gap is stable-rc.
+**Feature flag:** `NO_PERF_BUILD=1` to skip (e.g. on hosts missing libelf/libdw).
+**Report:** PASS/FAIL line in summary alongside kernel build results; full log in `build/perf/build.log`.
+
+---
+
 ## Out of Scope
 
 - **GitHub Actions CI with hosted runners** — too costly; Hetzner staging covers automated runs

@@ -41,6 +41,7 @@ REPORT_DIR    ?= $(DATA_REPO)/reports
 V             ?= 0
 NO_FETCH      ?= 0
 NO_BUILD      ?= 0
+NO_PERF_BUILD ?= 0
 LINUX_NEXT    ?= 0
 TOYBOX_VERSION ?= 0.8.14
 DMESG_LABEL    ?= mainline
@@ -118,7 +119,7 @@ endif
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
-export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD
+export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
 export TOYBOX_VERSION LABEL SNAPSHOT
 export SEED_CONFIG
@@ -454,6 +455,24 @@ programs:
 	make -C tests/programs || rc=1; \
 	make -C tests/ns       || rc=1; \
 	exit $$rc
+
+# Build tools/perf from KERNEL_TREE (host x86_64 only).
+# Catches missing-backport bugs in stable-rc that break the perf userspace tool.
+# Skip with NO_PERF_BUILD=1 on hosts missing libelf/libdw/libpython.
+perf-build:
+ifeq ($(NO_PERF_BUILD),1)
+	@echo "[perf-build] skipped (NO_PERF_BUILD=1)"
+else
+	@echo "[perf-build] Building tools/perf from $(KERNEL_TREE)"
+	$(Q)mkdir -p build/perf
+	$(Q)if $(MAKE) -j$$(nproc) -C $(KERNEL_TREE)/tools/perf O=$(CURDIR)/build/perf \
+	        >build/perf/build.log 2>&1; then \
+	    echo "[perf-build] PASS"; \
+	else \
+	    grep ': error:' build/perf/build.log | head -10 >&2; \
+	    echo "[perf-build] FAIL — see build/perf/build.log"; exit 1; \
+	fi
+endif
 
 # Build one initramfs per (config, arch) pair so each can include config-specific markers.
 initramfs:

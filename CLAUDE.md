@@ -50,6 +50,7 @@ make hw-bootstrap [DRY_RUN=1]                  # install hardware test infra (ne
 make hw-deploy                                 # copy kernel+initramfs+DTB to TFTP_DIR
 make hw-test BOARD_TTY=/dev/ttyUSB0           # serial capture on real board (≡ make test)
 make hw BOARD_TTY=/dev/ttyUSB0                # build → hw-deploy → hw-test → report
+make perf-build                                # build tools/perf from KERNEL_TREE; stable-rc only; NO_PERF_BUILD=1 to skip
 ```
 
 ### Fetch modes (per-clone preset)
