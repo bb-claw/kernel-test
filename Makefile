@@ -285,6 +285,7 @@ ns-full:
 extended:
 	+@$(MAKE) full
 	+@$(MAKE) ns-full
+	+@$(MAKE) perf-build
 
 # Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
 local:
@@ -699,7 +700,7 @@ Targets:
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   ns-smoke         Namespace smoke: kunitnsconfig + tinynsconfig (mirrors smoke; requires make bootstrap)
   ns-full          Namespace full: kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig (mirrors full)
-  extended         Full verification: full then ns-full (10 configs); intended for automated staging runs
+  extended         Full verification: full then ns-full (10 configs) + perf-build; intended for automated staging runs
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
   hw-deploy        Copy kernel + initramfs to TFTP_DIR (default: ./tftp/); board fetches via U-Boot tftpboot; BOARD_CONFIG/BOARD_ARCH selectable

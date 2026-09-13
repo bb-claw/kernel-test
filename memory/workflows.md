@@ -60,7 +60,7 @@ make smoke                                            # kunitconfig + tinyconfig
 make full                                             # 5 bootable configs, preset auto-selected
 make ns-smoke                                         # kunitnsconfig + tinynsconfig (requires make bootstrap)
 make ns-full                                          # 5 ns-variant configs (mirrors full)
-make extended                                         # full then ns-full (10 configs); for staging automation
+make extended                                         # full then ns-full (10 configs) + perf-build; for staging automation
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
