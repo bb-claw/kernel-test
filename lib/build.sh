@@ -47,7 +47,7 @@ printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on succes
 # ── Kernel source identity ────────────────────────────────────────────────────
 
 TREE_TAG=$(git -C "$KERNEL_TREE" describe --exact-match HEAD 2>/dev/null \
-           || git -C "$KERNEL_TREE" describe --tags --abbrev=0 HEAD 2>/dev/null \
+           || read_kernel_makefile_version \
            || echo "(untagged)")
 TREE_COMMIT=$(git -C "$KERNEL_TREE" rev-parse --short HEAD 2>/dev/null || echo "?")
 TREE_URL=$(git -C "$KERNEL_TREE" remote get-url origin 2>/dev/null || echo "(no remote)")
