@@ -457,8 +457,7 @@ programs:
 	make -C tests/ns       || rc=1; \
 	exit $$rc
 
-# Build tools/perf from KERNEL_TREE (host x86_64 only).
-# Catches missing-backport bugs in stable-rc that break the perf userspace tool.
+# Build tools/perf from KERNEL_TREE. Part of make extended.
 # Skip with NO_PERF_BUILD=1 on hosts missing libelf/libdw/libpython.
 perf-build:
 ifeq ($(NO_PERF_BUILD),1)
