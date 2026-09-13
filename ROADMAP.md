@@ -4,7 +4,7 @@
 
 - 38 VM tests across 4 arches (x86_64, i386, arm64, riscv), 9 default + 7 ns-variant config profiles
 - Namespace regression suite live (290–360, C binaries × 4 arches)
-- `make extended` = full + ns-full (10 configs) for Hetzner staging automation
+- `make extended` = full + ns-full (10 configs) + perf-build for Hetzner staging automation
 - All testing is QEMU/KVM; no physical hardware path yet
 
 ## Goal
@@ -275,6 +275,19 @@ Remaining candidates (next slot: 490_):
 | `bpf` | 490_ | `bpf(BPF_PROG_LOAD, SOCKET_FILTER)` — verifier + JIT/interpreter | BPF underpins seccomp, landlock, tc, XDP; verifier regressions break many subsystems |
 | `sysvipc` | 500_ | `shmget`/`shmat`/`semget`/`semop`/`msgget` | Used by X11, PostgreSQL, containers; `CONFIG_SYSVIPC` present in defconfig, skip on tinyconfig |
 | `i386 fixed core` | — | Move i386/tinyconfig from random dev-test pool to fixed core | Guarantees 32-bit path coverage every `make dev-test`; i386 KVM is fast (~20 s) |
+
+---
+
+## tools/perf Build Check *(part of `make extended`)*
+
+A host-side `make perf-build` target that builds `tools/perf` from the kernel source tree.
+Part of `make extended` — runs automatically on every staging run. Catches missing-backport bugs
+like the ones found in 7.2.6-rc1 (undeclared `hotkey_act`, undefined `CHECK_INITIALIZED`) before
+the review cycle closes.
+
+**Scope:** x86_64 host only; one build per `make extended` run; not per-config or per-arch.
+**Feature flag:** `NO_PERF_BUILD=1` to skip (e.g. on hosts missing libelf/libdw).
+**Report:** PASS/FAIL line in summary alongside kernel build results; full log in `build/perf/build.log`.
 
 ---
 

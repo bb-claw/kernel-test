@@ -31,7 +31,7 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig  # fast iteration: repack + re
 make smoke                                     # quick sanity: kunitconfig + tinyconfig, all archs
 make ns-smoke                                  # namespace smoke: kunitnsconfig + tinynsconfig
 make ns-full                                   # namespace full: 5 ns-variant configs
-make extended                                  # full then ns-full (10 configs); for staging automation
+make extended                                  # full then ns-full (10 configs) + perf-build; for staging automation
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → ci-test → programs (no i386)
@@ -50,6 +50,7 @@ make hw-bootstrap [DRY_RUN=1]                  # install hardware test infra (ne
 make hw-deploy                                 # copy kernel+initramfs+DTB to TFTP_DIR
 make hw-test BOARD_TTY=/dev/ttyUSB0           # serial capture on real board (≡ make test)
 make hw BOARD_TTY=/dev/ttyUSB0                # build → hw-deploy → hw-test → report
+make perf-build                                # build tools/perf from KERNEL_TREE; NO_PERF_BUILD=1 to skip
 ```
 
 ### Fetch modes (per-clone preset)
