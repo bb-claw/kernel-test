@@ -258,6 +258,16 @@ TXT="$RUN_DIR/summary.txt"
         printf '  %-16s %-8s %-64s %-10s %s\n' "$cfg" "$arc" "$sha" "$ok" "$file"
     done
 
+    if [[ -f "$BUILD_DIR/perf/build.status" ]]; then
+        _perf_status=$(grep '^STATUS=' "$BUILD_DIR/perf/build.status" | cut -d= -f2)
+        case "${_perf_status:-}" in
+            PASS) printf '\nPerf build: PASS\n' ;;
+            FAIL) printf '\nPerf build: FAIL\n' ;;
+            SKIP) printf '\nPerf build: skipped (NO_PERF_BUILD=1)\n' ;;
+            *)    printf '\nPerf build: unknown\n' ;;
+        esac
+    fi
+
     printf '\nReport dir: %s/\n' "$RUN_DIR"
 } > "$TXT"
 
