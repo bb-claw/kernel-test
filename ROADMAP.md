@@ -4,7 +4,7 @@
 
 - 38 VM tests across 4 arches (x86_64, i386, arm64, riscv), 9 default + 7 ns-variant config profiles
 - Namespace regression suite live (290–360, C binaries × 4 arches)
-- `make extended` = full + ns-full (10 configs) + perf-build for Hetzner staging automation
+- `make extended` = full + ns-full (10 configs) + perf-build; all phases run even on partial failure
 - All testing is QEMU/KVM; no physical hardware path yet
 
 ## Goal
@@ -287,7 +287,7 @@ the review cycle closes.
 
 **Scope:** x86_64 host only; one build per `make extended` run; not per-config or per-arch.
 **Feature flag:** `NO_PERF_BUILD=1` to skip (e.g. on hosts missing libelf/libdw).
-**Report:** PASS/FAIL line in summary alongside kernel build results; full log in `build/perf/build.log`.
+**Status file:** `build/perf/build.status` (STATUS=PASS/FAIL/SKIP); `lib/report.sh` appends `Perf build:` line to `summary.txt`; full log in `build/perf/build.log`.
 
 ---
 

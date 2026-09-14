@@ -60,12 +60,12 @@ make smoke                                            # kunitconfig + tinyconfig
 make full                                             # 5 bootable configs, preset auto-selected
 make ns-smoke                                         # kunitnsconfig + tinynsconfig (requires make bootstrap)
 make ns-full                                          # 5 ns-variant configs (mirrors full)
-make extended                                         # full then ns-full (10 configs) + perf-build; for staging automation
+make extended                                         # full + ns-full (10 configs) + perf-build; all phases run even on partial failure; exit non-zero if any failed
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 make programs                                         # rebuild C test binaries (tests/programs/ + tests/ns/) without system packages; auto-runs in make all
-make perf-build                                       # build tools/perf from KERNEL_TREE on x86_64 host; log in build/perf/build.log; skip with NO_PERF_BUILD=1
+make perf-build                                       # build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); report.sh includes result; NO_PERF_BUILD=1 to skip
 make hw-bootstrap [DRY_RUN=1]                         # install dnsmasq/networkd/udev for board testing (needs sudo)
 make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR (default: ./tftp/)
 make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
