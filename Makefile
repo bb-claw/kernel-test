@@ -716,6 +716,7 @@ Targets:
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
   programs         Rebuild C test binaries (tests/programs/ and tests/ns/) without system packages; runs automatically before initramfs in 'make all'
+  perf-build       Build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); result appears in summary.txt; NO_PERF_BUILD=1 to skip
   initramfs        Assemble Toybox cpio initramfs for each arch; injects tests/custom/*.sh, tests/ns/bin/<arch>/ns-*, tests/programs/*/bin/<arch>/*
   test             Boot each (config, arch) in QEMU/KVM and run tests
   report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
