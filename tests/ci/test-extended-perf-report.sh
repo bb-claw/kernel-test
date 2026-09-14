@@ -62,37 +62,25 @@ assert_not_contains "$recipe" '+@$(MAKE) full' "full is guarded, not bare"
 
 # ── Bug 1: functional — all phases run when full fails ────────────────────────
 
-begin_test "extended continues past full failure: ns-full still runs"
+begin_test "extended: ns-full and perf-build run when full fails"
 tmpdir; td="$_LAST_TMPDIR"
-ns_marker="$td/ns-full-ran"
-perf_marker="$td/perf-build-ran"
-# Invoke make with overridden sub-targets via a wrapper Makefile
 cat > "$td/Makefile" <<MAKEFILE
-REPO := $REPO
-
 extended:
 	+@rc=0; \\
-	 \$(MAKE) -f \$(REPO)/Makefile full       || rc=\$\$?; \\
-	 touch $ns_marker; \\
-	 \$(MAKE) -f \$(REPO)/Makefile ns-full    || rc=\$\$?; \\
-	 touch $perf_marker; \\
+	 \$(MAKE) full       || rc=\$\$?; \\
+	 \$(MAKE) ns-full    || rc=\$\$?; \\
+	 \$(MAKE) perf-build || rc=\$\$?; \\
 	 exit \$\$rc
-MAKEFILE
-# Just verify the pattern works with a simpler self-contained test
-tmpdir; td2="$_LAST_TMPDIR"
-cat > "$td2/Makefile" <<'MAKEFILE'
-extended:
-	+@rc=0; \
-	 $(MAKE) fail-phase  || rc=$$?; \
-	 $(MAKE) pass-phase  || rc=$$?; \
-	 exit $$rc
-fail-phase:
+full:
 	@exit 1
-pass-phase:
-	@echo "pass-phase-ran"
+ns-full:
+	@touch $td/ns-full-ran
+perf-build:
+	@touch $td/perf-build-ran
 MAKEFILE
-out=$(make -C "$td2" extended 2>&1 || true)
-assert_contains "$out" "pass-phase-ran" "pass-phase runs after fail-phase"
+make -C "$td" extended >/dev/null 2>&1 || true
+assert_file_exists "$td/ns-full-ran"    "ns-full ran after full failure"
+assert_file_exists "$td/perf-build-ran" "perf-build ran after full failure"
 
 begin_test "extended exits non-zero when any phase fails"
 tmpdir; td="$_LAST_TMPDIR"
@@ -125,6 +113,27 @@ pass-b:
 MAKEFILE
 assert_exit0 "extended exits zero when all pass" make -C "$td" extended
 
+begin_test "extended: full and ns-full run when perf-build fails"
+tmpdir; td="$_LAST_TMPDIR"
+cat > "$td/Makefile" <<MAKEFILE
+extended:
+	+@rc=0; \\
+	 \$(MAKE) full       || rc=\$\$?; \\
+	 \$(MAKE) ns-full    || rc=\$\$?; \\
+	 \$(MAKE) perf-build || rc=\$\$?; \\
+	 exit \$\$rc
+full:
+	@touch $td/full-ran
+ns-full:
+	@touch $td/ns-full-ran
+perf-build:
+	@exit 1
+MAKEFILE
+rc=0; make -C "$td" extended >/dev/null 2>&1 || rc=$?
+assert_file_exists "$td/full-ran"       "full ran"
+assert_file_exists "$td/ns-full-ran"    "ns-full ran"
+assert_ne "$rc" "0" "extended exits non-zero when perf-build fails"
+
 # ── Bug 2: perf-build writes build.status ────────────────────────────────────
 
 begin_test "perf-build NO_PERF_BUILD=1 writes STATUS=SKIP"
@@ -138,6 +147,15 @@ begin_test "perf-build status file has correct format"
 tmpdir; bd="$_LAST_TMPDIR"
 make -C "$REPO" perf-build NO_PERF_BUILD=1 BUILD_DIR="$bd" >/dev/null 2>&1
 assert_contains "$(cat "$bd/perf/build.status")" "STATUS=" "STATUS= line present"
+
+begin_test "perf-build FAIL path writes STATUS=FAIL"
+tmpdir; bd="$_LAST_TMPDIR"
+tmpdir; kt="$_LAST_TMPDIR"
+# kt has no tools/perf — inner make fails cleanly
+make -C "$REPO" perf-build BUILD_DIR="$bd" KERNEL_TREE="$kt" >/dev/null 2>&1 || true
+assert_file_exists "$bd/perf/build.status" "build.status created on failure"
+status=$(grep '^STATUS=' "$bd/perf/build.status" | cut -d= -f2)
+assert_eq "$status" "FAIL" "STATUS=FAIL written on build failure"
 
 # ── Bug 2: report.sh includes Perf build line ────────────────────────────────
 
