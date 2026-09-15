@@ -284,9 +284,9 @@ ns-full:
 # benefit from ccache populated by full. Intended for Hetzner staging automation.
 extended:
 	+@rc=0; \
+	 $(MAKE) perf-build || rc=$$?; \
 	 $(MAKE) full       || rc=$$?; \
 	 $(MAKE) ns-full    || rc=$$?; \
-	 $(MAKE) perf-build || rc=$$?; \
 	 exit $$rc
 
 # Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
@@ -705,7 +705,7 @@ Targets:
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   ns-smoke         Namespace smoke: kunitnsconfig + tinynsconfig (mirrors smoke; requires make bootstrap)
   ns-full          Namespace full: kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig (mirrors full)
-  extended         Full verification: full + ns-full (10 configs) + perf-build; all phases run even on partial failure; exit non-zero if any phase failed
+  extended         Full verification: perf-build first, then full + ns-full (10 configs); all phases run even on partial failure; perf status visible in both reports; exit non-zero if any phase failed
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
   hw-deploy        Copy kernel + initramfs to TFTP_DIR (default: ./tftp/); board fetches via U-Boot tftpboot; BOARD_CONFIG/BOARD_ARCH selectable
