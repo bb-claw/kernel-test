@@ -283,9 +283,11 @@ ns-full:
 # Complete verification: full + ns-full (10 configs). Sequential so ns-variant builds
 # benefit from ccache populated by full. Intended for Hetzner staging automation.
 extended:
-	+@$(MAKE) full
-	+@$(MAKE) ns-full
-	+@$(MAKE) perf-build
+	+@rc=0; \
+	 $(MAKE) perf-build || rc=$$?; \
+	 $(MAKE) full       || rc=$$?; \
+	 $(MAKE) ns-full    || rc=$$?; \
+	 exit $$rc
 
 # Daily-driver build: localconfig x86_64 only (uses /proc/config.gz; no BUILD_TIMEOUT).
 local:
@@ -462,15 +464,19 @@ programs:
 perf-build:
 ifeq ($(NO_PERF_BUILD),1)
 	@echo "[perf-build] skipped (NO_PERF_BUILD=1)"
+	$(Q)mkdir -p $(BUILD_DIR)/perf && printf 'STATUS=SKIP\n' > $(BUILD_DIR)/perf/build.status
 else
 	@echo "[perf-build] Building tools/perf from $(KERNEL_TREE)"
-	$(Q)mkdir -p build/perf
-	$(Q)if $(MAKE) -j$$(nproc) -C $(KERNEL_TREE)/tools/perf O=$(CURDIR)/build/perf \
-	        >build/perf/build.log 2>&1; then \
+	$(Q)mkdir -p $(BUILD_DIR)/perf
+	$(Q)if $(MAKE) -j$$(nproc) -C $(KERNEL_TREE)/tools/perf O=$(CURDIR)/$(BUILD_DIR)/perf \
+	        >$(BUILD_DIR)/perf/build.log 2>&1; then \
 	    echo "[perf-build] PASS"; \
+	    printf 'STATUS=PASS\n' > $(BUILD_DIR)/perf/build.status; \
 	else \
-	    grep ': error:' build/perf/build.log | head -10 >&2; \
-	    echo "[perf-build] FAIL — see build/perf/build.log"; exit 1; \
+	    grep ': error:' $(BUILD_DIR)/perf/build.log | head -10 >&2; \
+	    echo "[perf-build] FAIL — see $(BUILD_DIR)/perf/build.log"; \
+	    printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; \
+	    exit 1; \
 	fi
 endif
 
@@ -699,7 +705,7 @@ Targets:
   full             Broader coverage: bootable configs (kunitconfig tinyconfig defconfig randdefconfig rand500config), no fetch
   ns-smoke         Namespace smoke: kunitnsconfig + tinynsconfig (mirrors smoke; requires make bootstrap)
   ns-full          Namespace full: kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig (mirrors full)
-  extended         Full verification: full then ns-full (10 configs) + perf-build; intended for automated staging runs
+  extended         Full verification: perf-build first, then full + ns-full (10 configs); all phases run even on partial failure; perf status visible in both reports; exit non-zero if any phase failed
   local            Daily-driver build: localconfig x86_64 only, no fetch, no build timeout
   vf2              VisionFive 2 (JH7110) QEMU validation: vf2config riscv only, no fetch
   hw-deploy        Copy kernel + initramfs to TFTP_DIR (default: ./tftp/); board fetches via U-Boot tftpboot; BOARD_CONFIG/BOARD_ARCH selectable
@@ -710,6 +716,7 @@ Targets:
   info             Show current tag/commit checked out in KERNEL_TREE
   build            Build kernels for all CONFIGS × ARCHS
   programs         Rebuild C test binaries (tests/programs/ and tests/ns/) without system packages; runs automatically before initramfs in 'make all'
+  perf-build       Build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); result appears in summary.txt; NO_PERF_BUILD=1 to skip
   initramfs        Assemble Toybox cpio initramfs for each arch; injects tests/custom/*.sh, tests/ns/bin/<arch>/ns-*, tests/programs/*/bin/<arch>/*
   test             Boot each (config, arch) in QEMU/KVM and run tests
   report           Generate HTML/text report; exits 1 when OVERALL=FAIL (any build/boot/test/mismatch failure)
