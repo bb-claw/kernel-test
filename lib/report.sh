@@ -45,6 +45,26 @@ RUN_DIR_STAMP=$(date -d "$RUN_STAMP" +%Y-%m-%d_%H-%M-%S 2>/dev/null \
 RUN_DIR="$REPORT_DIR/${LABEL}-${VERSION_SHORT}-${RUN_DIR_STAMP}-${KERNEL_VERSION}"
 mkdir -p "$RUN_DIR"
 
+# ── Extended-run append mode ──────────────────────────────────────────────────
+# When make extended runs (perf-build → full → ns-full), both full and ns-full
+# call report.sh with the same RUN_STAMP. The first pass writes a sentinel so
+# the second pass can prepend the first-pass configs to produce a combined
+# 10-config summary instead of overwriting it with 5 ns configs only.
+SENTINEL="$BUILD_DIR/.report-extended-phase"
+EXTRA_CONFIGS=()
+ORIG_RUN_STAMP="$RUN_STAMP"
+
+if [[ -f "$SENTINEL" ]]; then
+    _s_stamp=$(grep '^RUN_STAMP=' "$SENTINEL" | cut -d= -f2-)
+    _s_configs=$(grep '^CONFIGS=' "$SENTINEL" | cut -d= -f2-)
+    if [[ "$_s_stamp" == "$RUN_STAMP" ]]; then
+        read -ra EXTRA_CONFIGS <<< "${_s_configs:-}"
+        rm -f "$SENTINEL"
+    else
+        rm -f "$SENTINEL"
+    fi
+fi
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 # read_status FILE KEY — print value for KEY= line, or '' if missing
@@ -73,7 +93,7 @@ ROWS=()
 CONFIG_ROWS=()
 OVERALL=PASS
 
-for config in $CONFIGS; do
+for config in "${EXTRA_CONFIGS[@]}" $CONFIGS; do
     for arch in $ARCHS; do
         out="$BUILD_DIR/$config-$arch"
 
@@ -153,7 +173,7 @@ done
 
 # ── Overall duration ──────────────────────────────────────────────────────────
 
-RUN_START_EPOCH=$(date -d "$RUN_STAMP" +%s 2>/dev/null || echo "$REPORT_GEN_EPOCH")
+RUN_START_EPOCH=$(date -d "$ORIG_RUN_STAMP" +%s 2>/dev/null || echo "$REPORT_GEN_EPOCH")
 OVERALL_DURATION=$(fmt_dur "$(( REPORT_GEN_EPOCH - RUN_START_EPOCH ))")
 
 # ── Host info ─────────────────────────────────────────────────────────────────
@@ -270,6 +290,13 @@ TXT="$RUN_DIR/summary.txt"
 
     printf '\nReport dir: %s/\n' "$RUN_DIR"
 } > "$TXT"
+
+# Write sentinel so the next report.sh call (ns-full in make extended) can
+# prepend these configs to produce a combined 10-config summary. Not written
+# on the second pass (EXTRA_CONFIGS non-empty) to avoid infinite chaining.
+if [[ ${#EXTRA_CONFIGS[@]} -eq 0 ]]; then
+    printf 'RUN_STAMP=%s\nCONFIGS=%s\n' "$RUN_STAMP" "$CONFIGS" > "$SENTINEL"
+fi
 
 # ── summary.mail.txt ──────────────────────────────────────────────────────────────
 # Email-ready preamble only — paste as the body of an LKML report mail.
