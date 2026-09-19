@@ -31,7 +31,7 @@ make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig  # fast iteration: repack + re
 make smoke                                     # quick sanity: kunitconfig + tinyconfig, all archs
 make ns-smoke                                  # namespace smoke: kunitnsconfig + tinynsconfig
 make ns-full                                   # namespace full: 5 ns-variant configs
-make extended                                  # perf-build first, then full + ns-full (10 configs); all phases run even on partial failure
+make extended                                  # perf-build first, then full + ns-full; all phases run even on partial failure; second report.sh pass merges both into one 10-config summary.txt
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → ci-test → programs (no i386)

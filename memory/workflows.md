@@ -60,7 +60,7 @@ make smoke                                            # kunitconfig + tinyconfig
 make full                                             # 5 bootable configs, preset auto-selected
 make ns-smoke                                         # kunitnsconfig + tinynsconfig (requires make bootstrap)
 make ns-full                                          # 5 ns-variant configs (mirrors full)
-make extended                                         # perf-build first (so status is in both reports), then full + ns-full (10 configs); all phases run even on partial failure; exit non-zero if any failed
+make extended                                         # perf-build first (so status is in both reports), then full + ns-full; all phases run even on partial failure; exit non-zero if any failed; report.sh sentinel merges both phases into one 10-config summary.txt
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
