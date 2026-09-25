@@ -94,9 +94,18 @@ BUILD_DIR := build
 CACHE_DIR := cache
 
 # Kernel version: version file written by fetch/checkout; fall back to git then kernel Makefile.
-KERNEL_VERSION := $(shell cat $(BUILD_DIR)/.kernel-version 2>/dev/null \
+# NOTE: make -s -C KERNEL_TREE kernelversion is intentionally avoided here — it parses the
+# full Kbuild machinery and takes 20+ seconds on every make invocation. Direct grep is instant.
+KERNEL_VERSION := $(shell \
+    { v=$$(cat $(BUILD_DIR)/.kernel-version 2>/dev/null); [ -n "$$v" ] && echo "$$v"; } \
     || git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null \
-    || make -s -C "$(KERNEL_TREE)" kernelversion 2>/dev/null \
+    || { mf=$(KERNEL_TREE)/Makefile; [ -f "$$mf" ] && { \
+        _v=$$(grep -m1 '^VERSION[[:space:]]*='      "$$mf" | sed 's/^[^=]*=[[:space:]]*//;s/[[:space:]]*$$//'); \
+        _p=$$(grep -m1 '^PATCHLEVEL[[:space:]]*='   "$$mf" | sed 's/^[^=]*=[[:space:]]*//;s/[[:space:]]*$$//'); \
+        _s=$$(grep -m1 '^SUBLEVEL[[:space:]]*='     "$$mf" | sed 's/^[^=]*=[[:space:]]*//;s/[[:space:]]*$$//'); \
+        _e=$$(grep -m1 '^EXTRAVERSION[[:space:]]*=' "$$mf" | sed 's/^[^=]*=[[:space:]]*//;s/[[:space:]]*$$//'); \
+        [ "$${_s:-0}" -eq 0 ] && printf 'v%s.%s%s' "$$_v" "$$_p" "$$_e" \
+                               || printf 'v%s.%s.%s%s' "$$_v" "$$_p" "$$_s" "$$_e"; }; } \
     || git -C "$(KERNEL_TREE)" rev-parse --short HEAD 2>/dev/null \
     || echo unknown)
 
