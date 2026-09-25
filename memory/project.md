@@ -46,6 +46,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | Per-(config,arch) initramfs | watchdog marker requires grepping per-build `.config` for `CONFIG_WATCHDOG=y`; one `initramfs-$CONFIG-$ARCH.cpio.gz` per pair → markers reflect actual config state; `build.status` prerequisite auto-rebuilds initramfs after kernel build |
 | `KERNEL_VERSION` computed via grep, not `make kernelversion` | `make -s -C KERNEL_TREE kernelversion` triggers full Kbuild at Makefile parse time, adding 20+ s to every `make` invocation; direct grep of VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION from `KERNEL_TREE/Makefile` is instant — same logic as `lib/common.sh:read_kernel_makefile_version()` |
 | `make info` uses `--exact-match` only for Tag (git) | `git describe HEAD` (no depth limit) walks the full DAG; on stable-rc clones with one stale mainline tag 1.4 M commits back this takes 10+ s; `Tag (Makefile)` and `Version file` already show the correct version |
+| `CCACHE_MAX_SIZE=25G` default, tuning via `--set-config` | 5G default caused cache thrashing on localconfig builds (~4.6G output, 82% miss rate); settings written to `ccache.conf` via `--set-config` so they persist for standalone `ccache` invocations; `hard_link` excluded — `objtool` modifies `.o` files in-place for ORC unwinder, incompatible with read-only hard-linked cache entries |
 
 ## Current State
 
