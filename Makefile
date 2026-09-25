@@ -67,6 +67,15 @@ BOARD_ARCH     ?= riscv
 BOARD_TTY      ?= /dev/ttyUSB0
 TFTP_DIR       ?= $(CURDIR)/tftp
 
+# ── ccache tuning ──────────────────────────────────────────────────────────────
+# 5G default causes cache thrashing on localconfig builds (~4.6G output); 25G
+# fits localconfig + all CI (config × arch) combos without eviction.
+# Override per-machine in local.mk.
+CCACHE_MAX_SIZE ?= 25G
+# 1 = enable time_macros sloppiness + zstd compression level 1 + base_dir=$HOME
+# 0 = size increase only (no behaviour changes beyond max_size)
+CCACHE_TUNE     ?= 1
+
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
 HW_HOST_IP     ?= 192.168.100.1
@@ -126,7 +135,7 @@ ifndef RUN_STAMP
 endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
-export KERNEL_TREE BUILD_DIR CACHE_DIR
+export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT

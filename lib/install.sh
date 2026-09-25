@@ -60,6 +60,16 @@ NPROC=$(nproc 2>/dev/null || echo 1)
 # ccache: reuse the build cache for the modules compile
 CACHE_DIR=${CACHE_DIR:-cache}
 export CCACHE_DIR="$PWD/$CACHE_DIR"
+ccache --set-config="max_size=${CCACHE_MAX_SIZE:-25G}"
+if [[ "${CCACHE_TUNE:-1}" == "1" ]]; then
+    ccache --set-config="sloppiness=time_macros"
+    ccache --set-config="compression_level=1"
+    ccache --set-config="base_dir=$HOME"
+else
+    ccache --set-config="sloppiness="
+    ccache --set-config="compression_level=0"
+    ccache --set-config="base_dir="
+fi
 
 info "Kernel version : $KVER"
 info "vmlinuz        : /boot/vmlinuz-$BOOT_SUFFIX"

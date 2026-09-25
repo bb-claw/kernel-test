@@ -62,6 +62,19 @@ mkdir -p "$CCACHE_DIR"
 # Validate ccache is available
 command -v ccache &>/dev/null || die "ccache not found in PATH"
 
+# Apply size and tuning from Makefile variables (overridable via local.mk).
+# All settings written to ccache.conf so they persist for standalone ccache commands.
+ccache --set-config="max_size=${CCACHE_MAX_SIZE:-25G}"
+if [[ "${CCACHE_TUNE:-1}" == "1" ]]; then
+    ccache --set-config="sloppiness=time_macros"  # ignore __DATE__/__TIME__ in cache key
+    ccache --set-config="compression_level=1"     # zstd level 1: faster on NVMe, ~5% larger
+    ccache --set-config="base_dir=$HOME"           # normalize absolute paths in cache keys
+else
+    ccache --set-config="sloppiness="
+    ccache --set-config="compression_level=0"
+    ccache --set-config="base_dir="
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # ── Namespace variant: derive base config ─────────────────────────────────────

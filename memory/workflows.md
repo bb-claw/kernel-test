@@ -43,9 +43,10 @@
 | `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
 | `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
 | `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
+| `CCACHE_MAX_SIZE` | `25G` | `CCACHE_MAX_SIZE=10G` — per-clone ccache budget; 5G default causes thrashing on localconfig (~4.6G build output); override in `local.mk` |
+| `CCACHE_TUNE` | `1` | `CCACHE_TUNE=0` — disable tuning (size increase only); `1` enables `time_macros` sloppiness + zstd level 1 + `base_dir=$HOME` normalization |
 
-`KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
-When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
+`KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
 ## Common Workflows
 
@@ -98,7 +99,6 @@ make warnings-baseline                                # pin latest run as warnin
 ```sh
 make config-archive   # scan DATA_REPO/reports/, populate DATA_REPO/configs/archive_{passed,failed}/; auto-commits to data repo
 ```
-
 ### Consolidated cross-source index
 `make consolidate-index` — merge per-source `archive_failed/index.txt` → `DATA_REPO/consolidation/index.{txt,html}`. Copy each machine's index to `DATA_REPO/consolidation/<label>/archive_failed/index.txt`.
 
