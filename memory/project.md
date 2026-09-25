@@ -44,6 +44,8 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | kunitrandconfig is build-only | Random KUnit module set; use kunitconfig for deterministic KUnit boot testing |
 | preset auto-dispatch via $(notdir $(CURDIR)) | Same `make fetch` command works in mainline/stable/stable-rc clones; directory name selects presets/kernel-test-*.mk; `kernel-test-next` preset sets `LINUX_NEXT=1`, causing `make fetch` to error and redirect to `make fetch-next` |
 | Per-(config,arch) initramfs | watchdog marker requires grepping per-build `.config` for `CONFIG_WATCHDOG=y`; one `initramfs-$CONFIG-$ARCH.cpio.gz` per pair → markers reflect actual config state; `build.status` prerequisite auto-rebuilds initramfs after kernel build |
+| `KERNEL_VERSION` computed via grep, not `make kernelversion` | `make -s -C KERNEL_TREE kernelversion` triggers full Kbuild at Makefile parse time, adding 20+ s to every `make` invocation; direct grep of VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION from `KERNEL_TREE/Makefile` is instant — same logic as `lib/common.sh:read_kernel_makefile_version()` |
+| `make info` uses `--exact-match` only for Tag (git) | `git describe HEAD` (no depth limit) walks the full DAG; on stable-rc clones with one stale mainline tag 1.4 M commits back this takes 10+ s; `Tag (Makefile)` and `Version file` already show the correct version |
 
 ## Current State
 
