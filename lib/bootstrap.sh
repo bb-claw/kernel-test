@@ -94,7 +94,7 @@ install_packages() {
                 clang lld llvm musl-tools \
                 qemu-system-x86 qemu-system-arm qemu-system-misc \
                 cpio git lzop libssl-dev \
-                bc flex bison libelf-dev \
+                bc flex bison libelf-dev pkg-config \
                 socat valgrind
 
             # Cross-compilers + sysroot headers in a separate step so a broken

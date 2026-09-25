@@ -468,7 +468,7 @@ programs:
 	exit $$rc
 
 # Build tools/perf from KERNEL_TREE. Part of make extended.
-# Skip with NO_PERF_BUILD=1 on hosts missing libelf/libdw/libpython.
+# Skip with NO_PERF_BUILD=1 on hosts missing libelf/libdw/pkg-config/libpython.
 perf-build:
 ifeq ($(NO_PERF_BUILD),1)
 	@echo "[perf-build] skipped (NO_PERF_BUILD=1)"
