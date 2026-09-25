@@ -244,8 +244,7 @@ info:
 	    "$$(git -C "$(KERNEL_TREE)" rev-parse HEAD 2>/dev/null || echo '(git error — is KERNEL_TREE set?)')"
 	@tag=$$(git -C "$(KERNEL_TREE)" describe --exact-match HEAD 2>/dev/null) \
 	    && printf 'Tag (git):    %s\n' "$$tag" \
-	    || printf 'Tag (git):    (not a tagged commit — nearest: %s)\n' \
-	        "$$(git -C "$(KERNEL_TREE)" describe HEAD 2>/dev/null || echo '?')"
+	    || printf 'Tag (git):    (not a tagged commit)\n'
 	@mf="$(KERNEL_TREE)/Makefile"; \
 	if [[ -f $$mf ]]; then \
 	    _ver=$$(grep -m1 '^VERSION[[:space:]]*='      "$$mf" | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]'); \
