@@ -468,7 +468,8 @@ programs:
 	exit $$rc
 
 # Build tools/perf from KERNEL_TREE. Part of make extended.
-# Skip with NO_PERF_BUILD=1 on hosts missing libelf/libdw/libpython.
+# Hard deps (all installed by make bootstrap): libelf-dev libdw-dev pkg-config python3-dev libtraceevent-dev.
+# Skip with NO_PERF_BUILD=1 on hosts where bootstrap has not been run.
 perf-build:
 ifeq ($(NO_PERF_BUILD),1)
 	@echo "[perf-build] skipped (NO_PERF_BUILD=1)"

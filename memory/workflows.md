@@ -42,7 +42,7 @@
 | `HW_RELAY` | `/dev/vf2-relay` | Stable udev symlink to USB relay for `board_reset` |
 | `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
 | `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
-| `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` (e.g. on hosts missing libelf/libdw) |
+| `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at Makefile parse time.
 When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
@@ -65,7 +65,7 @@ make local                                            # localconfig x86_64, no b
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 make programs                                         # rebuild C test binaries (tests/programs/ + tests/ns/) without system packages; auto-runs in make all
-make perf-build                                       # build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); report.sh includes result; NO_PERF_BUILD=1 to skip
+make perf-build                                       # build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); report.sh includes result; NO_PERF_BUILD=1 to skip; hard deps on Debian: libelf-dev libdw-dev pkg-config python3-dev libtraceevent-dev (all in make bootstrap)
 make hw-bootstrap [DRY_RUN=1]                         # install dnsmasq/networkd/udev for board testing (needs sudo)
 make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR (default: ./tftp/)
 make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
