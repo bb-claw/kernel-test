@@ -5,6 +5,7 @@
 # Exports required: GCC ARCHS BUILD_DIR CACHE_DIR (all have Makefile defaults).
 # Exits 0 when all checks pass; exits 1 and prints actionable errors otherwise.
 set -euo pipefail
+# shellcheck source=lib/common.sh
 . "$(dirname "$0")/common.sh"
 
 GCC=${GCC:-gcc}
