@@ -143,8 +143,8 @@ kernel-test/
 │   └── canary-patch.sh   # Patch kernel tree with boot canary module (make canary-patch)
 ├── tests/
 │   ├── 001_smoke.sh      # Boot smoke test (reaches init, no oops/panic)
-│   ├── custom/           # Functional kernel-path tests (run in NNN_ order; next: 290_)
-│   │   ├── 010_check-proc.sh  … 280_proc-self-extended.sh
+│   ├── custom/           # Functional kernel-path tests (run in NNN_ order; next: 510_)
+│   │   ├── 010_check-proc.sh  … 500_sysvipc.sh
 │   └── hardware/
 │       └── verify.sh     # Real-hardware check for localconfig (run on the booted laptop)
 ├── .githooks/
@@ -166,8 +166,11 @@ kernel-test/
 | `make fetch` | Fetch and checkout the latest -rc tag automatically |
 | `make checkout TAG=v7.2-rc2` | Fetch and checkout a specific tag or commit |
 | `make info` | Show current tag/commit and kernel Makefile version |
-| `make smoke` | Quick sanity: kunitconfig + tinyconfig, all archs |
-| `make full` | Broader: 5 bootable configs, all archs |
+| `make smoke` | Quick sanity: tinyconfig kunitconfig, all archs |
+| `make full` | defconfig tinyconfig kunitconfig randdefconfig rand500config (base-first order for cache reuse) |
+| `make ns-smoke` | Namespace smoke: tinynsconfig kunitnsconfig |
+| `make ns-full` | Namespace full: defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig |
+| `make extended` | perf-build → full → ns-full in one pass; phases are independent; combined 10-config report |
 | `make build` | Build kernels for all configs × archs |
 | `make initramfs` | Assemble the Toybox cpio initramfs |
 | `make test` | Boot VMs and run tests |
@@ -285,6 +288,19 @@ for inspection.
 `configs/randdefconfig.config` which forces heavy subsystems off (DRM, SOUND, STAGING, INFINIBAND,
 MEDIA_SUPPORT) and re-pins bootability options. This keeps build time reliably under 5 minutes
 on a 16-core machine.
+
+### Config cache and sibling reuse
+
+`build.sh` caches the pre-fragment `.config-base` per `(config, arch)` combo, keyed by
+`sha256(commit + fragments)`. On a cache hit the expensive `make tinyconfig`/`make defconfig`
+step is skipped (~0 s vs 17–29 s per arch). Several configs borrow their base from a sibling
+combo's cached `.config-base` on cold runs: `kunitconfig`/`kunitnsconfig` → `defconfig`;
+`tinynsconfig` → `tinyconfig`; `defnsconfig` → `defconfig`; `vf2config` → `defconfig` (riscv).
+Deterministic configs write their own per-combo cache after a sibling hit so subsequent runs
+skip the sibling entirely. Random configs (`rand500config`, `randdefconfig`, `kunitrandconfig`)
+also borrow from their sibling but do not write an own cache — their output changes each run.
+`make full` and `make ns-full` order base configs first to maximise same-session sibling hits.
+`NO_CONFIG_CACHE=1` forces a fresh base-config run.
 
 ## Adding Custom Tests
 
