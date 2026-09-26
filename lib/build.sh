@@ -34,6 +34,10 @@ esac
     die "Kernel Makefile not found in '$KERNEL_TREE' — run 'make fetch' first, " \
         "or restore the tree with: git -C $KERNEL_TREE checkout HEAD -- ."
 
+# Catch a missing host compiler before ccache tries (and fails obscurely) to invoke it
+command -v "$GCC" >/dev/null 2>&1 || \
+    die "Host compiler '$GCC' not found in PATH — override via GCC= in local.mk (e.g. GCC=gcc)"
+
 OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
 LOG_FILE="$OUT_DIR/build.log"
 STATUS_FILE="$OUT_DIR/build.status"
