@@ -45,6 +45,7 @@
 | `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
 | `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `25G` / `1` | ccache budget (5G causes localconfig thrashing); `TUNE=0` disables `time_macros`+zstd+`base_dir` normalization; override in `local.mk` |
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
+| `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
@@ -141,7 +142,6 @@ make verify-patch FILES=security/landlock/fs.o [BASE=v7.2-rc4] [COMPILER=clang] 
 make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host kernel
 make valgrind                                   # build + run all C programs AND ns-* subcommands under Valgrind; EPERM→skip, exit 99→fail
 ```
-
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`. **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
 ### CI / linting / preflight / dev-test / bug-hunt
 `make preflight` — validate host compiler (`GCC`), cross-compilers per `ARCHS`, QEMU binaries per `ARCHS`, disk space (default 5G; override via `MIN_BUILD_SPACE_GB`/`MIN_CACHE_SPACE_GB` in `local.mk`); auto-runs at `make build`.
