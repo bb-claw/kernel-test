@@ -66,7 +66,13 @@ assert_file_exists "$REPO/lib/preflight.sh" "lib/preflight.sh present"
                                    || fail "lib/preflight.sh must be executable"
 
 begin_test "lib/preflight.sh is shellcheck-clean"
-assert_exit0 "shellcheck clean" shellcheck --severity=warning "$REPO/lib/preflight.sh"
+if ! command -v shellcheck &>/dev/null; then
+    pass "skip: shellcheck not available"
+elif shellcheck --severity=warning "$REPO/lib/preflight.sh" >/dev/null 2>&1; then
+    pass "shellcheck clean"
+else
+    fail "shellcheck clean: exited non-zero"
+fi
 
 # ── Happy path ────────────────────────────────────────────────────────────────
 
