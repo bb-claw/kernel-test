@@ -42,7 +42,9 @@ command -v "$GCC" >/dev/null 2>&1 || \
 OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
 LOG_FILE="$OUT_DIR/build.log"
 STATUS_FILE="$OUT_DIR/build.status"
-NPROC=$(nproc 2>/dev/null || echo 1)
+_host_cpus=$(nproc 2>/dev/null || echo 1)
+NPROC=$(( _host_cpus / ${PARALLEL_BUILDS:-1} ))
+[[ $NPROC -lt 1 ]] && NPROC=1
 
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
@@ -175,7 +177,7 @@ _try_config_cache() {
 # _write_config_cache: snapshot .config as the new base and update the stamp.
 _write_config_cache() {
     cp "$OUT_DIR/.config" "$_config_base"
-    printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
+    printf '%s\n' "$TREE_COMMIT" > "${_config_base_commit}.tmp" && mv "${_config_base_commit}.tmp" "$_config_base_commit"
     config_cache_hash "$TREE_COMMIT" "${_cache_frags[@]}" > "$_config_cache_hash"
 }
 
@@ -231,7 +233,7 @@ elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
             die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
         fi
         cp "$OUT_DIR/.config" "$_config_base"
-        printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
+        printf '%s\n' "$TREE_COMMIT" > "${_config_base_commit}.tmp" && mv "${_config_base_commit}.tmp" "$_config_base_commit"
     fi
     # Generate a fresh randconfig in a temp dir, constrain it to exclude heavy
     # subsystems (same set as configs/randconfig.config), then sample 500 =y lines.
@@ -270,7 +272,7 @@ elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
             die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
         fi
         cp "$OUT_DIR/.config" "$_config_base"
-        printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
+        printf '%s\n' "$TREE_COMMIT" > "${_config_base_commit}.tmp" && mv "${_config_base_commit}.tmp" "$_config_base_commit"
     fi
     # Randomly disable ~300 options to reduce build surface.
     # The fragment (step 1b) forces heavy subsystems off and re-pins bootability options,

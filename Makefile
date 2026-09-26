@@ -84,6 +84,17 @@ MIN_CACHE_SPACE_GB ?= 5
 # 0 = always use BFD (set in local.mk when LLD causes issues)
 USE_LLD            ?= 1
 
+# ── Parallelism controls ──────────────────────────────────────────────────────
+# PARALLEL_BUILDS: concurrent kernel builds. Default 1 = sequential (exact current behaviour).
+#   Set to 4 to run 4 builds at once; each build's -j is reduced to nproc/PARALLEL_BUILDS.
+#   Tier-0 base configs (defconfig, tinyconfig, etc.) always complete before tier-1 starts
+#   so the sibling config cache remains effective. Override per-machine in local.mk.
+PARALLEL_BUILDS    ?= 1
+# PARALLEL_VMS: concurrent QEMU VMs. Default 1 = sequential.
+#   Each VM uses 512M–1G RAM. Cap based on available RAM (4 VMs ≈ 3G, safe on all hosts).
+#   Override per-machine in local.mk.
+PARALLEL_VMS       ?= 1
+
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
 HW_HOST_IP     ?= 192.168.100.1
@@ -144,6 +155,7 @@ endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
+export PARALLEL_BUILDS PARALLEL_VMS
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD NO_CONFIG_CACHE
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
@@ -469,14 +481,28 @@ build:
 ifeq ($(NO_BUILD),1)
 	@echo "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
-	@echo "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS)"
+	@echo "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
+	_pids=(); \
+	_enqueue() { \
+	    printf '[build] %-16s %s\n' "$$1" "$$2"; \
+	    lib/build.sh "$$1" "$$2" & _pids+=("$$!"); \
+	    while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
+	        wait "$${_pids[0]}" || rc=1; \
+	        _pids=("$${_pids[@]:1}"); \
+	    done; \
+	}; \
+	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
 	for config in $(CONFIGS); do \
-		for arch in $(ARCHS); do \
-			printf '[build] %-16s %s\n' "$$config" "$$arch"; \
-			lib/build.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) ;; *) continue ;; esac; \
+	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
 	done; \
+	_flush; \
+	for config in $(CONFIGS); do \
+	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) continue ;; esac; \
+	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
+	done; \
+	_flush; \
 	exit $$rc
 endif
 
@@ -522,14 +548,20 @@ endif
 
 # Build one initramfs per (config, arch) pair so each can include config-specific markers.
 initramfs:
-	@echo "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
+	@echo "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
+	_pids=(); \
 	for config in $(BOOT_CONFIGS); do \
-		for arch in $(ARCHS); do \
-			printf '[initramfs] %s %s\n' "$$config" "$$arch"; \
-			lib/initramfs.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    for arch in $(ARCHS); do \
+	        printf '[initramfs] %s %s\n' "$$config" "$$arch"; \
+	        lib/initramfs.sh "$$config" "$$arch" & _pids+=("$$!"); \
+	        while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
+	            wait "$${_pids[0]}" || rc=1; \
+	            _pids=("$${_pids[@]:1}"); \
+	        done; \
+	    done; \
 	done; \
+	for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; \
 	exit $$rc
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
@@ -537,20 +569,27 @@ initramfs:
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
-	@echo "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
+	@echo "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel VMs: $(PARALLEL_VMS)"
 	$(Q)rc=0; \
+	_pids=(); \
+	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
 	for config in $(BOOT_CONFIGS); do \
-		for arch in $(ARCHS); do \
-			bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
-			if [[ $$bstatus != PASS ]]; then \
-				printf '[test] %-16s %s  SKIP (build %s)\n' "$$config" "$$arch" "$${bstatus:-missing}"; \
-				rc=1; \
-				continue; \
-			fi; \
-			printf '[test] %-16s %s\n' "$$config" "$$arch"; \
-			lib/vm.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    for arch in $(ARCHS); do \
+	        bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
+	        if [[ $$bstatus != PASS ]]; then \
+	            printf '[test] %-16s %s  SKIP (build %s)\n' "$$config" "$$arch" "$${bstatus:-missing}"; \
+	            rc=1; \
+	            continue; \
+	        fi; \
+	        printf '[test] %-16s %s\n' "$$config" "$$arch"; \
+	        lib/vm.sh "$$config" "$$arch" & _pids+=("$$!"); \
+	        while [[ $${#_pids[@]} -ge $(PARALLEL_VMS) ]]; do \
+	            wait "$${_pids[0]}" || rc=1; \
+	            _pids=("$${_pids[@]:1}"); \
+	        done; \
+	    done; \
 	done; \
+	_flush; \
 	exit $$rc
 
 report:
@@ -850,6 +889,8 @@ Variables (current values):
   HW_RELAY            = $(HW_RELAY)  (USB relay device symlink for board_reset; default: /dev/vf2-relay)
   HW_RELAY_VID        = $(HW_RELAY_VID)  (USB vendor ID of relay; CH340 default: 1a86)
   HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
+  PARALLEL_BUILDS     = $(PARALLEL_BUILDS)  (concurrent kernel builds; 1=sequential; set to 4 to run 4 builds at once; per-build -j reduced proportionally)
+  PARALLEL_VMS        = $(PARALLEL_VMS)  (concurrent QEMU VMs; 1=sequential; each VM uses 512M–1G RAM; 4 VMs ≈ 3G)
   SEED                = $(if $(SEED),$(SEED),(not set — make dev-test SEED=N for reproducible random draw))
   BUDGET              = $(if $(BUDGET),$(BUDGET),(not set — make dev-test BUDGET=N overrides 300s time cap; default: 300))
   MAX_MINUTES         = $(if $(MAX_MINUTES),$(MAX_MINUTES),(not set — make bug-hunt MAX_MINUTES=N overrides 30 min time cap))
