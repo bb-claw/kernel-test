@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   ci:
-    name: lint → ci-test → programs
+    name: lint → programs → ci-test
     runs-on: ubuntu-22.04
     timeout-minutes: 15
 
@@ -80,8 +80,8 @@ jobs:
       - name: make lint
         run: make lint
 
-      - name: make ci-test
-        run: make ci-test
-
       - name: make programs
         run: make programs ARCHES="x86_64 arm64 riscv"
+
+      - name: make ci-test
+        run: make ci-test

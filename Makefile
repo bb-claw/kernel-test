@@ -226,10 +226,11 @@ lint-context:
 ci-test:
 	$(Q)scripts/ci-run-tests.sh
 
-# Mirror the GitHub Actions pipeline locally: lint → ci-test → programs.
+# Mirror the GitHub Actions pipeline locally: lint → programs → ci-test.
 # i386 excluded — gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu.
-ci: lint ci-test
+ci: lint
 	$(MAKE) programs ARCHES="x86_64 arm64 riscv"
+	$(MAKE) ci-test
 
 # ≤6-minute branch verification gate: fixed core (lint + C build + 13 CI tests +
 # tinyconfig/defconfig/localconfig VM smokes) + random weighted draw.
@@ -777,7 +778,7 @@ Targets:
   verify-patch     Build FILES with GCC+Clang across VERIFY_ARCHS; optional before/after via BASE=  (requires FILES=; opt: BASE= COMPILER=gcc|clang|both VERIFY_ARCHS= CLEAN=1)
   lint             Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
   ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
-  ci               Run the full GitHub Actions pipeline locally: lint → ci-test → programs (i386 excluded)
+  ci               Run the full GitHub Actions pipeline locally: lint → programs → ci-test (i386 excluded)
   dev-test         ≤6-min branch verification gate: >70% of 41 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
   hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
   bug-hunt         Claude Code bug hunt: find 3 high-severity bugs; results in bug-hunt/ (MAX_MINUTES=30 MAX_TURNS=80; requires claude CLI)
