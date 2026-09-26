@@ -315,7 +315,7 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
     # Force =m → =y: initramfs cannot load modules, tests must be built-in.
     grep '^CONFIG_[A-Z0-9_]*KUNIT[A-Z0-9_]*=[ym]$' "$RAND_TMP/.config" \
         | sed 's/=[ym]$/=y/' \
-        | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config"
+        | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config" || true
     rm -rf "$RAND_TMP"
     trap - EXIT
 elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
