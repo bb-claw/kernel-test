@@ -50,7 +50,7 @@ install_packages() {
                 qemu-system-x86 qemu-system-aarch64 extra/qemu-system-riscv \
                 cpio git lzop \
                 bc flex bison libelf pahole \
-                valgrind socat
+                shellcheck valgrind socat
             ;;
 
         apt)
@@ -96,7 +96,7 @@ install_packages() {
                 cpio git lzop libssl-dev \
                 bc flex bison libelf-dev libdw-dev pkg-config \
                 python3 python3-dev libtraceevent-dev \
-                socat valgrind
+                shellcheck socat valgrind
 
             # Cross-compilers + sysroot headers in a separate step so a broken
             # pre-existing package state does not abort the rest of bootstrap.
@@ -163,7 +163,7 @@ MUSL_CLANG_WRAPPER
                 qemu-system-x86 qemu-system-aarch64 \
                 cpio git lzop \
                 bc flex bison elfutils-libelf-devel dwarves \
-                valgrind socat glibc-debuginfo
+                ShellCheck valgrind socat glibc-debuginfo
             ;;
 
         zypper)
@@ -173,7 +173,7 @@ MUSL_CLANG_WRAPPER
                 qemu-x86 qemu-arm \
                 cpio git lzop \
                 bc flex bison libelf-devel dwarves \
-                valgrind socat glibc-debuginfo
+                ShellCheck valgrind socat glibc-debuginfo
             ;;
 
         unknown)
