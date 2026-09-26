@@ -11,6 +11,7 @@ ARCH=${2:?usage: build.sh <config> <arch>}
 require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
 GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
+USE_LLD=${USE_LLD:-1}
 
 # ── Architecture-specific settings ───────────────────────────────────────────
 
@@ -47,6 +48,14 @@ mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
 printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
+
+# ── Linker selection ──────────────────────────────────────────────────────────
+LINKER=bfd
+if detect_lld; then
+    LINKER=lld
+    info "Linker: ld.lld ${LLD_VERSION}"
+fi
+trap 'printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 
@@ -116,6 +125,7 @@ kmake() {
         "$@"
     )
     [[ -n $CROSS_COMPILE ]] && make_args+=( CROSS_COMPILE="$CROSS_COMPILE" )
+    [[ ${LINKER:-bfd} == lld ]] && make_args+=( LD=ld.lld )
     if [[ ${V:-0} == 1 ]]; then
         "${pfx[@]}" make "${make_args[@]}" 2>&1 | tee -a "$LOG_FILE"
     else

@@ -79,6 +79,9 @@ CCACHE_TUNE        ?= 1
 # ── Preflight thresholds (overridable in local.mk) ────────────────────────────
 MIN_BUILD_SPACE_GB ?= 5
 MIN_CACHE_SPACE_GB ?= 5
+# 1 = use ld.lld if present and ≥ kernel minimum (auto-detected by preflight)
+# 0 = always use BFD (set in local.mk when LLD causes issues)
+USE_LLD            ?= 1
 
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
@@ -139,7 +142,7 @@ ifndef RUN_STAMP
 endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
-export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB
+export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT

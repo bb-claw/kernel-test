@@ -8,6 +8,7 @@ set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
 GCC=${GCC:-gcc}
+USE_LLD=${USE_LLD:-1}
 ARCHS=${ARCHS:-x86_64 i386 arm64 riscv}
 BUILD_DIR=${BUILD_DIR:-build}
 CACHE_DIR=${CACHE_DIR:-cache}
@@ -59,6 +60,18 @@ _check_space() {
 }
 _check_space "$BUILD_DIR" "$MIN_BUILD_SPACE_GB" "BUILD_DIR"
 _check_space "$CACHE_DIR" "$MIN_CACHE_SPACE_GB" "CACHE_DIR"
+
+# ── LLD linker (informational) ────────────────────────────────────────────────
+if [[ "$USE_LLD" != "0" ]]; then
+    if detect_lld; then
+        printf 'Preflight: LLD %s ≥ %s — using ld.lld\n' "$LLD_VERSION" "$LLD_MIN"
+    elif [[ -n "$LLD_VERSION" ]]; then
+        printf 'Preflight: LLD %s < %s — using BFD (upgrade lld or set USE_LLD=0 in local.mk)\n' \
+            "$LLD_VERSION" "$LLD_MIN"
+    else
+        printf 'Preflight: ld.lld not found — using BFD\n'
+    fi
+fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
 if [[ $_errors -gt 0 ]]; then
