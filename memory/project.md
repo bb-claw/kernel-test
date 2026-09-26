@@ -12,6 +12,7 @@ Goal: systematic community verification of each -rc kernel.
 ```
 make all
   └─ lib/fetch.sh / lib/fetch-stable-rc.sh   auto-dispatch by preset: mainline rc tag / stable vX.Y.* tag / stable-rc branch tip
+  └─ lib/preflight.sh    hard-fail validation before build: host compiler, cross-compilers, QEMU binaries per ARCHS, disk space; auto-invoked by `make build`
   └─ lib/build.sh        cross-compile kernel per (config × arch), ccache; clears vm.status on start
   └─ lib/initramfs.sh    Toybox cpio initramfs per (config, arch); inject tests/custom/*.sh + ns-* binaries (tests/ns/) + perf-event + arena-test (tests/programs/); write capability markers (/tests/ns-enabled, perf-enabled, arena-enabled, watchdog-enabled)
   └─ lib/vm.sh           QEMU boot (KVM for x86, TCG for arm64), capture serial, count TEST PASS/FAIL + KUnit KTAP ok/not ok
@@ -61,7 +62,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 ```
 kernel-test/
 ├── Makefile
-├── lib/            core pipeline: fetch.sh fetch-next.sh fetch-stable-rc.sh checkout.sh build.sh initramfs.sh vm.sh report.sh diff.sh install.sh dmesg.sh + common.sh (shared arch helpers)
+├── lib/            core pipeline: fetch.sh fetch-next.sh fetch-stable-rc.sh checkout.sh preflight.sh build.sh initramfs.sh vm.sh report.sh diff.sh install.sh dmesg.sh + common.sh (shared arch helpers)
 ├── scripts/        on-demand tools: kconfig-check.sh kconfig-enumerate.sh build-kconfig.sh config-archive.sh config-bisect.sh canary-patch.sh migrate-reports.sh dev-test.sh hook-dev-test.sh verify-patch.sh
 ├── tests/
 │   ├── 001_smoke.sh

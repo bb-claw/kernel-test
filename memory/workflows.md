@@ -43,8 +43,8 @@
 | `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
 | `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
 | `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
-| `CCACHE_MAX_SIZE` | `25G` | `CCACHE_MAX_SIZE=10G` — per-clone ccache budget; 5G default causes thrashing on localconfig (~4.6G build output); override in `local.mk` |
-| `CCACHE_TUNE` | `1` | `CCACHE_TUNE=0` — disable tuning (size increase only); `1` enables `time_macros` sloppiness + zstd level 1 + `base_dir=$HOME` normalization |
+| `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `25G` / `1` | ccache budget (5G causes localconfig thrashing); `TUNE=0` disables `time_macros`+zstd+`base_dir` normalization; override in `local.mk` |
+| `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
