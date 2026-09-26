@@ -142,12 +142,9 @@ make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host ke
 make valgrind                                   # build + run all C programs AND ns-* subcommands under Valgrind; EPERM→skip, exit 99→fail
 ```
 
-`BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`.
-**Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
-### Preflight
-`make preflight` — validate host compiler (`GCC`), cross-compilers per `ARCHS`, QEMU binaries per `ARCHS`, and disk space (`MIN_BUILD_SPACE_GB`/`MIN_CACHE_SPACE_GB`, default 5G each); runs automatically at the start of `make build`; override thresholds in `local.mk`.
-
-### CI / linting / dev-test / bug-hunt
+`BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`. **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
+### CI / linting / preflight / dev-test / bug-hunt
+`make preflight` — validate host compiler (`GCC`), cross-compilers per `ARCHS`, QEMU binaries per `ARCHS`, disk space (default 5G; override via `MIN_BUILD_SPACE_GB`/`MIN_CACHE_SPACE_GB` in `local.mk`); auto-runs at `make build`.
 `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → ci-test → programs, i386 excluded). GitHub Actions: `lint → ci-test → programs` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu).
 `make dev-test` — ≤6-min branch gate; >70% of 41 paths (fixed core C1–C9 covers 30/41); random draw samples remaining VM combos for bonus coverage; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`. `make bug-hunt` — Claude Code agentic bug hunt; 3 high-severity bugs; results in `bug-hunt/` (gitignored); MAX_MINUTES=30, MAX_TURNS=80; requires `claude` CLI.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.2.1-rc1` is the rolling `linux-7.2.y` branch tip; use `make fetch-stable-rc`.
