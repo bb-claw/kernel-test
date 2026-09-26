@@ -313,6 +313,23 @@ effort first, then medium+ impact.
 | **Thin LTO (`CONFIG_LTO_CLANG_THIN=y`)** | — | — | ~~**DEAD END** (2026-09-26): LTO adds cross-module analysis at every `LD vmlinux` step (currently 0.22s with LLD). Measured XZ kernel compression takes 1.1s vs gzip's 0.13s — more optimisation = slower build. Thin LTO is a *runtime* speedup, not a build speedup. Makes warm builds slower.~~ |
 | **Shared object cache across configs** | — | — | ~~**ALREADY PROVIDED BY CCACHE** (2026-09-26): defconfig=1658 y-options vs kunitconfig=1665 (99% overlap). Warm builds already make only 5 CC calls total — ccache handles the rest implicitly. A two-stage build would save only the ~5 CC invocation overhead: negligible.~~ |
 
+### Config cache — `feat/config-cache` ✓ DONE (branch ready, 2026-09-26)
+
+Cache the pre-fragment `.config-base` per combo using a sha256 key over kernel commit +
+fragment files. On cache hit, `kmake <base-config>` is skipped entirely. rand500config
+reuses the tinyconfig sibling's `.config-base` (cross-combo). `NO_CONFIG_CACHE=1` forces regen.
+
+Measured on laptop (bb-82jq, v7.3-rc3, warm ccache, x86_64):
+
+| Step | Before | After | Saved |
+|---|---|---|---|
+| tinyconfig/x86_64 config gen | 17s | 0s (instant) | 17s |
+| tinyconfig/x86_64 total build | 30.4s | 13.0s | 17.4s |
+| rand500config/x86_64 config gen | 27s* | 11s | 16s |
+
+*rand500config/x86_64 before = stable-rc clone same hardware (v7.2.8-rc1); riscv before = 38s.
+The 11s residual for rand500config is the mandatory randconfig temp-dir step (intentionally random — cannot be cached).
+
 ### Group 3 — Parallelisation *(highest wall-time impact, more complexity)*
 
 Measured 2026-09-26 on Hetzner (3 configs × 4 arches = 12 combos, warm ccache, v7.2.8-rc1):
