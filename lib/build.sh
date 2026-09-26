@@ -179,6 +179,28 @@ _write_config_cache() {
     config_cache_hash "$TREE_COMMIT" "${_cache_frags[@]}" > "$_config_cache_hash"
 }
 
+# _try_sibling_base <dir>: copy a sibling combo's pre-fragment .config-base when
+# the kernel commit matches, avoiding a redundant kmake scan.  Returns 0 on hit.
+#
+# CORRECTNESS INVARIANT — callers must follow this rule:
+#   Deterministic configs (kunitconfig, tinynsconfig, defnsconfig, vf2config …):
+#     call _write_config_cache after a 0 return so the per-combo cache is warm
+#     for subsequent runs and the sibling is never consulted again.
+#   Random configs (rand500config, randdefconfig, kunitrandconfig …):
+#     do NOT call _write_config_cache — their final .config changes every run,
+#     so a per-combo cache entry would be immediately stale.
+_try_sibling_base() {
+    local sib_dir="$1"
+    [[ "${NO_CONFIG_CACHE:-0}" == "1" ]] && return 1
+    [[ -f "$sib_dir/.config-base-commit" ]] || return 1
+    [[ "$(cat "$sib_dir/.config-base-commit")" == "$TREE_COMMIT" ]] || return 1
+    [[ -f "$sib_dir/.config-base" ]] || return 1
+    cp "$sib_dir/.config-base" "$OUT_DIR/.config"
+    local sib_name; sib_name=$(basename "$sib_dir" | sed 's/-[^-]*$//')
+    info "Config cache hit (sibling: $sib_name): $CONFIG / $ARCH"
+    return 0
+}
+
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
 if [[ -n "${SEED_CONFIG:-}" ]]; then
@@ -191,27 +213,18 @@ if [[ -n "${SEED_CONFIG:-}" ]]; then
     fi
 elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     # Base: tinyconfig (tiny, known-bootable kernel).
-    # Reuse the tinyconfig sibling's pre-fragment base when the kernel commit
-    # matches — avoids a 29 s redundant kconfig scan.  Fall back to own prior
-    # base, then to a fresh kmake tinyconfig.
+    # Random config: never write own per-combo cache (output changes each run).
+    # Priority: tinyconfig sibling → own prior base → fresh kmake.
     _tiny_sib="$BUILD_DIR/tinyconfig-$ARCH"
-    _used_tiny_cache=0
-    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
-        if [[ -f "$_tiny_sib/.config-base-commit" ]] && \
-           [[ "$(cat "$_tiny_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
-           [[ -f "$_tiny_sib/.config-base" ]]; then
-            info "Config cache hit (tinyconfig sibling): $CONFIG / $ARCH"
-            cp "$_tiny_sib/.config-base" "$OUT_DIR/.config"
-            _used_tiny_cache=1
-        elif [[ -f "$_config_base_commit" ]] && \
-             [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
-             [[ -f "$_config_base" ]]; then
-            info "Config cache hit (own base): $CONFIG / $ARCH"
-            cp "$_config_base" "$OUT_DIR/.config"
-            _used_tiny_cache=1
-        fi
-    fi
-    if [[ $_used_tiny_cache == 0 ]]; then
+    if _try_sibling_base "$_tiny_sib"; then
+        :
+    elif [[ "${NO_CONFIG_CACHE:-0}" != "1" ]] && \
+         [[ -f "$_config_base_commit" ]] && \
+         [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
+         [[ -f "$_config_base" ]]; then
+        info "Config cache hit (own base): $CONFIG / $ARCH"
+        cp "$_config_base" "$OUT_DIR/.config"
+    else
         if ! kmake tinyconfig; then
             printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
                 "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -239,26 +252,18 @@ elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     trap - EXIT
 elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
     # Base: defconfig (broad, coherent, realistic baseline).
-    # Reuse defconfig sibling base when commit matches — saves the defconfig
-    # scan on repeated rand runs.
+    # Random config: never write own per-combo cache (output changes each run).
+    # Priority: defconfig sibling → own prior base → fresh kmake.
     _def_sib="$BUILD_DIR/defconfig-$ARCH"
-    _used_def_cache=0
-    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
-        if [[ -f "$_def_sib/.config-base-commit" ]] && \
-           [[ "$(cat "$_def_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
-           [[ -f "$_def_sib/.config-base" ]]; then
-            info "Config cache hit (defconfig sibling): $CONFIG / $ARCH"
-            cp "$_def_sib/.config-base" "$OUT_DIR/.config"
-            _used_def_cache=1
-        elif [[ -f "$_config_base_commit" ]] && \
-             [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
-             [[ -f "$_config_base" ]]; then
-            info "Config cache hit (own base): $CONFIG / $ARCH"
-            cp "$_config_base" "$OUT_DIR/.config"
-            _used_def_cache=1
-        fi
-    fi
-    if [[ $_used_def_cache == 0 ]]; then
+    if _try_sibling_base "$_def_sib"; then
+        :
+    elif [[ "${NO_CONFIG_CACHE:-0}" != "1" ]] && \
+         [[ -f "$_config_base_commit" ]] && \
+         [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
+         [[ -f "$_config_base" ]]; then
+        info "Config cache hit (own base): $CONFIG / $ARCH"
+        cp "$_config_base" "$OUT_DIR/.config"
+    else
         if ! kmake defconfig; then
             printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
                 "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -274,10 +279,12 @@ elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
         | sed 's/=[ym]$/=n/' > "$OUT_DIR/randdef-disabled.config"
     cat "$OUT_DIR/randdef-disabled.config" >> "$PWD/$OUT_DIR/.config"
 elif [[ $EFFECTIVE_CONFIG == kunitconfig ]]; then
-    # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
-    # 'kunitconfig' is not a kernel make target — use defconfig as the base.
+    # kunitconfig / kunitnsconfig: defconfig base + KUnit suites (applied in step 1b).
+    # Deterministic: write own cache after any miss so warm runs never need the sibling.
     if _try_config_cache; then
         :
+    elif _try_sibling_base "$BUILD_DIR/defconfig-$ARCH"; then
+        _write_config_cache
     elif ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -289,19 +296,11 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
     # Enumerate every CONFIG_*KUNIT* from a fresh randconfig (full option set for
     # this arch), append to defconfig base.  olddefconfig (step 1b) drops any
     # module whose deps are unmet — only valid, buildable options survive.
-    # Reuse defconfig sibling base for the deterministic base step.
+    # Random config: never write own per-combo cache (output changes each run).
+    # Priority: defconfig sibling → fresh kmake (no own-base fallback: kunitrand
+    # never writes its own base, so a stale commit file cannot exist).
     _def_sib="$BUILD_DIR/defconfig-$ARCH"
-    _used_krand_cache=0
-    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
-        if [[ -f "$_def_sib/.config-base-commit" ]] && \
-           [[ "$(cat "$_def_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
-           [[ -f "$_def_sib/.config-base" ]]; then
-            info "Config cache hit (defconfig sibling): $CONFIG / $ARCH"
-            cp "$_def_sib/.config-base" "$OUT_DIR/.config"
-            _used_krand_cache=1
-        fi
-    fi
-    if [[ $_used_krand_cache == 0 ]]; then
+    if ! _try_sibling_base "$_def_sib"; then
         if ! kmake defconfig; then
             printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
                 "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -320,7 +319,7 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
     trap - EXIT
 elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
     # vf2config: StarFive JH7110 (VisionFive 2) — riscv-only; uses defconfig as base.
-    # 'vf2config' is not a kernel make target; defconfig is the correct base for riscv.
+    # Deterministic: write own cache after any miss so warm runs never need the sibling.
     if [[ $ARCH != riscv ]]; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=0\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -328,6 +327,8 @@ elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
     fi
     if _try_config_cache; then
         :
+    elif _try_sibling_base "$BUILD_DIR/defconfig-$ARCH"; then
+        _write_config_cache
     elif ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
@@ -353,6 +354,34 @@ elif [[ $EFFECTIVE_CONFIG == localconfig ]]; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    fi
+elif [[ $EFFECTIVE_CONFIG == tinyconfig && -n $NS_BASE ]]; then
+    # tinynsconfig: tinyconfig base + namespaces.config (applied in step 1b).
+    # Deterministic: write own cache after any miss so warm runs never need the sibling.
+    if _try_config_cache; then
+        :
+    elif _try_sibling_base "$BUILD_DIR/tinyconfig-$ARCH"; then
+        _write_config_cache
+    elif ! kmake tinyconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    else
+        _write_config_cache
+    fi
+elif [[ $EFFECTIVE_CONFIG == defconfig && -n $NS_BASE ]]; then
+    # defnsconfig: defconfig base + namespaces.config (applied in step 1b).
+    # Deterministic: write own cache after any miss so warm runs never need the sibling.
+    if _try_config_cache; then
+        :
+    elif _try_sibling_base "$BUILD_DIR/defconfig-$ARCH"; then
+        _write_config_cache
+    elif ! kmake defconfig; then
+        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    else
+        _write_config_cache
     fi
 elif _try_config_cache; then
     :

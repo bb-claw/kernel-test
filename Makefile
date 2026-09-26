@@ -291,19 +291,20 @@ checkout:
 
 # presets/<dir>.mk supplies repo-specific params (STABLE_RELEASE, KERNEL_TREE, LABEL, GCC, …).
 smoke:
-	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig"
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="tinyconfig kunitconfig"
 
 full:
-	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitconfig tinyconfig defconfig randdefconfig rand500config"
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="defconfig tinyconfig kunitconfig randdefconfig rand500config"
 
 # Namespace regression smoke test: mirrors 'smoke' (kunit + tiny) with ns-variant configs.
 # Requires prior 'make bootstrap' to have built the ns-* test binaries.
 ns-smoke:
-	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitnsconfig tinynsconfig"
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="tinynsconfig kunitnsconfig"
 
 # Namespace full test: mirrors 'full' with ns-variant configs.
+# Base configs first so sibling reuse fires within a single make ns-full call.
 ns-full:
-	+@$(MAKE) all NO_FETCH=1 CONFIGS="kunitnsconfig tinynsconfig defnsconfig randdefnsconfig rand500nsconfig"
+	+@$(MAKE) all NO_FETCH=1 CONFIGS="defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig"
 
 # Complete verification: full + ns-full (10 configs). Sequential so ns-variant builds
 # benefit from ccache populated by full. Intended for Hetzner staging automation.
