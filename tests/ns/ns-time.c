@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -80,7 +81,14 @@ static int cmd_offset(void)
 	}
 	if (child == 0) {
 		struct timespec ts;
-		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
+		/*
+		 * Use raw syscall, not clock_gettime() via the vDSO.  On riscv
+		 * under QEMU 11.x TCG, the vDSO seqlock for the per-namespace
+		 * vvar page is not made coherent after the timens_offsets write,
+		 * causing an infinite spin.  The kernel syscall path applies the
+		 * timens offset correctly on all QEMU versions.
+		 */
+		if (syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &ts) < 0)
 			_exit(1);
 		/* With a +100s offset the time must be at least 100 seconds */
 		if (ts.tv_sec < 100) {

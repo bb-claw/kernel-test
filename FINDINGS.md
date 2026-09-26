@@ -710,48 +710,35 @@ branch. The three below remain open and require separate fix branches.
 
 ### Medium — Test Reliability
 
-- [ ] **`350_ns-time` hangs on defconfig/riscv in TCG mode — VM times out after 720 s**
+- [x] **`350_ns-time` hangs on defconfig/riscv in TCG mode — VM times out after 720 s** ✅ resolved 2026-09-26
 
   **Observed:** `make dev-test SEED=671370223` (kernel-test-stable-rc, v7.2.8-rc1).
-  Reproducible with the same seed. Also observed independently in a plain
-  `make all NO_FETCH=1 CONFIGS=defconfig ARCHS=riscv` run on the same host.
+  Reproducible with the same seed. Also observed in a plain
+  `make all NO_FETCH=1 CONFIGS=defconfig ARCHS=riscv` run. Not reproducible on
+  hetzner-staging (QEMU 10.0.2); laptop only (QEMU 11.1.1).
 
-  **Hang point:** The VM boots, runs all ns-* tests up to and including `340_ns-cgroup`
-  (PASS), then enters `350_ns-time`. It prints:
-  ```
-  ok: nsfs time: time:[4026531834]
-  ok: time: /proc/self/timens_offsets readable
-  ```
-  …and then stalls. No further serial output. dmesg.txt stops growing (≈25 KB at hang).
-  QEMU process stays at 99% CPU (TCG busy-loop) until the 720 s timeout fires.
+  **Hang point:** `ns-time offset` subcommand — not `setns-mt` as initially suspected.
+  The VM prints two ok lines from pure shell code (nsfs format check + timens_offsets
+  readable), then stalls when `$NS_TIME offset` is invoked. QEMU stays at 99% CPU
+  (TCG busy-loop, not kernel blocking).
 
-  **Host:** x86_64, AMD Ryzen 7 5800H. Guest: riscv64, QEMU virt machine, 1 G RAM, TCG.
-  **Kernel:** v7.2.8-rc1 (54e8ef17140e). Config: defconfig/riscv.
+  **Host:** x86_64, AMD Ryzen 7 5800H, QEMU 11.1.1. Guest: riscv64, 1 G RAM, TCG.
+  **Kernel:** v7.2.8-rc1. **Passes on hetzner:** QEMU 10.0.2 (Debian bookworm).
 
-  **Root cause (likely):** `tests/ns/ns-time.c` — the `setns-mt` subcommand creates a
-  time namespace with a +100 s `CLOCK_MONOTONIC` offset and then spawns threads. Thread
-  creation or the `clock_gettime` call inside the time namespace may block indefinitely
-  under riscv TCG. QEMU's riscv TCG does not faithfully emulate time-namespace clock
-  offsets in the same way as KVM — a `nanosleep`/`clock_nanosleep` inside the namespace
-  may never return, or a futex wait keyed on the namespace-offset clock never wakes.
+  **Root cause:** In `cmd_offset()`, after `unshare(CLONE_NEWTIME)` and writing
+  `"monotonic 100 0"` to `timens_offsets`, a child is forked and calls
+  `clock_gettime(CLOCK_MONOTONIC, &ts)`. On riscv this uses the vDSO, which reads
+  the per-namespace vvar page via a read-side seqlock spin loop. Under QEMU 11.x
+  riscv TCG, the kernel's seqlock write (`smp_store_release` + `fence`) to the vvar
+  page is not made coherent to the child's vDSO spin — the child reads an odd seq
+  value and spins indefinitely. This is a QEMU 11.x riscv TCG regression vs 10.x.
 
-  **Impact:** defconfig/riscv VM always times out (720 s) when the random draw selects it
-  in dev-test. Adds 12 min to the wall time; budget overrun causes remaining combos to be
-  skipped. dev-test still passes (coverage 33/43 = 76% > 70%) but the FAIL line is noisy.
+  **Fix:** Replace `clock_gettime(CLOCK_MONOTONIC, &ts)` in the child with
+  `syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &ts)`. The raw syscall bypasses the
+  vDSO and goes directly to the kernel, which applies the timens offset correctly on
+  all QEMU versions. See `fix/ns-time-riscv-vdso-hang` branch and
+  `docs/ns-time-riscv-vdso-hang-plan.md`.
 
-  **Not a regression** — this hang exists on `main` too; not introduced by any recent branch.
-
-  **Investigation steps:**
-  1. Boot defconfig/riscv, let it hang; attach GDB via QEMU `-s -S` or dump serial at hang
-  2. Check `ns-time.c` — does `setns-mt` call `clock_nanosleep`/`nanosleep` inside the
-     timens offset? If so, replace with a CPU-busy wait (`:` loop) as done in other TCG-safe
-     test paths.
-  3. Check whether adding `CLOCK_BOOTTIME` or `CLOCK_REALTIME` instead of `CLOCK_MONOTONIC`
-     avoids the stall (some TCG implementations handle BOOTTIME differently).
-  4. As a short-term workaround: add a `/tests/riscv-tcg` capability marker (written by
-     `lib/vm.sh` when `ARCH=riscv` and KVM is absent) and skip the `setns-mt` subcommand
-     when it is present.
-
-  **Workaround (dev-test):** `make dev-test ARCHS="x86_64 i386 arm64"` excludes riscv from
-  the random VM pool, preventing the timeout. Does not affect CI (`make ci-test` has no VM
-  runs for riscv ns-time).
+  **QEMU upstream:** This is a riscv TCG regression between QEMU 10.x and 11.x in
+  the seqlock coherence for time namespace vDSO pages. A bug report draft is in the
+  design doc.

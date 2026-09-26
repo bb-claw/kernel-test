@@ -66,7 +66,7 @@ OPTIMIZATION: `speed` (-O2+gc-sections) | `size` (-Os+gc-sections) | `ultra` (-O
 - **arena-test x86_64**: plain `gcc` + kernel nolibc (`-isystem KERNEL_TREE/tools/include/nolibc -include nolibc.h -nostdlib`); eliminates musl-gcc dep for this binary. Other arches keep glibc cross-compilers.
 - **nolibc not viable for**: perf-event (`SYS_perf_event_open` absent), snapshot (klog/pwd), syscall-tests (socket/eventfd/shm), serial-capture (termios), ns/ (ipc/sem).
 - **musl hard-required** for quality gates: `make bootstrap` installs `musl` (Arch) / `musl-tools` (Debian). Clang suppressions: `-Wno-disabled-macro-expansion` (musl stderr macro); `-Wno-unsafe-buffer-usage` (bounds-correct pointer arithmetic). Valgrind builds: `bin/x86_64/<name>-valgrind` (gcc/glibc, x86_64-only; `make valgrind-build`). Suppressions: `tests/programs/valgrind.supp`. `make valgrind` in `tests/ns/` builds + runs all ns-* subcommands; EPERM exits are skip (exit ≠ 99), exit 99 = valgrind memory error = fail.
-
+- **`clock_gettime()` inside a time namespace on riscv TCG** → on QEMU 11.x riscv TCG the vDSO seqlock for the per-namespace vvar page is not made coherent after a `timens_offsets` write; the child's vDSO spin reads an odd seq value forever, hanging the VM at 99% CPU. Fix: use `syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &ts)` to bypass the vDSO and go directly to the kernel, which applies the timens offset correctly. Confirmed regression QEMU 10.x (passes) vs 11.x (hangs). See `fix/ns-time-riscv-vdso-hang`.
 ---
 ## Bash Lib Script Pitfalls
 
