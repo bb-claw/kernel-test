@@ -71,10 +71,14 @@ TFTP_DIR       ?= $(CURDIR)/tftp
 # 5G default causes cache thrashing on localconfig builds (~4.6G output); 25G
 # fits localconfig + all CI (config × arch) combos without eviction.
 # Override per-machine in local.mk.
-CCACHE_MAX_SIZE ?= 25G
+CCACHE_MAX_SIZE    ?= 25G
 # 1 = enable time_macros sloppiness + zstd compression level 1 + base_dir=$HOME
 # 0 = size increase only (no behaviour changes beyond max_size)
-CCACHE_TUNE     ?= 1
+CCACHE_TUNE        ?= 1
+
+# ── Preflight thresholds (overridable in local.mk) ────────────────────────────
+MIN_BUILD_SPACE_GB ?= 5
+MIN_CACHE_SPACE_GB ?= 5
 
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
@@ -135,7 +139,7 @@ ifndef RUN_STAMP
 endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
-export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE
+export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
@@ -451,7 +455,11 @@ endif
 
 # Build all CONFIGS × ARCHS; collect failures and exit non-zero if any failed.
 # allmodconfig is included here (build only, not booted).
+preflight:
+	$(Q)lib/preflight.sh
+
 build:
+	$(Q)lib/preflight.sh
 ifeq ($(NO_BUILD),1)
 	@echo "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
@@ -486,6 +494,14 @@ ifeq ($(NO_PERF_BUILD),1)
 else
 	@echo "[perf-build] Building tools/perf from $(KERNEL_TREE)"
 	$(Q)mkdir -p $(BUILD_DIR)/perf
+	$(Q)for _t in pkg-config python3; do \
+	    command -v "$$_t" >/dev/null 2>&1 || { \
+	        printf '[perf-build] ERROR: %s not found — run: make bootstrap\n' "$$_t" >&2; \
+	        printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; exit 1; }; done
+	$(Q)for _lib in libelf libdw libtraceevent; do \
+	    pkg-config --exists "$$_lib" 2>/dev/null || { \
+	        printf '[perf-build] ERROR: pkg-config %s not found — run: make bootstrap\n' "$$_lib" >&2; \
+	        printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; exit 1; }; done
 	$(Q)if $(MAKE) -j$$(nproc) -C $(KERNEL_TREE)/tools/perf O=$(CURDIR)/$(BUILD_DIR)/perf \
 	        >$(BUILD_DIR)/perf/build.log 2>&1; then \
 	    echo "[perf-build] PASS"; \

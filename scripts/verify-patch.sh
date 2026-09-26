@@ -37,6 +37,16 @@ case "${COMPILER}" in
     *)     die "COMPILER must be gcc, clang, or both — got: ${COMPILER}" ;;
 esac
 
+# ── Tool preflight ────────────────────────────────────────────────────────────
+if [[ " ${compilers[*]} " == *" clang "* ]]; then
+    command -v clang  >/dev/null 2>&1 || die "clang not found in PATH (COMPILER=${COMPILER}) — install clang"
+    command -v ld.lld >/dev/null 2>&1 || die "ld.lld not found in PATH (COMPILER=${COMPILER}) — install lld"
+fi
+if [[ -n "${BASE}" ]]; then
+    git -C "${KERNEL_TREE}" rev-parse "${BASE}" >/dev/null 2>&1 || \
+        die "BASE='${BASE}' is not a valid git ref in ${KERNEL_TREE}"
+fi
+
 # ── Print header ──────────────────────────────────────────────────────────────
 echo
 echo "── verify-patch ──────────────────────────────────────────────────────────────"
