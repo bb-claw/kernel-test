@@ -48,7 +48,7 @@ make olddefconfig   # resolves all dependency conflicts
 ```
 `KCONFIG_ALLCONFIG` is NOT used — `tinyconfig` overrides it internally.
 `configs/defconfig.config` enables options absent from arch defconfigs: `CONFIG_SOFT_WATCHDOG=y` (390_watchdog), `CONFIG_BPF_SYSCALL=y` (490_bpf — off in arch defconfig; kunitconfig inherits via defconfig base). NS-variant defconfig-based configs (`defnsconfig` etc.) inherit it via `EFFECTIVE_CONFIG` in `build.sh`.
-Config cache: deterministic configs save `.config-base` (pre-fragment) keyed by `sha256(commit+fragments)` — cache hit skips `kmake <base-config>`. rand500config/randdefconfig/kunitrandconfig reuse a sibling combo's `.config-base` (cross-combo). Not cached: randconfig, localconfig, kunitrandconfig. `NO_CONFIG_CACHE=1` forces regen.
+Config cache: deterministic configs save `.config-base` (pre-fragment) keyed by `sha256(commit+fragments)` — cache hit skips `kmake <base-config>`. Sibling reuse (`_try_sibling_base`): rand500/randdef/kunitrand borrow tinyconfig/defconfig base (no own cache written); kunitconfig/kunitnsconfig/tinynsconfig/defnsconfig/vf2config borrow their base sibling and write own cache — warm runs skip sibling. `make full`/`ns-full` order base configs first. `NO_CONFIG_CACHE=1` forces regen.
 
 ---
 

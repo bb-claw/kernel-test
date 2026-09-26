@@ -28,9 +28,9 @@ Bash harness for testing Linux release-candidate kernels: build under multiple c
 make fetch                                     # fetch latest kernel for this clone (preset-aware)
 make all NO_FETCH=1                            # full pipeline: build + boot + test + report
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig  # fast iteration: repack + re-run tests only
-make smoke                                     # quick sanity: kunitconfig + tinyconfig, all archs
-make ns-smoke                                  # namespace smoke: kunitnsconfig + tinynsconfig
-make ns-full                                   # namespace full: 5 ns-variant configs
+make smoke                                     # quick sanity: tinyconfig kunitconfig, all archs
+make ns-smoke                                  # namespace smoke: tinynsconfig kunitnsconfig
+make ns-full                                   # namespace full: defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig
 make extended                                  # perf-build first, then full + ns-full; all phases run even on partial failure; second report.sh pass merges both into one 10-config summary.txt
 make preflight                                 # validate host compiler, cross-compilers, QEMU binaries, disk space; auto-runs at make build
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title

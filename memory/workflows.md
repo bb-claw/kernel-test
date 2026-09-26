@@ -58,10 +58,10 @@ make fetch                                            # auto-dispatches: mainlin
 make fetch-next                                       # linux-next only (kernel-test-next clone)
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
-make smoke                                            # kunitconfig + tinyconfig, preset auto-selected
-make full                                             # 5 bootable configs, preset auto-selected
-make ns-smoke                                         # kunitnsconfig + tinynsconfig (requires make bootstrap)
-make ns-full                                          # 5 ns-variant configs (mirrors full)
+make smoke                                            # tinyconfig kunitconfig, preset auto-selected
+make full                                             # defconfig tinyconfig kunitconfig randdefconfig rand500config (base-first order for sibling reuse)
+make ns-smoke                                         # tinynsconfig kunitnsconfig (requires make bootstrap)
+make ns-full                                          # defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig (base-first order)
 make extended                                         # perf-build first (so status is in both reports), then full + ns-full; all phases run even on partial failure; exit non-zero if any failed; report.sh sentinel merges both phases into one 10-config summary.txt
 make local                                            # localconfig x86_64, no build timeout
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
