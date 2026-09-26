@@ -51,9 +51,11 @@ printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on succes
 
 # ── Linker selection ──────────────────────────────────────────────────────────
 LINKER=bfd
+LINKER_OBJCOPY=""
 if detect_lld; then
     LINKER=lld
     info "Linker: ld.lld ${LLD_VERSION}"
+    command -v llvm-objcopy >/dev/null 2>&1 && LINKER_OBJCOPY="llvm-objcopy"
 fi
 trap 'printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
 
@@ -125,7 +127,13 @@ kmake() {
         "$@"
     )
     [[ -n $CROSS_COMPILE ]] && make_args+=( CROSS_COMPILE="$CROSS_COMPILE" )
-    [[ ${LINKER:-bfd} == lld ]] && make_args+=( LD=ld.lld )
+    if [[ ${LINKER:-bfd} == lld ]]; then
+        if [[ -n "${LINKER_OBJCOPY:-}" ]]; then
+            make_args+=( LD=ld.lld OBJCOPY="$LINKER_OBJCOPY" )
+        elif [[ "$ARCH" == x86_64 || "$ARCH" == i386 ]]; then
+            make_args+=( LD=ld.lld )
+        fi
+    fi
     if [[ ${V:-0} == 1 ]]; then
         "${pfx[@]}" make "${make_args[@]}" 2>&1 | tee -a "$LOG_FILE"
     else

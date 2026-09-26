@@ -65,6 +65,9 @@ _check_space "$CACHE_DIR" "$MIN_CACHE_SPACE_GB" "CACHE_DIR"
 if [[ "$USE_LLD" != "0" ]]; then
     if detect_lld; then
         printf 'Preflight: LLD %s ≥ %s — using ld.lld\n' "$LLD_VERSION" "$LLD_MIN"
+        if ! command -v llvm-objcopy >/dev/null 2>&1; then
+            printf 'Preflight: llvm-objcopy not found — arm64/riscv will use BFD\n'
+        fi
     elif [[ -n "$LLD_VERSION" ]]; then
         printf 'Preflight: LLD %s < %s — using BFD (upgrade lld or set USE_LLD=0 in local.mk)\n' \
             "$LLD_VERSION" "$LLD_MIN"
