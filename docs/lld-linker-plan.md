@@ -15,20 +15,32 @@ LLD 22.1.8 is already installed on the local machine. Hetzner staging has LLD 14
 
 ## Measured results (2026-09-26, Ryzen 7 5800H, localconfig/x86_64, v7.3-rc3)
 
+### End-to-end warm-cache builds (harness)
+
 | Run | Linker | Duration | Notes |
 |---|---|---|---|
 | cold ccache | lld | 8m36s | first build, cache cold |
 | warm ccache | lld | 2m52s | 100% ccache hit |
 | warm ccache | bfd (USE_LLD=0) | 2m55s | 3s slower |
 
-The LLD vs BFD difference on a fully warm localconfig build is ~3s. This is expected:
-ccache covers ~99% of compilation (only files testing `CONFIG_LD_IS_LLD` differ); the
-link step is ~20–30s of a 2:52 total, and LLD's 4× speedup saves ~15–20s on that step.
+### Isolated linker comparison (direct invocation, same vmlinux.a input)
+
+| Step | BFD | LLD | Speedup |
+|---|---|---|---|
+| Partial link (`-r vmlinux.a → vmlinux.o`) | 1.50s (1 core) | 0.22s (2.6 cores) | **6.8×** |
+| Single final-link pass (vmlinux.o → vmlinux.unstripped) | 1.29s (1 core) | 0.80s (1.3 cores) | **1.6×** |
+
+LLD links the vmlinux partial-link step **6.8× faster** and uses multiple cores.
+
+The 3s end-to-end saving (5%) is much smaller than the pure-linker 6.8× because
+`CONFIG_LD_IS_LLD=y` enables objtool IBT+ORC validation on vmlinux.o. The raw partial
+link produces a 79 MB object; objtool post-processing grows it to 113 MB and takes ~17s.
+This objtool work runs for both BFD and LLD — only the pure linker invocation is faster.
+For defconfig and partial-cache (source-change) rebuilds the saving is proportionally larger.
+
 The CONFIG_SHA256 differs between LLD and BFD builds because the kernel sets
 `CONFIG_LD_IS_LLD=y` via `scripts/Kconfig.include` when `LD=ld.lld` is passed — this
-enables LLD-specific Kconfig paths (thin LTO, linker relaxation, etc.) and is correct.
-The link-time saving is more visible on partial-cache rebuilds (source changes) and on
-defconfig where the link step is a larger fraction of total time.
+enables LLD-specific Kconfig paths (IBT, linker relaxation, etc.) and is correct.
 
 ---
 

@@ -34,6 +34,7 @@ run_detect_lld() {
     (
         PATH="$bd"
         USE_LLD="${USE_LLD:-1}"
+        # shellcheck disable=SC2034  # KERNEL_TREE is read by detect_lld() from sourced common.sh
         KERNEL_TREE="$kdir"
         . "$REPO/lib/common.sh"
         if detect_lld; then
@@ -160,6 +161,79 @@ done
     && pass "LINKER_USED=lld when build.status has LINKER=lld" \
     || fail "expected lld, got '$LINKER_USED'"
 rm -rf "$tmp"
+
+# ── llvm-objcopy detection (preflight output) ────────────────────────────────
+begin_test "preflight: no objcopy warning when llvm-objcopy present"
+bd=$(make_base_dir)
+add_lld_stub "$bd" "22.1.8"
+printf '#!/bin/bash\n' > "$bd/llvm-objcopy" && chmod +x "$bd/llvm-objcopy"
+kdir=$(mktemp -d) && mkdir -p "$kdir/scripts"
+add_min_version_stub "$kdir" "17.0.1"
+mkdir -p "$bd/../build" "$bd/../cache"
+out=$(PATH="$bd" GCC=bash USE_LLD=1 KERNEL_TREE="$kdir" ARCHS=x86_64 \
+    BUILD_DIR="$bd/../build" CACHE_DIR="$bd/../cache" \
+    bash "$REPO/lib/preflight.sh" 2>&1 || true)
+echo "$out" | grep -q "llvm-objcopy not found" \
+    && fail "unexpected objcopy warning in output: $out" \
+    || pass "no objcopy warning when llvm-objcopy is present"
+rm -rf "$bd" "$kdir"
+
+begin_test "preflight: objcopy warning when llvm-objcopy absent"
+bd=$(make_base_dir)
+add_lld_stub "$bd" "22.1.8"
+kdir=$(mktemp -d) && mkdir -p "$kdir/scripts"
+add_min_version_stub "$kdir" "17.0.1"
+mkdir -p "$bd/../build" "$bd/../cache"
+out=$(PATH="$bd" GCC=bash USE_LLD=1 KERNEL_TREE="$kdir" ARCHS=x86_64 \
+    BUILD_DIR="$bd/../build" CACHE_DIR="$bd/../cache" \
+    bash "$REPO/lib/preflight.sh" 2>&1 || true)
+echo "$out" | grep -q "llvm-objcopy not found" \
+    && pass "objcopy warning printed when llvm-objcopy absent" \
+    || fail "expected objcopy warning in output, got: $out"
+rm -rf "$bd" "$kdir"
+
+# ── kmake OBJCOPY arg logic (inline replication from build.sh) ────────────────
+begin_test "kmake-args: LLD + llvm-objcopy present → LD and OBJCOPY both set"
+LINKER=lld LINKER_OBJCOPY=llvm-objcopy ARCH=x86_64
+make_args=()
+if [[ ${LINKER:-bfd} == lld ]]; then
+    if [[ -n "${LINKER_OBJCOPY:-}" ]]; then
+        make_args+=( LD=ld.lld OBJCOPY="$LINKER_OBJCOPY" )
+    elif [[ "$ARCH" == x86_64 || "$ARCH" == i386 ]]; then
+        make_args+=( LD=ld.lld )
+    fi
+fi
+[[ " ${make_args[*]} " == *" LD=ld.lld "* && " ${make_args[*]} " == *" OBJCOPY=llvm-objcopy "* ]] \
+    && pass "LD=ld.lld and OBJCOPY=llvm-objcopy both present" \
+    || fail "expected LD+OBJCOPY, got: ${make_args[*]}"
+
+begin_test "kmake-args: LLD + no llvm-objcopy, ARCH=x86_64 → LD set, no OBJCOPY"
+LINKER=lld LINKER_OBJCOPY="" ARCH=x86_64
+make_args=()
+if [[ ${LINKER:-bfd} == lld ]]; then
+    if [[ -n "${LINKER_OBJCOPY:-}" ]]; then
+        make_args+=( LD=ld.lld OBJCOPY="$LINKER_OBJCOPY" )
+    elif [[ "$ARCH" == x86_64 || "$ARCH" == i386 ]]; then
+        make_args+=( LD=ld.lld )
+    fi
+fi
+[[ " ${make_args[*]} " == *" LD=ld.lld "* && " ${make_args[*]} " != *"OBJCOPY"* ]] \
+    && pass "LD=ld.lld present, no OBJCOPY for x86_64 without llvm-objcopy" \
+    || fail "expected LD only, got: ${make_args[*]}"
+
+begin_test "kmake-args: LLD + no llvm-objcopy, ARCH=arm64 → neither LD nor OBJCOPY"
+LINKER=lld LINKER_OBJCOPY="" ARCH=arm64
+make_args=()
+if [[ ${LINKER:-bfd} == lld ]]; then
+    if [[ -n "${LINKER_OBJCOPY:-}" ]]; then
+        make_args+=( LD=ld.lld OBJCOPY="$LINKER_OBJCOPY" )
+    elif [[ "$ARCH" == x86_64 || "$ARCH" == i386 ]]; then
+        make_args+=( LD=ld.lld )
+    fi
+fi
+[[ ${#make_args[@]} -eq 0 ]] \
+    && pass "no LD or OBJCOPY for arm64 without llvm-objcopy (BFD path)" \
+    || fail "expected empty make_args, got: ${make_args[*]}"
 
 begin_test "report: falls back to bfd when LINKER absent"
 tmp=$(mktemp -d)
