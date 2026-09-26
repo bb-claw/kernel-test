@@ -11,6 +11,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # ── Env / defaults ────────────────────────────────────────────────────────────
 
 CONFIG_FILE="${CONFIG_FILE:?CONFIG_FILE= is required. See: make help}"
+[[ -f "$CONFIG_FILE" ]] || die "CONFIG_FILE not found or not readable: $CONFIG_FILE"
 DRY_RUN="${DRY_RUN:-0}"
 PINNED_OPTS="${PINNED_OPTS:-}"  # comma-separated options always present in test steps but not baseline
 BUILD_DIR="${BUILD_DIR:-$REPO_DIR/build}"

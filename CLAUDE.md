@@ -32,10 +32,11 @@ make smoke                                     # quick sanity: kunitconfig + tin
 make ns-smoke                                  # namespace smoke: kunitnsconfig + tinynsconfig
 make ns-full                                   # namespace full: 5 ns-variant configs
 make extended                                  # perf-build first, then full + ns-full; all phases run even on partial failure; second report.sh pass merges both into one 10-config summary.txt
+make preflight                                 # validate host compiler, cross-compilers, QEMU binaries, disk space; auto-runs at make build
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → ci-test → programs (no i386)
-make dev-test                                  # branch gate: ≤6 min, >70% of 41 decision paths; SEED=N replays, BUDGET=N cap
+make dev-test                                  # branch gate: ≤6 min, >70% of 43 decision paths; SEED=N replays, BUDGET=N cap
 make hook-dev-test                             # toggle dev-test in .githooks/pre-push (opt-in; run again removes)
 make bug-hunt                                  # Claude Code bug hunt: find 3 high-severity bugs; results in bug-hunt/ (requires claude CLI)
 make bootstrap                                 # install deps, download Toybox, activate git hooks
