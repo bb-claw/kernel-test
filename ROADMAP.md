@@ -301,9 +301,9 @@ effort first, then medium+ impact.
 
 | Option | Effort | Impact | Notes |
 |---|---|---|---|
-| **KVM on Hetzner (nested virt)** | Low | High | Check `/sys/module/kvm_intel/parameters/nested`; if 1, add `-enable-kvm` to QEMU args is already in `vm.sh` — just needs KVM enabled at the host level. Dedicated Hetzner servers support nested virt; Cloud VMs usually don't. 5× boot speedup on x86. |
-| **LZ4 initramfs + kernel fragment** | Low | Low–Medium | Replace `gzip` with `lz4 -l` in `lib/initramfs.sh`; add `CONFIG_RD_LZ4=y` + `CONFIG_INITRAMFS_COMPRESSION_LZ4=y` to boot-baseline fragment. Faster pack (~5× vs gzip -1) and faster kernel decompress — most visible on slow TCG VMs. |
-| **Skip redundant `olddefconfig` passes** | Low–Medium | Low | `lib/build.sh` can call `olddefconfig` 2–3 times per combo (base + fragment + correction). A hash-before/after check skips the pass when `.config` hasn't changed. |
+| **KVM on Hetzner (nested virt)** | — | — | ~~**DEAD END** (2026-09-26): Hetzner staging is a Cloud VM — neither `kvm_intel` nor `kvm_amd` module loads, no `/dev/kvm`. Measured: KVM=25.6s vs TCG=114.4s per x86 combo (4.5×), but hardware virt passthrough is not available. Would require migrating to a Hetzner dedicated server.~~ |
+| **LZ4 initramfs + kernel fragment** | — | — | ~~**NOT WORTH IT**: initramfs is 2.3 MB; gzip -9 takes 0.34s, lz4 takes 0.007s. Total saving across all combos: <30s.~~ |
+| **Skip redundant `olddefconfig` passes** | — | — | ~~**NOT WORTH IT**: build logs show only 1 `olddefconfig` call per normal combo (not 2–3 as estimated) — it resolves the config fragment and is doing real work. rand500config has 3–4 calls but they're all part of the algorithm. No skippable redundancy.~~ |
 
 ### Group 2 — Non-parallel, medium+ impact *(do after Group 1)*
 
