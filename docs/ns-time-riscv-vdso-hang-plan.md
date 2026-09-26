@@ -107,6 +107,16 @@ make all NO_FETCH=1 CONFIGS=defconfig ARCHS=riscv
 # Expected output: "ok: time: CLOCK_MONOTONIC +100s offset applied correctly"
 ```
 
+### Validated 2026-09-26
+
+| Step | Result |
+|---|---|
+| `make ci-test` | 40/40 passed (including 7 tests in test-ns-time-fix.sh) |
+| `make all NO_FETCH=1 CONFIGS=defconfig ARCHS=riscv` | `PASS 52/52` in 22s on QEMU 11.1.1 (was 720s timeout) |
+| Diff vs previous run | `FIXES (1): defconfig/riscv BOOT: FAIL → PASS` |
+
+Host: AMD Ryzen 7 5800H, QEMU 11.1.1 (Manjaro) — the machine where the hang was confirmed.
+
 ---
 
 ## QEMU Upstream Bug Report (draft)
