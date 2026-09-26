@@ -252,6 +252,31 @@ log_run_result() {
     fi
 }
 
+# ── Config cache helpers ──────────────────────────────────────────────────────
+
+# config_cache_hash <commit> [fragment_file ...]
+# Returns a single sha256 over the kernel commit + sha256 of each existing fragment.
+# Missing fragment files are silently skipped (arch overlays are optional).
+config_cache_hash() {
+    local commit="$1"; shift
+    local combined="$commit"
+    local f
+    for f in "$@"; do
+        [[ -f "$f" ]] && combined+=$(sha256sum "$f" | cut -d' ' -f1)
+    done
+    printf '%s' "$combined" | sha256sum | cut -d' ' -f1
+}
+
+# config_cache_valid <hash_file> <commit> [fragment_file ...]
+# Returns 0 if <hash_file> exists and its content matches config_cache_hash output.
+config_cache_valid() {
+    local hash_file="$1"; shift
+    [[ -f "$hash_file" ]] || return 1
+    local stored; stored=$(cat "$hash_file")
+    local current; current=$(config_cache_hash "$@")
+    [[ "$stored" == "$current" ]]
+}
+
 # detect_lld — returns 0 if ld.lld is present and meets the kernel minimum version.
 # Reads: USE_LLD (default 1), KERNEL_TREE (for scripts/min-tool-version.sh).
 # Sets: LLD_VERSION (actual version string), LLD_MIN (effective minimum).

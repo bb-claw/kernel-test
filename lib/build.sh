@@ -144,6 +144,41 @@ kmake() {
 BUILD_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 BUILD_START_EPOCH=$(date -u +%s)
 
+# ── Config cache setup ────────────────────────────────────────────────────────
+# Deterministic configs produce identical .config output for a given kernel
+# commit + fragment set.  Cache the pre-fragment base so repeated runs of the
+# same kernel version skip the slow kmake step (29 s for tinyconfig/riscv).
+# Cache key: kernel commit + sha256 of each fragment/overlay that exists.
+# Files written per combo: .config-base (pre-fragment snapshot),
+#   .config-base-commit (plain commit hash, for cross-combo lookups),
+#   .config-cache-hash (full opaque key for this combo's fragment set).
+_config_base="$OUT_DIR/.config-base"
+_config_base_commit="$OUT_DIR/.config-base-commit"
+_config_cache_hash="$OUT_DIR/.config-cache-hash"
+_cache_frags=()
+[[ -f "$FRAGMENT" ]] && _cache_frags+=("$FRAGMENT")
+_early_overlay="$SCRIPT_DIR/configs/${EFFECTIVE_CONFIG}-${ARCH}.config"
+[[ -f "$_early_overlay" ]] && _cache_frags+=("$_early_overlay")
+_ns_fragment_path="$SCRIPT_DIR/configs/namespaces.config"
+[[ -n "${NS_BASE:-}" && -f "$_ns_fragment_path" ]] && _cache_frags+=("$_ns_fragment_path")
+
+# _try_config_cache: restore .config-base and return 0 on a valid cache hit.
+_try_config_cache() {
+    [[ "${NO_CONFIG_CACHE:-0}" == "1" ]] && return 1
+    [[ -f "$_config_base" ]] || return 1
+    config_cache_valid "$_config_cache_hash" "$TREE_COMMIT" "${_cache_frags[@]}" || return 1
+    cp "$_config_base" "$OUT_DIR/.config"
+    info "Config cache hit: $CONFIG / $ARCH (skipping kmake)"
+    return 0
+}
+
+# _write_config_cache: snapshot .config as the new base and update the stamp.
+_write_config_cache() {
+    cp "$OUT_DIR/.config" "$_config_base"
+    printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
+    config_cache_hash "$TREE_COMMIT" "${_cache_frags[@]}" > "$_config_cache_hash"
+}
+
 # Step 1: generate .config
 info "Configuring $CONFIG / $ARCH"
 if [[ -n "${SEED_CONFIG:-}" ]]; then
@@ -155,11 +190,35 @@ if [[ -n "${SEED_CONFIG:-}" ]]; then
         die "Config step failed (seed olddefconfig): $CONFIG / $ARCH — see $LOG_FILE"
     fi
 elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
-    # Base: tinyconfig (tiny, known-bootable kernel)
-    if ! kmake tinyconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    # Base: tinyconfig (tiny, known-bootable kernel).
+    # Reuse the tinyconfig sibling's pre-fragment base when the kernel commit
+    # matches — avoids a 29 s redundant kconfig scan.  Fall back to own prior
+    # base, then to a fresh kmake tinyconfig.
+    _tiny_sib="$BUILD_DIR/tinyconfig-$ARCH"
+    _used_tiny_cache=0
+    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
+        if [[ -f "$_tiny_sib/.config-base-commit" ]] && \
+           [[ "$(cat "$_tiny_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
+           [[ -f "$_tiny_sib/.config-base" ]]; then
+            info "Config cache hit (tinyconfig sibling): $CONFIG / $ARCH"
+            cp "$_tiny_sib/.config-base" "$OUT_DIR/.config"
+            _used_tiny_cache=1
+        elif [[ -f "$_config_base_commit" ]] && \
+             [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
+             [[ -f "$_config_base" ]]; then
+            info "Config cache hit (own base): $CONFIG / $ARCH"
+            cp "$_config_base" "$OUT_DIR/.config"
+            _used_tiny_cache=1
+        fi
+    fi
+    if [[ $_used_tiny_cache == 0 ]]; then
+        if ! kmake tinyconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+        fi
+        cp "$OUT_DIR/.config" "$_config_base"
+        printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
     fi
     # Generate a fresh randconfig in a temp dir, constrain it to exclude heavy
     # subsystems (same set as configs/randconfig.config), then sample 500 =y lines.
@@ -179,11 +238,34 @@ elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     rm -rf "$RAND_TMP"
     trap - EXIT
 elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
-    # Base: defconfig (broad, coherent, realistic baseline)
-    if ! kmake defconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    # Base: defconfig (broad, coherent, realistic baseline).
+    # Reuse defconfig sibling base when commit matches — saves the defconfig
+    # scan on repeated rand runs.
+    _def_sib="$BUILD_DIR/defconfig-$ARCH"
+    _used_def_cache=0
+    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
+        if [[ -f "$_def_sib/.config-base-commit" ]] && \
+           [[ "$(cat "$_def_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
+           [[ -f "$_def_sib/.config-base" ]]; then
+            info "Config cache hit (defconfig sibling): $CONFIG / $ARCH"
+            cp "$_def_sib/.config-base" "$OUT_DIR/.config"
+            _used_def_cache=1
+        elif [[ -f "$_config_base_commit" ]] && \
+             [[ "$(cat "$_config_base_commit")" == "$TREE_COMMIT" ]] && \
+             [[ -f "$_config_base" ]]; then
+            info "Config cache hit (own base): $CONFIG / $ARCH"
+            cp "$_config_base" "$OUT_DIR/.config"
+            _used_def_cache=1
+        fi
+    fi
+    if [[ $_used_def_cache == 0 ]]; then
+        if ! kmake defconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+        fi
+        cp "$OUT_DIR/.config" "$_config_base"
+        printf '%s\n' "$TREE_COMMIT" > "$_config_base_commit"
     fi
     # Randomly disable ~300 options to reduce build surface.
     # The fragment (step 1b) forces heavy subsystems off and re-pins bootability options,
@@ -194,19 +276,37 @@ elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
 elif [[ $EFFECTIVE_CONFIG == kunitconfig ]]; then
     # kunitconfig: defconfig base + KUnit test suites (applied in step 1b).
     # 'kunitconfig' is not a kernel make target — use defconfig as the base.
-    if ! kmake defconfig; then
+    if _try_config_cache; then
+        :
+    elif ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    else
+        _write_config_cache
     fi
 elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
     # Enumerate every CONFIG_*KUNIT* from a fresh randconfig (full option set for
     # this arch), append to defconfig base.  olddefconfig (step 1b) drops any
     # module whose deps are unmet — only valid, buildable options survive.
-    if ! kmake defconfig; then
-        printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
-            "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
-        die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    # Reuse defconfig sibling base for the deterministic base step.
+    _def_sib="$BUILD_DIR/defconfig-$ARCH"
+    _used_krand_cache=0
+    if [[ "${NO_CONFIG_CACHE:-0}" != "1" ]]; then
+        if [[ -f "$_def_sib/.config-base-commit" ]] && \
+           [[ "$(cat "$_def_sib/.config-base-commit")" == "$TREE_COMMIT" ]] && \
+           [[ -f "$_def_sib/.config-base" ]]; then
+            info "Config cache hit (defconfig sibling): $CONFIG / $ARCH"
+            cp "$_def_sib/.config-base" "$OUT_DIR/.config"
+            _used_krand_cache=1
+        fi
+    fi
+    if [[ $_used_krand_cache == 0 ]]; then
+        if ! kmake defconfig; then
+            printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
+                "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
+            die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+        fi
     fi
     RAND_TMP=$(mktemp -d)
     trap 'rm -rf "$RAND_TMP"' EXIT
@@ -226,10 +326,14 @@ elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
             "$BUILD_START_TIME" "$KERNEL_TREE" > "$STATUS_FILE"
         die "vf2config is riscv-only (StarFive JH7110 SoC) — use ARCHS=riscv"
     fi
-    if ! kmake defconfig; then
+    if _try_config_cache; then
+        :
+    elif ! kmake defconfig; then
         printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+    else
+        _write_config_cache
     fi
 elif [[ $EFFECTIVE_CONFIG == localconfig ]]; then
     # localconfig: running kernel's config as base — for daily-driver builds.
@@ -250,10 +354,14 @@ elif [[ $EFFECTIVE_CONFIG == localconfig ]]; then
             "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
         die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
     fi
+elif _try_config_cache; then
+    :
 elif ! kmake "$EFFECTIVE_CONFIG"; then
     printf 'STATUS=FAIL\nSTART_TIME=%s\nDURATION=%d\nKERNEL_TREE=%s\n' \
         "$BUILD_START_TIME" "$(( $(date -u +%s) - BUILD_START_EPOCH ))" "$KERNEL_TREE" > "$STATUS_FILE"
     die "Config step failed: $CONFIG / $ARCH — see $LOG_FILE"
+else
+    _write_config_cache
 fi
 
 # Step 1b: apply config fragment + arch overlay, then resolve with one olddefconfig.

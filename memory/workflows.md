@@ -46,6 +46,7 @@
 | `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `25G` / `1` | ccache budget (5G causes localconfig thrashing); `TUNE=0` disables `time_macros`+zstd+`base_dir` normalization; override in `local.mk` |
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 | `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
+| `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
 
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
