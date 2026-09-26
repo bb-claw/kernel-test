@@ -13,6 +13,23 @@ On a Ryzen 7 5800H, localconfig warm builds take ~150s with BFD; defconfig ~35s.
 LLD 22.1.8 is already installed on the local machine. Hetzner staging has LLD 14.0.6
 (below the Linux 7.x minimum of 17.0.1) and needs an upgrade to benefit.
 
+## Measured results (2026-09-26, Ryzen 7 5800H, localconfig/x86_64, v7.3-rc3)
+
+| Run | Linker | Duration | Notes |
+|---|---|---|---|
+| cold ccache | lld | 8m36s | first build, cache cold |
+| warm ccache | lld | 2m52s | 100% ccache hit |
+| warm ccache | bfd (USE_LLD=0) | 2m55s | 3s slower |
+
+The LLD vs BFD difference on a fully warm localconfig build is ~3s. This is expected:
+ccache covers ~99% of compilation (only files testing `CONFIG_LD_IS_LLD` differ); the
+link step is ~20–30s of a 2:52 total, and LLD's 4× speedup saves ~15–20s on that step.
+The CONFIG_SHA256 differs between LLD and BFD builds because the kernel sets
+`CONFIG_LD_IS_LLD=y` via `scripts/Kconfig.include` when `LD=ld.lld` is passed — this
+enables LLD-specific Kconfig paths (thin LTO, linker relaxation, etc.) and is correct.
+The link-time saving is more visible on partial-cache rebuilds (source changes) and on
+defconfig where the link step is a larger fraction of total time.
+
 ---
 
 ## Problems to Solve
