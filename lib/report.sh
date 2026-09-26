@@ -200,6 +200,17 @@ else
 fi
 ARCH_LIST=$(echo "$ARCHS" | tr ' ' '/')
 
+# ── Linker used (read from first build.status that has the LINKER field) ──────
+LINKER_USED=bfd
+for _bs in "$BUILD_DIR"/*-*/build.status; do
+    [[ -f "$_bs" ]] || continue
+    _l=$(read_status "$_bs" LINKER)
+    if [[ -n "$_l" ]]; then
+        LINKER_USED="$_l"
+        break
+    fi
+done
+
 # ── summary.txt ───────────────────────────────────────────────────────────────
 
 TXT="$RUN_DIR/summary.txt"
@@ -211,6 +222,7 @@ TXT="$RUN_DIR/summary.txt"
     printf 'Repository:       %s\n' "$REPO_URL"
     printf 'Commit:           %s\n' "$COMMIT_SHA"
     printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Linker:           %s\n' "$LINKER_USED"
     printf 'Tested ARCH:      %s\n' "$ARCHS"
     printf '\n'
     [[ -n $TESTED_BY ]] && printf 'Tested-by: %s\n' "$TESTED_BY"
@@ -221,6 +233,7 @@ TXT="$RUN_DIR/summary.txt"
     printf 'Repository: %s\n' "$REPO_URL"
     printf 'Commit:     %s\n' "$COMMIT_SHA"
     printf 'Host:       %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Linker:     %s\n' "$LINKER_USED"
     printf 'Started:    %s\n' "$RUN_STAMP"
     printf 'Duration:   %s\n' "$OVERALL_DURATION"
     printf 'Result:     %s\n\n' "$OVERALL"
@@ -309,6 +322,7 @@ MAIL="$RUN_DIR/summary.mail.txt"
     printf 'Repository:       %s\n' "$REPO_URL"
     printf 'Commit:           %s\n' "$COMMIT_SHA"
     printf 'Host:             %s  |  %s  |  %s\n' "$HOST_ARCH" "$CPU_MODEL" "$RAM"
+    printf 'Linker:           %s\n' "$LINKER_USED"
     printf 'Tested ARCH:      %s\n' "$ARCHS"
     printf '\n'
     [[ -n $TESTED_BY ]] && printf 'Tested-by: %s\n' "$TESTED_BY"
@@ -345,6 +359,7 @@ overall_cls=$( [[ $OVERALL == PASS ]] && echo pass || echo fail )
 <p>Repository: $REPO_URL</p>
 <p>Commit: $COMMIT_SHA</p>
 <p>Host: $HOST_ARCH | $CPU_MODEL | $RAM</p>
+<p>Linker: $LINKER_USED</p>
 <p>Started: $RUN_STAMP</p>
 <p>Label: $LABEL</p>
 <p>Duration: $OVERALL_DURATION</p>

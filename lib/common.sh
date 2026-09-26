@@ -251,3 +251,20 @@ log_run_result() {
         return 1
     fi
 }
+
+# detect_lld — returns 0 if ld.lld is present and meets the kernel minimum version.
+# Reads: USE_LLD (default 1), KERNEL_TREE (for scripts/min-tool-version.sh).
+# Sets: LLD_VERSION (actual version string), LLD_MIN (effective minimum).
+detect_lld() {
+    LLD_VERSION="" LLD_MIN="17.0.1"
+    [[ "${USE_LLD:-1}" == "0" ]] && return 1
+    command -v ld.lld >/dev/null 2>&1 || return 1
+    LLD_VERSION=$(ld.lld --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+    [[ -z "$LLD_VERSION" ]] && return 1
+    if [[ -x "${KERNEL_TREE:-}/scripts/min-tool-version.sh" ]]; then
+        local _raw
+        _raw=$(bash "${KERNEL_TREE}/scripts/min-tool-version.sh" lld 2>/dev/null || true)
+        [[ -n "$_raw" ]] && LLD_MIN="$_raw"
+    fi
+    [[ "$(printf '%s\n' "$LLD_MIN" "$LLD_VERSION" | sort -V | head -1)" == "$LLD_MIN" ]]
+}
