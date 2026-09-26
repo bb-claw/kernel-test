@@ -291,6 +291,39 @@ the review cycle closes.
 
 ---
 
+## Build + Pipeline Acceleration
+
+Brainstormed 2026-09-26. Prioritised: non-parallelisation options first (single-threaded gains that
+don't require a parallel job dispatcher), then parallelisation. Within non-parallel: low/medium
+effort first, then medium+ impact.
+
+### Group 1 — Non-parallel, low/medium effort *(do first)*
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **KVM on Hetzner (nested virt)** | Low | High | Check `/sys/module/kvm_intel/parameters/nested`; if 1, add `-enable-kvm` to QEMU args is already in `vm.sh` — just needs KVM enabled at the host level. Dedicated Hetzner servers support nested virt; Cloud VMs usually don't. 5× boot speedup on x86. |
+| **LZ4 initramfs + kernel fragment** | Low | Low–Medium | Replace `gzip` with `lz4 -l` in `lib/initramfs.sh`; add `CONFIG_RD_LZ4=y` + `CONFIG_INITRAMFS_COMPRESSION_LZ4=y` to boot-baseline fragment. Faster pack (~5× vs gzip -1) and faster kernel decompress — most visible on slow TCG VMs. |
+| **Skip redundant `olddefconfig` passes** | Low–Medium | Low | `lib/build.sh` can call `olddefconfig` 2–3 times per combo (base + fragment + correction). A hash-before/after check skips the pass when `.config` hasn't changed. |
+
+### Group 2 — Non-parallel, medium+ impact *(do after Group 1)*
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **`LLVM=1` / full Clang build path** | High | Medium | Clang is faster on incremental builds (better at skipping unchanged TUs); also unlocks Thin LTO. Requires `USE_CLANG=1` Makefile variable, clang cross-compilers for all arches, and a second CI dimension. Additive — don't replace GCC. |
+| **Thin LTO (`CONFIG_LTO_CLANG_THIN=y`)** | Medium | Medium | Only with `LLVM=1`. Faster than full LTO; better dead-code elimination. Adds a fragment option; no pipeline change needed beyond enabling. |
+| **Shared object cache across configs** | High | Medium | Configs that share a base (e.g. `defconfig` vs `kunitconfig`) rebuild the same `.o` files from scratch. A two-stage build (shared base first, per-config delta second) would reuse ccache hits more aggressively. Complex dependency tracking. |
+
+### Group 3 — Parallelisation *(highest wall-time impact, more complexity)*
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **Parallel builds** | Medium | Very high | `build` loop is a sequential `for config; for arch` — each combo writes to its own `build/<config>-<arch>/` dir. `xargs -P$(nproc)` or a `wait`-based fan-out. Output buffering required to avoid interleaved logs. |
+| **Parallel VM runs** | Medium | Very high | Same pattern in `test` loop. x86 KVM VMs are cheap to run concurrently (512 MB each, mostly idle). TCG (arm64/riscv) is CPU-bound; concurrency still helps when x86 combos don't wait for TCG. |
+| **Parallel initramfs** | Low | Medium | `initramfs` loop is also sequential; each combo is independent. Easy win alongside parallel builds. |
+| **Parallel builds + VMs together** | Medium | Very high | Natural pairing: run `build` and `test` for a combo as soon as its build finishes, rather than waiting for all builds to complete first. Requires a simple dependency DAG per combo. |
+
+---
+
 ## Out of Scope
 
 - **GitHub Actions CI with hosted runners** — too costly; Hetzner staging covers automated runs
