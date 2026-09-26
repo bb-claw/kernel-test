@@ -50,6 +50,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | `CCACHE_MAX_SIZE=25G` default, tuning via `--set-config` | 5G default caused cache thrashing on localconfig builds (~4.6G output, 82% miss rate); settings written to `ccache.conf` via `--set-config` so they persist for standalone `ccache` invocations; `hard_link` excluded — `objtool` modifies `.o` files in-place for ORC unwinder, incompatible with read-only hard-linked cache entries |
 | LLD auto-detected; `LINKER=lld\|bfd` written to `build.status` | Warm-cache builds spend nearly all time in vmlinux link; LLD is 6.8× faster on partial link (0.22s vs 1.50s), 1.6× on final link. `detect_lld()` in `common.sh` checks `ld.lld` ≥ kernel minimum (`scripts/min-tool-version.sh lld`, fallback 17.0.1). `USE_LLD=0` in `local.mk` disables. `LINKER=` appended to `build.status` via EXIT trap; shown in report headers. |
 | `OBJCOPY=llvm-objcopy` alongside `LD=ld.lld` for cross-arch | LLD 18+ emits arm64/riscv ELF with section types that `aarch64-linux-gnu-objcopy` (binutils 2.40) does not recognise. When `llvm-objcopy` is in PATH: passed for all arches. When absent: LLD still used for x86_64/i386 (native ELF unaffected); arm64/riscv fall back to BFD; preflight warns. |
+| Config cache: `.config-base` + `.config-cache-hash` per combo | `make tinyconfig ARCH=riscv` takes 29 s (kconfig scans full tree 3–4×); output is deterministic for a fixed kernel commit + fragment set. `build.sh` caches the pre-fragment `.config-base` keyed on `sha256(commit + fragments)`; on hit `kmake <base-config>` is skipped (~0 s). `rand500config`/`randdefconfig`/`kunitrandconfig` reuse the sibling defconfig/tinyconfig base (cross-combo). `NO_CONFIG_CACHE=1` forces regen. Not cached: `randconfig`, `localconfig` (non-deterministic). |
 
 ## Current State
 
@@ -88,6 +89,9 @@ build/<config>-<arch>/
   build.status        STATUS=PASS|FAIL|TIMEOUT, START_TIME, DURATION, CONFIG_SHA256, KERNEL_TREE
   build.log           full make output
   .config             final resolved kernel config
+  .config-base            pre-fragment config; cached before fragment application; keyed by sha256(commit+fragments)
+  .config-base-commit     plain kernel commit hash (for cross-combo sibling reuse)
+  .config-cache-hash      opaque sha256 key used to validate cache hits
   vm.status           BOOT=PASS|FAIL, TESTS_PASS, TESTS_FAIL, KUNIT_PASS, KUNIT_FAIL, FAILED_TESTS (space-sep list)
   dmesg.txt           serial console output
 ```

@@ -291,6 +291,74 @@ the review cycle closes.
 
 ---
 
+## Build + Pipeline Acceleration
+
+Brainstormed 2026-09-26. Prioritised: non-parallelisation options first (single-threaded gains that
+don't require a parallel job dispatcher), then parallelisation. Within non-parallel: low/medium
+effort first, then medium+ impact.
+
+### Group 1 — Non-parallel, low/medium effort *(do first)*
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **KVM on Hetzner (nested virt)** | — | — | ~~**DEAD END** (2026-09-26): Hetzner staging is a Cloud VM — neither `kvm_intel` nor `kvm_amd` module loads, no `/dev/kvm`. Measured: KVM=25.6s vs TCG=114.4s per x86 combo (4.5×), but hardware virt passthrough is not available. Would require migrating to a Hetzner dedicated server.~~ |
+| **LZ4 initramfs + kernel fragment** | — | — | ~~**NOT WORTH IT**: initramfs is 2.3 MB; gzip -9 takes 0.34s, lz4 takes 0.007s. Total saving across all combos: <30s.~~ |
+| **Skip redundant `olddefconfig` passes** | — | — | ~~**NOT WORTH IT**: build logs show only 1 `olddefconfig` call per normal combo (not 2–3 as estimated) — it resolves the config fragment and is doing real work. rand500config has 3–4 calls but they're all part of the algorithm. No skippable redundancy.~~ |
+
+### Group 2 — Non-parallel, medium+ impact *(do after Group 1)*
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **`LLVM=1` / full Clang build path** | — | — | ~~**NOT WORTH IT** (2026-09-26): warm builds run only 5 CC calls (version.o, misc.o — always recompile due to timestamps); all other compilation is served by ccache regardless of compiler. Clang would not accelerate the link/AR/OBJCOPY/compression steps that dominate warm build time. Cold CI benefit: ~10–20%, high effort. Not implemented in pipeline; would require `USE_CLANG=1` Makefile variable + clang cross-compilers for all arches.~~ |
+| **Thin LTO (`CONFIG_LTO_CLANG_THIN=y`)** | — | — | ~~**DEAD END** (2026-09-26): LTO adds cross-module analysis at every `LD vmlinux` step (currently 0.22s with LLD). Measured XZ kernel compression takes 1.1s vs gzip's 0.13s — more optimisation = slower build. Thin LTO is a *runtime* speedup, not a build speedup. Makes warm builds slower.~~ |
+| **Shared object cache across configs** | — | — | ~~**ALREADY PROVIDED BY CCACHE** (2026-09-26): defconfig=1658 y-options vs kunitconfig=1665 (99% overlap). Warm builds already make only 5 CC calls total — ccache handles the rest implicitly. A two-stage build would save only the ~5 CC invocation overhead: negligible.~~ |
+
+### Config cache — `feat/config-cache` ✓ DONE (branch ready, 2026-09-26)
+
+Cache the pre-fragment `.config-base` per combo using a sha256 key over kernel commit +
+fragment files. On cache hit, `kmake <base-config>` is skipped entirely. rand500config
+reuses the tinyconfig sibling's `.config-base` (cross-combo). `NO_CONFIG_CACHE=1` forces regen.
+
+Config gen times saved per arch (directly measured on laptop bb-82jq unless marked †):
+
+| Config | x86_64 | i386 | arm64 | riscv | Notes |
+|---|---|---|---|---|---|
+| tinyconfig | 17s | 43s | 13s | 29–54s | laptop; i386 larger Kconfig tree |
+| tinynsconfig | — | — | — | 31s | laptop; +namespaces pass |
+| defconfig | 5s | 5s | 2s | 5s | laptop; single conf pass |
+| randdefconfig | — | — | — | 4s | laptop; own base hit; rand-300-disable still runs → SHA256 differs each run |
+| rand500config | 16s‡ | ~16s‡ | ~6s‡ | ~27s‡ | laptop; savings = before − 11s residual |
+
+‡rand500config: before from stable-rc (v7.2.8-rc1) same hardware; 11s residual = mandatory randconfig temp-dir step (intentionally random — cannot be cached).
+
+Hetzner (4 cores, warm NVMe) — kconfig 3–7× faster than laptop:
+
+| Config | x86_64 | i386 | arm64 | riscv | Total / wall savings |
+|---|---|---|---|---|---|
+| tinynsconfig | 5s | 5s | 7s | 6s | 23s saved; 1m07s → 36.6s |
+
+### Group 3 — Parallelisation *(highest wall-time impact, more complexity)*
+
+Measured 2026-09-26 on Hetzner (3 configs × 4 arches = 12 combos, warm ccache, v7.2.8-rc1):
+
+| Mode | Wall time | Speedup |
+|---|---|---|
+| Sequential (current) | 19m 7s | 1× |
+| Parallel 4 workers (per-arch within config) | 14m 55s | 1.3× |
+| Parallel 12 workers (all combos) | 14m 2s | 1.4× |
+| **All 12 warm + parallel** | **~39s** | **~18×** |
+
+The 14-minute floor is entirely from one cold build (kunitconfig/i386, first run). After cache warmup, parallel runs collapse to the slowest single combo (~39s). Configuration phases also run in parallel, so config overhead is absorbed. Hetzner: 5–7s flat per combo. Laptop: tinyconfig gen takes 10–29s per arch (riscv is slowest: 29s gen + 4s fragment = 33s; x86_64/i386 ~22s; arm64 ~13s) — likely riscv Kconfig tree size + page cache cold on laptop SSD. defconfig gen is 5s on both machines.
+
+| Option | Effort | Impact | Notes |
+|---|---|---|---|
+| **Parallel builds** | Medium | Very high | `build` loop is a sequential `for config; for arch` — each combo writes to its own `build/<config>-<arch>/` dir. `xargs -P$(nproc)` or a `wait`-based fan-out. Output buffering required to avoid interleaved logs. |
+| **Parallel VM runs** | Medium | Very high | Same pattern in `test` loop. x86 KVM VMs are cheap to run concurrently (512 MB each, mostly idle). TCG (arm64/riscv) is CPU-bound; concurrency still helps when x86 combos don't wait for TCG. |
+| **Parallel initramfs** | Low | Medium | `initramfs` loop is also sequential; each combo is independent. Easy win alongside parallel builds. |
+| **Parallel builds + VMs together** | Medium | Very high | Natural pairing: run `build` and `test` for a combo as soon as its build finishes, rather than waiting for all builds to complete first. Requires a simple dependency DAG per combo. |
+
+---
+
 ## Out of Scope
 
 - **GitHub Actions CI with hosted runners** — too costly; Hetzner staging covers automated runs
