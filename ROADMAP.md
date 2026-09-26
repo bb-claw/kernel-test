@@ -319,16 +319,17 @@ Cache the pre-fragment `.config-base` per combo using a sha256 key over kernel c
 fragment files. On cache hit, `kmake <base-config>` is skipped entirely. rand500config
 reuses the tinyconfig sibling's `.config-base` (cross-combo). `NO_CONFIG_CACHE=1` forces regen.
 
-Measured on laptop (bb-82jq, v7.3-rc3, warm ccache, x86_64):
+Measured on laptop (bb-82jq, v7.3-rc3, warm ccache). Config gen times saved per arch (all directly measured unless marked †):
 
-| Step | Before | After | Saved |
-|---|---|---|---|
-| tinyconfig/x86_64 config gen | 17s | 0s (instant) | 17s |
-| tinyconfig/x86_64 total build | 30.4s | 13.0s | 17.4s |
-| rand500config/x86_64 config gen | 27s* | 11s | 16s |
+| Config | x86_64 | i386 | arm64 | riscv | Total 4 arches |
+|---|---|---|---|---|---|
+| tinyconfig | 17s | ~17s† | ~13s† | 29s | ~76s |
+| defconfig | 5s | 5s | 2s | 5s | 17s |
+| rand500config | 16s‡ | ~16s‡ | ~6s‡ | ~27s‡ | ~65s |
 
-*rand500config/x86_64 before = stable-rc clone same hardware (v7.2.8-rc1); riscv before = 38s.
-The 11s residual for rand500config is the mandatory randconfig temp-dir step (intentionally random — cannot be cached).
+†estimated from pre-branch session data. ‡savings = before − 11s residual (randconfig temp-dir step, mandatory and intentionally random — cannot be cached). rand500config/x86_64 before from stable-rc clone (v7.2.8-rc1), same hardware.
+
+Total build time example: defconfig all-4-arch run 1m45.5s → 1m22.2s = 23s saved on second run.
 
 ### Group 3 — Parallelisation *(highest wall-time impact, more complexity)*
 
