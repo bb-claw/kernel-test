@@ -17,11 +17,7 @@ log() {
     local _ts _el
     _ts=$(date -u +%H:%M:%S)
     _el=$(( $(date -u +%s) - _LOG_START ))
-    if [[ -n "${CONFIG:-}" && -n "${ARCH:-}" ]]; then
-        printf '%s [%4d] %-16s %-6s %s\n' "$_ts" "$_el" "$CONFIG" "$ARCH" "$*"
-    else
-        printf '%s %s\n' "$_ts" "$*"
-    fi
+    printf '%s [%4d] %-16s %-6s %s\n' "$_ts" "$_el" "${CONFIG:--}" "${ARCH:--}" "$*"
 }
 info() { log "${_GRN}INFO${_RST}  $*"; }
 warn() { log "${_YLW}WARN${_RST}  $*" >&2; }
