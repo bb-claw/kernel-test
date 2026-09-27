@@ -3,4 +3,4 @@
 # _LOG_START is exported by the Makefile so elapsed is relative to make start.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
-log "$*"
+info "$*"
