@@ -90,7 +90,7 @@ _snapshot() {
     fi
 
     # -- Run plan (total expected builds / tests; scoped combos for done counts) --
-    local build_total=0 test_total=0 _plan_configs="" _plan_archs="" _plan_boot=""
+    local build_total=0 test_total=0 _plan_configs="" _plan_archs="" _plan_boot="" _run_elapsed=""
     if [[ -f "$BUILD_DIR/.run-plan" ]]; then
         build_total=$(grep '^BUILD_TOTAL='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
         test_total=$(grep '^TEST_TOTAL='    "$BUILD_DIR/.run-plan" | cut -d= -f2)
@@ -98,6 +98,7 @@ _snapshot() {
         _plan_archs=$(grep '^ARCHS='        "$BUILD_DIR/.run-plan" | cut -d= -f2)
         _plan_boot=$(grep '^BOOT_CONFIGS='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
         build_total=${build_total:-0}; test_total=${test_total:-0}
+        _run_elapsed=$(_elapsed_fmt "$BUILD_DIR/.run-plan")
     fi
 
     # Scope done counts to this run's combos so accumulated prior-run artifacts
@@ -164,9 +165,10 @@ _snapshot() {
     # -- Render --
     [[ $_ONCE -eq 0 ]] && printf '\033[2J\033[H'   # clear screen (not in --once mode)
 
-    local ts
+    local ts _run_sfx=""
     ts=$(date '+%H:%M:%S')
-    printf '  KERNEL-TEST MONITOR%41s%s\n' '' "$ts"
+    [[ -n $_run_elapsed ]] && _run_sfx="   run: $_run_elapsed"
+    printf '  KERNEL-TEST MONITOR%41s%s%s\n' '' "$ts" "$_run_sfx"
     printf '  %s\n' "$(printf '─%.0s' {1..60})"
     printf '\n'
 
