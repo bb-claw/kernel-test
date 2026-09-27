@@ -489,8 +489,9 @@ else
 	_enqueue() { \
 	    lib/build.sh "$$1" "$$2" & _pids+=("$$!"); \
 	    while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
-	        wait "$${_pids[0]}" || rc=1; \
-	        _pids=("$${_pids[@]:1}"); \
+	        wait -n || rc=1; \
+	        _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	        _pids=("$${_new[@]}"); \
 	    done; \
 	}; \
 	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
@@ -556,8 +557,9 @@ initramfs:
 	    for arch in $(ARCHS); do \
 	        lib/initramfs.sh "$$config" "$$arch" & _pids+=("$$!"); \
 	        while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
-	            wait "$${_pids[0]}" || rc=1; \
-	            _pids=("$${_pids[@]:1}"); \
+	            wait -n || rc=1; \
+	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	            _pids=("$${_new[@]}"); \
 	        done; \
 	    done; \
 	done; \
@@ -583,8 +585,9 @@ test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.sta
 	        fi; \
 	        lib/vm.sh "$$config" "$$arch" & _pids+=("$$!"); \
 	        while [[ $${#_pids[@]} -ge $(PARALLEL_VMS) ]]; do \
-	            wait "$${_pids[0]}" || rc=1; \
-	            _pids=("$${_pids[@]:1}"); \
+	            wait -n || rc=1; \
+	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	            _pids=("$${_new[@]}"); \
 	        done; \
 	    done; \
 	done; \
