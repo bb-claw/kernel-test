@@ -89,6 +89,14 @@ _snapshot() {
         [[ $_oldest -gt 0 ]] && test_wall_elapsed=$(( $(date +%s) - _oldest ))
     fi
 
+    # -- Run plan (total expected builds / tests for this run) --
+    local build_total=0 test_total=0
+    if [[ -f "$BUILD_DIR/.run-plan" ]]; then
+        build_total=$(grep '^BUILD_TOTAL=' "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        test_total=$(grep '^TEST_TOTAL='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        build_total=${build_total:-0}; test_total=${test_total:-0}
+    fi
+
     # -- Write monitor sample for metrics.sh peak aggregation --
     local _samples="$BUILD_DIR/.monitor-samples"
     if [[ -d $BUILD_DIR ]]; then
@@ -117,7 +125,11 @@ _snapshot() {
     printf '  %s\n' "$(printf '─%.0s' {1..60})"
     printf '\n'
 
-    printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
+    if [[ $build_total -gt 0 ]]; then
+        printf '  BUILDS (%d active / %d done / %d total)' "${#build_active[@]}" "$build_done" "$build_total"
+    else
+        printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
+    fi
     printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)\n' \
         "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1" \
         "$mem_used_g" "$mem_total_g" "$mem_pct"
@@ -131,7 +143,13 @@ _snapshot() {
     fi
 
     printf '\n'
-    if [[ $test_wall_elapsed -gt 0 ]]; then
+    if [[ $test_total -gt 0 && $test_wall_elapsed -gt 0 ]]; then
+        printf '  TESTS  (%d active / %d done / %d total)   VMs: %d   wall: %s\n' \
+            "${#test_active[@]}" "$test_done" "$test_total" "$qemu_count" "$(_fmt_dur "$test_wall_elapsed")"
+    elif [[ $test_total -gt 0 ]]; then
+        printf '  TESTS  (%d active / %d done / %d total)   VMs: %d\n' \
+            "${#test_active[@]}" "$test_done" "$test_total" "$qemu_count"
+    elif [[ $test_wall_elapsed -gt 0 ]]; then
         printf '  TESTS  (%d active / %d done)   VMs: %d   wall: %s\n' \
             "${#test_active[@]}" "$test_done" "$qemu_count" "$(_fmt_dur "$test_wall_elapsed")"
     else

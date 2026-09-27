@@ -141,6 +141,8 @@ KERNEL_VERSION := $(shell \
 # kunitrandconfig is booted: defconfig base is bootable; KUnit emits KTAP to serial; KUNIT_PASS/FAIL tracked.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig randnsconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
+_BUILD_TOTAL       := $(words $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$c-$a)))
+_TEST_TOTAL        := $(words $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$c-$a)))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
 # ?= with $(shell) creates a lazy recursive variable — the shell command would
@@ -480,6 +482,7 @@ build:
 	$(Q)lib/preflight.sh
 	$(Q)mkdir -p $(BUILD_DIR) && ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
 	$(Q)rm -f $(BUILD_DIR)/.monitor-samples
+	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\n' $(_BUILD_TOTAL) $(_TEST_TOTAL) > $(BUILD_DIR)/.run-plan
 ifeq ($(NO_BUILD),1)
 	@lib/mklog.sh "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
@@ -572,6 +575,7 @@ initramfs:
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
 	@lib/mklog.sh "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel VMs: $(PARALLEL_VMS)"
+	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\n' $(_BUILD_TOTAL) $(_TEST_TOTAL) > $(BUILD_DIR)/.run-plan 2>/dev/null || true
 	$(Q)rc=0; \
 	_pids=(); \
 	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
