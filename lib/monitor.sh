@@ -5,6 +5,7 @@
 # Reads: $BUILD_DIR/.build-active  $BUILD_DIR/.vm-active  (sentinels from build.sh / vm.sh)
 #        /proc/loadavg  ps         (cc1, kbuild-make, QEMU process counts)
 #        $REPORT_DIR                (last metrics.txt for delta section)
+#        /sys/devices/system/cpu/*/cpufreq  /sys/class/thermal  (throttle warning)
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/common.sh
@@ -32,12 +33,51 @@ _field() { grep "^${1}=" "$2" 2>/dev/null | cut -d= -f2; }
 
 _fmt_dur() { local s=$1; printf '%dm%02ds' "$(( s / 60 ))" "$(( s % 60 ))"; }
 
+_sep() { printf '─%.0s' $(seq 1 "$1"); }
+
+# Prints a WARN line when average CPU freq < 80% of max; silent otherwise.
+_check_cpu_throttle() {
+    local _max_khz _f _v
+    _max_khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null) || return 0
+    [[ -z ${_max_khz:-} || $_max_khz -eq 0 ]] && return 0
+    local _cur_sum=0 _cur_cnt=0
+    for _f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq; do
+        [[ -r $_f ]] || continue
+        _v=$(cat "$_f" 2>/dev/null) || continue
+        _cur_sum=$(( _cur_sum + _v ))
+        _cur_cnt=$(( _cur_cnt + 1 ))
+    done
+    [[ $_cur_cnt -eq 0 ]] && return 0
+    local _avg_khz
+    _avg_khz=$(( _cur_sum / _cur_cnt ))
+    [[ $_avg_khz -eq 0 ]] && return 0
+    local _pct
+    _pct=$(( _avg_khz * 100 / _max_khz ))
+    [[ $_pct -ge 80 ]] && return 0
+    local _cur_ghz _max_ghz
+    _cur_ghz=$(awk "BEGIN{printf \"%.1f\", $_avg_khz/1000000}")
+    _max_ghz=$(awk "BEGIN{printf \"%.1f\", $_max_khz/1000000}")
+    local _tmax=0
+    for _f in /sys/class/thermal/thermal_zone*/temp; do
+        [[ -r $_f ]] || continue
+        _v=$(cat "$_f" 2>/dev/null) || continue
+        [[ ${_v:-0} -gt $_tmax ]] && _tmax=$_v
+    done
+    printf '  WARN: CPU throttled — avg %s GHz / %s GHz max (%d%%)  temp: %d°C\n' \
+        "$_cur_ghz" "$_max_ghz" "$_pct" "$(( _tmax / 1000 ))"
+}
+
 # ── Snapshot + display ────────────────────────────────────────────────────────
 
 _snapshot() {
+    # -- Terminal width: min 60, max 100; _w = usable width (subtract 2-space indent) --
+    local _cols _w
+    _cols=$(tput cols 2>/dev/null) || _cols=80
+    [[ $_cols -lt 60  ]] && _cols=60
+    [[ $_cols -gt 100 ]] && _cols=100
+    _w=$(( _cols - 2 ))
+
     # -- Process counts (ps) --
-    # grep -c exits 1 when count is 0, which would add a second "0" inside $().
-    # Use || var=0 outside $() to handle the non-zero exit without double-capture.
     local cc1_count cc1_cpu kbuild_count qemu_count
     cc1_count=$(ps ax --no-headers -o comm 2>/dev/null | grep -c '^cc1$') || cc1_count=0
     cc1_cpu=$(ps ax --no-headers -o '%cpu comm' 2>/dev/null | awk '/cc1$/{s+=$1}END{printf "%d",s+0}')
@@ -66,7 +106,8 @@ _snapshot() {
         build_active+=("${_combo}|${_j:-?}|$(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
     build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
-        -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l || echo 0)
+        -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l 2>/dev/null || true)
+    build_done=${build_done:-0}
 
     # -- Active tests (sentinel files) --
     local test_active=() test_done=0 test_wall_elapsed=0
@@ -76,7 +117,8 @@ _snapshot() {
         _combo=${_af%/.vm-active}; _combo=${_combo#"$BUILD_DIR"/}
         test_active+=("$_combo $(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
-    test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l || echo 0)
+    test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l 2>/dev/null || true)
+    test_done=${test_done:-0}
 
     # -- Test wall time: elapsed since oldest active VM sentinel --
     if [[ ${#test_active[@]} -gt 0 ]]; then
@@ -90,7 +132,8 @@ _snapshot() {
     fi
 
     # -- Run plan (total expected builds / tests; scoped combos for done counts) --
-    local build_total=0 test_total=0 _plan_configs="" _plan_archs="" _plan_boot="" _run_elapsed=""
+    local build_total=0 test_total=0 _plan_configs="" _plan_archs="" _plan_boot=""
+    local _run_elapsed="" _run_elapsed_secs=0
     if [[ -f "$BUILD_DIR/.run-plan" ]]; then
         build_total=$(grep '^BUILD_TOTAL='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
         test_total=$(grep '^TEST_TOTAL='    "$BUILD_DIR/.run-plan" | cut -d= -f2)
@@ -99,6 +142,9 @@ _snapshot() {
         _plan_boot=$(grep '^BOOT_CONFIGS='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
         build_total=${build_total:-0}; test_total=${test_total:-0}
         _run_elapsed=$(_elapsed_fmt "$BUILD_DIR/.run-plan")
+        local _plan_mtime
+        _plan_mtime=$(stat -c %Y "$BUILD_DIR/.run-plan" 2>/dev/null) || _plan_mtime=0
+        [[ $_plan_mtime -gt 0 ]] && _run_elapsed_secs=$(( $(date +%s) - _plan_mtime ))
     fi
 
     # Scope done counts to this run's combos so accumulated prior-run artifacts
@@ -127,6 +173,18 @@ _snapshot() {
         test_done=$_td
     fi
 
+    # -- ETA: estimated remaining time based on done/total progress --
+    local _eta_sfx=""
+    if [[ $_run_elapsed_secs -gt 5 ]]; then
+        local _eta_secs=0
+        if [[ $build_total -gt 0 && $build_done -gt 0 && $build_done -lt $build_total ]]; then
+            _eta_secs=$(( _run_elapsed_secs * (build_total - build_done) / build_done ))
+        elif [[ $test_total -gt 0 && $test_done -gt 0 && $test_done -lt $test_total && $test_wall_elapsed -gt 0 ]]; then
+            _eta_secs=$(( test_wall_elapsed * (test_total - test_done) / test_done ))
+        fi
+        [[ $_eta_secs -gt 0 ]] && _eta_sfx=" → ETA ~$(_fmt_dur $_eta_secs)"
+    fi
+
     # -- Write monitor sample for metrics.sh peak aggregation --
     local _samples="$BUILD_DIR/.monitor-samples"
     if [[ -d $BUILD_DIR ]]; then
@@ -135,19 +193,59 @@ _snapshot() {
             >> "$_samples" 2>/dev/null || true
     fi
 
-    # -- Live ccache hit rate (delta from build-start snapshot) --
-    local _ccache_live="" _cc_dir="${CCACHE_DIR:-$REPO/${CACHE_DIR:-cache}}"
-    if [[ -f "$BUILD_DIR/.ccache-stats-before" && -d $_cc_dir ]]; then
-        local _hb _mb _now_cs _hn _mn _dh _dm _dt
-        _hb=$(grep -E '^\s+Hits:'   "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _hb=${_hb:-0}
-        _mb=$(grep -E '^\s+Misses:' "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _mb=${_mb:-0}
-        _now_cs=$(CCACHE_DIR="$_cc_dir" ccache -s 2>/dev/null)
-        _hn=$(printf '%s' "$_now_cs" | grep -E '^\s+Hits:'   | head -1 | grep -oE '[0-9]+' | head -1); _hn=${_hn:-0}
-        _mn=$(printf '%s' "$_now_cs" | grep -E '^\s+Misses:' | head -1 | grep -oE '[0-9]+' | head -1); _mn=${_mn:-0}
-        _dh=$(( _hn - _hb )); [[ $_dh -lt 0 ]] && _dh=0
-        _dm=$(( _mn - _mb )); [[ $_dm -lt 0 ]] && _dm=0
-        _dt=$(( _dh + _dm ))
-        [[ $_dt -gt 0 ]] && _ccache_live=$(( _dh * 100 / _dt ))
+    # -- ccache stats: one --show-stats call per tick covers live delta + all-time display --
+    local _cc_dir="${CCACHE_DIR:-$REPO/${CACHE_DIR:-cache}}"
+    local _cs_out="" _ccache_live="" _ccache_alltime=""
+    local _cc_size_used="?" _cc_size_max="?" _cc_size_pct="?"
+    local _cc_direct_n=0 _cc_direct_d=0 _cc_direct_pct=0
+    local _cc_prepro_n=0 _cc_prepro_d=0 _cc_prepro_pct=0
+    local _cc_errors=0 _cc_cleanups=0
+
+    if [[ -d $_cc_dir ]] && command -v ccache >/dev/null 2>&1; then
+        _cs_out=$(CCACHE_DIR="$_cc_dir" ccache --show-stats 2>/dev/null) || _cs_out=""
+        if [[ -n $_cs_out ]]; then
+            # All-time hit / miss totals (first "Hits:" / "Misses:" under "Cacheable calls:")
+            local _hn_abs _hm_abs _ht_abs
+            _hn_abs=$(printf '%s' "$_cs_out" | grep -E '^\s*Hits:'   | head -1 | grep -oE '[0-9]+' | head -1); _hn_abs=${_hn_abs:-0}
+            _hm_abs=$(printf '%s' "$_cs_out" | grep -E '^\s*Misses:' | head -1 | grep -oE '[0-9]+' | head -1); _hm_abs=${_hm_abs:-0}
+            _ht_abs=$(( _hn_abs + _hm_abs ))
+            [[ $_ht_abs -gt 0 ]] && _ccache_alltime=$(( _hn_abs * 100 / _ht_abs ))
+
+            # Direct / Preprocessed hit split
+            _cc_direct_n=$(printf '%s' "$_cs_out" | grep -E '^\s*Direct:'       | grep -oE '[0-9]+' | sed -n '1p'); _cc_direct_n=${_cc_direct_n:-0}
+            _cc_direct_d=$(printf '%s' "$_cs_out" | grep -E '^\s*Direct:'       | grep -oE '[0-9]+' | sed -n '2p'); _cc_direct_d=${_cc_direct_d:-0}
+            _cc_prepro_n=$(printf '%s' "$_cs_out" | grep -E '^\s*Preprocessed:' | grep -oE '[0-9]+' | sed -n '1p'); _cc_prepro_n=${_cc_prepro_n:-0}
+            _cc_prepro_d=$(printf '%s' "$_cs_out" | grep -E '^\s*Preprocessed:' | grep -oE '[0-9]+' | sed -n '2p'); _cc_prepro_d=${_cc_prepro_d:-0}
+            [[ $_cc_direct_d -gt 0 ]] && _cc_direct_pct=$(( _cc_direct_n * 100 / _cc_direct_d ))
+            [[ $_cc_prepro_d -gt 0 ]] && _cc_prepro_pct=$(( _cc_prepro_n * 100 / _cc_prepro_d ))
+
+            # Cache size (GB)
+            local _cs_line _cs_nums
+            _cs_line=$(printf '%s' "$_cs_out" | grep 'Cache size (GB):')
+            if [[ -n $_cs_line ]]; then
+                _cs_nums=$(printf '%s' "$_cs_line" | grep -oE '[0-9]+\.[0-9]+')
+                _cc_size_used=$(printf '%s' "$_cs_nums" | sed -n '1p'); _cc_size_used=${_cc_size_used:-?}
+                _cc_size_max=$(printf '%s' "$_cs_nums"  | sed -n '2p'); _cc_size_max=${_cc_size_max:-?}
+                local _cc_size_pct_raw
+                _cc_size_pct_raw=$(printf '%s' "$_cs_nums" | sed -n '3p')
+                _cc_size_pct=${_cc_size_pct_raw%.*}; _cc_size_pct=${_cc_size_pct:-?}
+            fi
+
+            # Errors + cleanups
+            _cc_errors=$(printf '%s' "$_cs_out"    | grep '^Errors:'       | grep -oE '[0-9]+' | head -1); _cc_errors=${_cc_errors:-0}
+            _cc_cleanups=$(printf '%s' "$_cs_out"  | grep '^\s*Cleanups:' | grep -oE '[0-9]+' | head -1); _cc_cleanups=${_cc_cleanups:-0}
+
+            # Live delta (this run): compare with stats captured at build start
+            if [[ -f "$BUILD_DIR/.ccache-stats-before" ]]; then
+                local _hb _mb _dh _dm _dt
+                _hb=$(grep -E '^\s+Hits:'   "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _hb=${_hb:-0}
+                _mb=$(grep -E '^\s+Misses:' "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _mb=${_mb:-0}
+                _dh=$(( _hn_abs - _hb )); [[ $_dh -lt 0 ]] && _dh=0
+                _dm=$(( _hm_abs - _mb )); [[ $_dm -lt 0 ]] && _dm=0
+                _dt=$(( _dh + _dm ))
+                [[ $_dt -gt 0 ]] && _ccache_live=$(( _dh * 100 / _dt ))
+            fi
+        fi
     fi
 
     # -- Delta vs last metrics.txt --
@@ -162,26 +260,27 @@ _snapshot() {
         prev_ccache=$(_field CCACHE_HIT_RATE_PCT "$last_metrics")
     fi
 
-    # -- Render --
-    [[ $_ONCE -eq 0 ]] && printf '\033[2J\033[H'   # clear screen (not in --once mode)
+    # ── Render ────────────────────────────────────────────────────────────────
+
+    [[ $_ONCE -eq 0 ]] && printf '\033[2J\033[H'
 
     local ts _run_sfx=""
     ts=$(date '+%H:%M:%S')
-    [[ -n $_run_elapsed ]] && _run_sfx="   run: $_run_elapsed"
+    [[ -n $_run_elapsed ]] && _run_sfx="   run: $_run_elapsed${_eta_sfx}"
     printf '  KERNEL-TEST MONITOR%41s%s%s\n' '' "$ts" "$_run_sfx"
-    printf '  %s\n' "$(printf '─%.0s' {1..60})"
+    printf '  %s\n' "$(_sep "$_w")"
     printf '\n'
 
+    # BUILDS
     if [[ $build_total -gt 0 ]]; then
         printf '  BUILDS (%d active / %d done / %d total)' "${#build_active[@]}" "$build_done" "$build_total"
     else
         printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
     fi
-    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)' \
+    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)\n' \
         "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1" \
         "$mem_used_g" "$mem_total_g" "$mem_pct"
-    [[ -n ${_ccache_live:-} ]] && printf '  cache: %d%%' "$_ccache_live"
-    printf '\n'
+    _check_cpu_throttle
     if [[ ${#build_active[@]} -gt 0 ]]; then
         for _entry in "${build_active[@]}"; do
             IFS='|' read -r _combo _j _elapsed <<< "$_entry"
@@ -191,6 +290,7 @@ _snapshot() {
         printf '    (none)\n'
     fi
 
+    # TESTS
     printf '\n'
     if [[ $test_total -gt 0 && $test_wall_elapsed -gt 0 ]]; then
         printf '  TESTS  (%d active / %d done / %d total)   VMs: %d   wall: %s\n' \
@@ -213,8 +313,31 @@ _snapshot() {
         printf '    (none)\n'
     fi
 
+    # CCACHE
+    printf '\n'
+    if [[ -n $_cs_out ]]; then
+        local _cc_hdr=""
+        if [[ -n $_ccache_live ]]; then
+            _cc_hdr="this run: ${_ccache_live}%"
+            [[ -n $_ccache_alltime ]] && _cc_hdr+="  all-time: ${_ccache_alltime}%"
+        elif [[ -n $_ccache_alltime ]]; then
+            _cc_hdr="all-time: ${_ccache_alltime}%"
+        else
+            _cc_hdr="cold"
+        fi
+        printf '  CCACHE  (%s)   size: %s / %s GB (%s%%)\n' \
+            "$_cc_hdr" "$_cc_size_used" "$_cc_size_max" "$_cc_size_pct"
+        printf '    direct: %d / %d (%d%%)   preprocessed: %d / %d (%d%%)\n' \
+            "$_cc_direct_n" "$_cc_direct_d" "$_cc_direct_pct" \
+            "$_cc_prepro_n" "$_cc_prepro_d" "$_cc_prepro_pct"
+        printf '    errors: %d   cleanups: %d\n' "$_cc_errors" "$_cc_cleanups"
+    else
+        printf '  CCACHE  (no data — run make build first or check CCACHE_DIR)\n'
+    fi
+
+    # Delta vs last run
     if [[ -n $last_label ]]; then
-        printf '\n  %s\n' "$(printf '─%.0s' {1..60})"
+        printf '\n  %s\n' "$(_sep "$_w")"
         printf '  vs last run: %s\n' "$last_label"
         [[ -n ${prev_build_wall:-} ]] && \
             printf '    build wall: %s\n' "$(_fmt_dur "$prev_build_wall")"
@@ -222,7 +345,7 @@ _snapshot() {
             printf '    test  wall: %s\n' "$(_fmt_dur "$prev_test_wall")"
         [[ -n ${prev_ccache:-} ]] && \
             printf '    ccache hit: %s%%\n' "$prev_ccache"
-        printf '  %s\n' "$(printf '─%.0s' {1..60})"
+        printf '  %s\n' "$(_sep "$_w")"
     fi
     printf '\n'
 }
