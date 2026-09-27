@@ -2,7 +2,7 @@
 
 Branch: `feat/jobserver-builds`
 Prerequisite: `feat/parallel-builds` merged to `main` ✓
-Status: **ready to implement**
+Status: **implemented**
 
 ---
 
