@@ -1,0 +1,10 @@
+Summary:
+  Hits:             1000 / 1050 (95.24 %)
+    Direct:         1000
+    Preprocessed:      0
+  Misses:             50
+  Uncacheable:         0
+Primary storage:
+  Hits:             1000 / 1050 (95.24 %)
+  Misses:             50
+  Cache size (GiB):  5.00 / 25.00 (20.00 %)

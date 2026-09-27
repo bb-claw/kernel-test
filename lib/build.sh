@@ -44,13 +44,21 @@ OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
 LOG_FILE="$OUT_DIR/build.log"
 STATUS_FILE="$OUT_DIR/build.status"
 _host_cpus=$(nproc 2>/dev/null || echo 1)
-NPROC=$(( _host_cpus / ${PARALLEL_BUILDS:-1} ))
+# Use min(PARALLEL_BUILDS, BUILD_TOTAL) as the divisor so small runs
+# (fewer combos than PARALLEL_BUILDS) get proportionally more -j slots.
+_effective_par=${PARALLEL_BUILDS:-1}
+_plan_total=$(grep '^BUILD_TOTAL=' "${BUILD_DIR}/.run-plan" 2>/dev/null | cut -d= -f2)
+if [[ -n ${_plan_total:-} && $_plan_total -gt 0 && $_plan_total -lt $_effective_par ]]; then
+    _effective_par=$_plan_total
+fi
+NPROC=$(( _host_cpus / _effective_par ))
 [[ $NPROC -lt 2 ]] && NPROC=2
 
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
 printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
+printf '%d\n' "$NPROC" > "$OUT_DIR/.build-active"   # sentinel for make monitor; content is -j value; removed in EXIT trap
 
 # ── Linker selection ──────────────────────────────────────────────────────────
 LINKER=bfd
@@ -60,7 +68,7 @@ if detect_lld; then
     info "Linker: ld.lld ${LLD_VERSION}"
     command -v llvm-objcopy >/dev/null 2>&1 && LINKER_OBJCOPY="llvm-objcopy"
 fi
-trap 'printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
+trap 'rm -f "$OUT_DIR/.build-active"; printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 

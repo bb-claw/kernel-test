@@ -520,6 +520,14 @@ printf '\n'
 info "Running warning analysis ..."
 "$_WARNINGS" "$RUN_DIR" || warn "warnings.sh exited non-zero (analysis incomplete)"
 
+# ── Run metrics ───────────────────────────────────────────────────────────────
+
+_METRICS="$(dirname "$0")/metrics.sh"
+printf '\n'
+info "Collecting run metrics ..."
+"$_METRICS" "$RUN_DIR" "${BUILD_DIR}/.ccache-stats-before" \
+    || warn "metrics.sh exited non-zero (metrics incomplete)"
+
 # ── Commit report to data repo ────────────────────────────────────────────────
 
 run_name=$(basename "$RUN_DIR")

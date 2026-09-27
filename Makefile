@@ -141,6 +141,8 @@ KERNEL_VERSION := $(shell \
 # kunitrandconfig is booted: defconfig base is bootable; KUnit emits KTAP to serial; KUNIT_PASS/FAIL tracked.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig randnsconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
+_BUILD_TOTAL       := $(words $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$c-$a)))
+_TEST_TOTAL        := $(words $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$c-$a)))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
 # ?= with $(shell) creates a lazy recursive variable — the shell command would
@@ -179,7 +181,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -478,6 +480,10 @@ preflight:
 
 build:
 	$(Q)lib/preflight.sh
+	$(Q)mkdir -p $(BUILD_DIR) && CCACHE_DIR=$(CURDIR)/$(CACHE_DIR) ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
+	$(Q)rm -f $(BUILD_DIR)/.monitor-samples
+	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\nCONFIGS=%s\nARCHS=%s\nBOOT_CONFIGS=%s\n' \
+		$(_BUILD_TOTAL) $(_TEST_TOTAL) '$(CONFIGS)' '$(ARCHS)' '$(BOOT_CONFIGS)' > $(BUILD_DIR)/.run-plan
 ifeq ($(NO_BUILD),1)
 	@lib/mklog.sh "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
@@ -601,6 +607,12 @@ report:
 # Without arguments, compares the two most recent runs automatically.
 OLD ?=
 NEW ?=
+# Live KPI dashboard — run in a separate terminal while make all is active.
+# Shows: active builds/tests, cc1 count, kbuild-make depth, CPU%, load.
+# Also writes per-sample data to build/.monitor-samples for peak aggregation in metrics.txt.
+monitor:
+	@lib/monitor.sh
+
 diff:
 	$(Q)if [[ -z "$(OLD)" && -z "$(NEW)" ]]; then \
 	    lib/diff.sh; \
