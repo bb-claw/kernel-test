@@ -113,9 +113,14 @@ and a corresponding HTML section to `summary.html`.
 
 ### ccache stats snapshot
 
-`Makefile` writes `ccache -s > $(BUILD_DIR)/.ccache-stats-before` at the start of `make build`
-(before any build.sh invocation). This captures the cumulative ccache counter values so
-`lib/metrics.sh` can compute the per-run delta by subtracting.
+`Makefile` writes `CCACHE_DIR=$(CURDIR)/$(CACHE_DIR) ccache -s > $(BUILD_DIR)/.ccache-stats-before`
+at the start of `make build` (before any build.sh invocation). This captures the cumulative
+ccache counter values so `lib/metrics.sh` can compute the per-run delta by subtracting.
+
+`CCACHE_DIR` must be set explicitly: `build.sh` sets it to `$PWD/$CACHE_DIR` for each build
+subprocess, but the Makefile snapshot runs before any build.sh — without the env var, `ccache -s`
+reads the global `~/.cache/ccache` rather than the per-clone `cache/` directory, giving a
+0% delta. `lib/metrics.sh` applies the same fix when taking the post-run snapshot.
 
 ---
 

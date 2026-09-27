@@ -114,7 +114,7 @@ _read_ccache_misses() {
 
 if [[ -n $CCACHE_BEFORE && -f $CCACHE_BEFORE ]]; then
     _now_file=$(mktemp)
-    ccache -s > "$_now_file" 2>/dev/null || true
+    CCACHE_DIR="${CCACHE_DIR:-$REPO/${CACHE_DIR:-cache}}" ccache -s > "$_now_file" 2>/dev/null || true
     _h_before=$(_read_ccache_hits "$CCACHE_BEFORE")
     _h_after=$(_read_ccache_hits "$_now_file")
     _m_before=$(_read_ccache_misses "$CCACHE_BEFORE")

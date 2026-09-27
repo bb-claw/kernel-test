@@ -480,7 +480,7 @@ preflight:
 
 build:
 	$(Q)lib/preflight.sh
-	$(Q)mkdir -p $(BUILD_DIR) && ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
+	$(Q)mkdir -p $(BUILD_DIR) && CCACHE_DIR=$(CURDIR)/$(CACHE_DIR) ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
 	$(Q)rm -f $(BUILD_DIR)/.monitor-samples
 	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\nCONFIGS=%s\nARCHS=%s\nBOOT_CONFIGS=%s\n' \
 		$(_BUILD_TOTAL) $(_TEST_TOTAL) '$(CONFIGS)' '$(ARCHS)' '$(BOOT_CONFIGS)' > $(BUILD_DIR)/.run-plan

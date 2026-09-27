@@ -134,10 +134,25 @@ _snapshot() {
             >> "$_samples" 2>/dev/null || true
     fi
 
+    # -- Live ccache hit rate (delta from build-start snapshot) --
+    local _ccache_live="" _cc_dir="${CCACHE_DIR:-$REPO/${CACHE_DIR:-cache}}"
+    if [[ -f "$BUILD_DIR/.ccache-stats-before" && -d $_cc_dir ]]; then
+        local _hb _mb _now_cs _hn _mn _dh _dm _dt
+        _hb=$(grep -E '^\s+Hits:'   "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _hb=${_hb:-0}
+        _mb=$(grep -E '^\s+Misses:' "$BUILD_DIR/.ccache-stats-before" | head -1 | grep -oE '[0-9]+' | head -1); _mb=${_mb:-0}
+        _now_cs=$(CCACHE_DIR="$_cc_dir" ccache -s 2>/dev/null)
+        _hn=$(printf '%s' "$_now_cs" | grep -E '^\s+Hits:'   | head -1 | grep -oE '[0-9]+' | head -1); _hn=${_hn:-0}
+        _mn=$(printf '%s' "$_now_cs" | grep -E '^\s+Misses:' | head -1 | grep -oE '[0-9]+' | head -1); _mn=${_mn:-0}
+        _dh=$(( _hn - _hb )); [[ $_dh -lt 0 ]] && _dh=0
+        _dm=$(( _mn - _mb )); [[ $_dm -lt 0 ]] && _dm=0
+        _dt=$(( _dh + _dm ))
+        [[ $_dt -gt 0 ]] && _ccache_live=$(( _dh * 100 / _dt ))
+    fi
+
     # -- Delta vs last metrics.txt --
     local last_metrics last_label prev_build_wall="" prev_test_wall="" prev_ccache=""
-    last_metrics=$(find "$REPORT_DIR" -maxdepth 2 -name 'metrics.txt' 2>/dev/null \
-        | sort | tail -1)
+    last_metrics=$(find "$REPORT_DIR" -maxdepth 2 -name 'metrics.txt' \
+        -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
     last_label=""
     if [[ -n ${last_metrics:-} && -f $last_metrics ]]; then
         last_label=$(basename "$(dirname "$last_metrics")")
@@ -160,9 +175,11 @@ _snapshot() {
     else
         printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
     fi
-    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)\n' \
+    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)' \
         "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1" \
         "$mem_used_g" "$mem_total_g" "$mem_pct"
+    [[ -n ${_ccache_live:-} ]] && printf '  cache: %d%%' "$_ccache_live"
+    printf '\n'
     if [[ ${#build_active[@]} -gt 0 ]]; then
         for _entry in "${build_active[@]}"; do
             IFS='|' read -r _combo _j _elapsed <<< "$_entry"
