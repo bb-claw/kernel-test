@@ -52,7 +52,7 @@ Examples:
 ---
 ## C Program Compilation Baseline (tests/programs/)
 
-All programs share `tests/programs/common.mk` (included by thin per-program Makefiles). `tests/ns/Makefile` uses FLAGS_ONLY=1 to import flag variables from common.mk.
+All programs share `tests/programs/common.mk` (included by thin per-program Makefiles). `tests/ns/Makefile` uses FLAGS_ONLY=1 to import flag variables from common.mk. **V/Q verbosity:** compiler invocations prefixed with `$(Q)` (silent at default V=0); per-binary summary lines use `@bash $(_TESTS_DIR)../lib/mklog.sh` so they carry the standard `INFO  ` timestamp format; `tests/programs/Makefile` passes `--no-print-directory --silent` to sub-makes to suppress `make[N]: Entering/Leaving` and "Nothing to be done" noise.
 
 ```
 CFLAGS_COMMON   -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration

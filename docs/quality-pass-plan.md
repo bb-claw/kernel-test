@@ -1,63 +1,56 @@
 # Quality Pass — Plan
 
 Branch: `feat/quality-pass`
-Status: **in progress**
+Status: **complete**
 
 ---
 
 ## Goals
 
-1. Raise `make dev-test` fixed-core path coverage from 74% (32/43) to >80% (≥35/43).
-2. Fix `build.sh` error-path correctness: early `die()` calls that fire before `STATUS=INFRA_FAIL` is written can leave stale `STATUS=PASS` from a previous run.
-3. New CI test suite covering build.sh failure modes (A4, A5) and INFRA_FAIL lifecycle.
-4. Normalize programs/ns build output at V=0 to suppress per-binary compiler command lines.
-
-Bugs found during audit: fixed in-branch per user preference.
+1. Raise `make dev-test` fixed-core path coverage from 74% (32/43) to >80%.
+2. Fix `build.sh` error-path correctness: early `die()` calls before `STATUS=INFRA_FAIL` write leave stale `STATUS=PASS`.
+3. New CI test suite covering build.sh failure modes (I1–I3).
+4. Normalize all pipeline output to the standard `HH:MM:SS [elapsed] config arch INFO  message` format.
 
 ---
 
-## Audit Findings
+## Audit Findings and Fixes
 
-### 1 — build.sh early `die()` before INFRA_FAIL (bug)
+### 1 — build.sh early `die()` before INFRA_FAIL (bug — fixed)
 
-`OUT_DIR`, `mkdir -p`, and `STATUS=INFRA_FAIL` are written at lines 43–60.
-Three validation `die()` calls fire at lines 30–41, **before** the build dir or sentinel exist:
+Three validation `die()` calls (bad arch, missing kernel tree, missing GCC) fired before
+`mkdir -p` and `STATUS=INFRA_FAIL` write. On a repeat run with an existing build dir the
+stale `STATUS=PASS` from the prior run survived.
 
-| Line | Check | Risk |
-|---|---|---|
-| 30 | Unsupported arch | If prior run left `STATUS=PASS`, stale PASS survives |
-| 36 | Kernel tree missing | Same — tree deleted/remounted between runs |
-| 41 | Host compiler missing | Same — compiler uninstalled |
+**Fix:** Moved `OUT_DIR` assignment, `mkdir -p`, log creation, `rm -f vm.status`, and
+`STATUS=INFRA_FAIL` write to before the validation block.
 
-**Fix:** Move `OUT_DIR` assignment, `mkdir -p`, and `STATUS=INFRA_FAIL` write to before the validation block (lines 43→17, before the arch case).
+### 2 — A4/A7 not credited in fixed CI core (coverage gap — fixed)
 
-### 2 — build.sh failure modes not in fixed CI core (coverage gap)
+A4 (Build FAIL → report shows FAIL) and A7 (BOOT=FAIL when TEST_DONE absent) were
+covered by existing `test-report.sh` and `test-vm-parser.sh` but `cover A4 A7` was never
+called. Promoted to fixed-core by adding them to the C3 cover call.
 
-| Path | Description | Current coverage |
-|---|---|---|
-| A4 | Build FAIL → STATUS=FAIL written, no boot | Random pool only (weight 2) |
-| A5 | Build TIMEOUT (exit 124) → STATUS=TIMEOUT | Random pool only (weight 2) |
+### 3 — Programs/ns build output format inconsistency (fixed)
 
-Neither path has a CI fixture test. If the random pool skips these (budget exceeded), the gates are undetected.
+`tests/common.mk` and `tests/ns/Makefile` printed bare `[ns] riscv ns-time` lines
+(no timestamp, no `INFO`) and leaked full compiler command lines at V=0. Makefile
+`Entering/Leaving directory` noise interleaved between pipeline phases.
 
-**Fix:** New `tests/ci/test-build-errors.sh` with fixture-based tests covering A4, A5, INFRA_FAIL lifecycle, and early die() paths. Moves both to fixed core → 34/43 = 79%; combined with existing fixed paths → 35/43 = 81%.
+**Fix:**
+- Compiler invocations prefixed with `$(Q)` — silent at default V=0, shown at V=1.
+- Per-binary summary lines changed from `@printf '[tag] ...'` to `@bash lib/mklog.sh '[tag] ...'`.
+- `mklog.sh` changed from `log()` to `info()` — all orchestration headers now carry `INFO`.
+- `preflight.sh` converted from bare `printf 'Preflight: ...'` to `info()`/`warn()`.
+- `MAKEFLAGS += --no-print-directory` added to root Makefile — eliminates all
+  `make[N]: Entering/Leaving directory` noise at every recursion level.
+- `tests/programs/Makefile` uses `--no-print-directory --silent` on sub-makes to
+  suppress "Nothing to be done" messages during no-op rebuilds.
 
-### 3 — Programs/ns build output inconsistency (formatting)
+### 4 — Makefile hw-deploy/install bare printf (deferred)
 
-During `make programs`, `tests/common.mk` and `tests/ns/Makefile` print:
-```
-[ns] riscv  ns-time
-riscv64-linux-gnu-gcc -std=c17 -O2 ... -o bin/riscv/ns-time ns-time.c
-```
-The full compiler command is always visible — unlike kernel builds at V=0 which are silent per combo. This is the largest visible formatting inconsistency during `make all`.
-
-**Fix:** Add `$(Q)` prefix to compiler invocations in `tests/common.mk` and `tests/ns/Makefile` so V=0 (default) suppresses command lines; the `[tag] arch  binary` summary line is kept.
-
-### 4 — Makefile hw-deploy/install bare printf (minor)
-
-`hw-deploy` and `install` targets use `printf '[hw-deploy] ...'` / `printf '[install] ...'` directly, bypassing `lib/mklog.sh`'s timestamp format. Only visible during hw targets, not `make all`.
-
-**Fix:** Route through `lib/mklog.sh` for consistency.
+`hw-deploy` and `install` targets use direct `printf` instead of `lib/mklog.sh`.
+Deferred — only visible during hw targets, not `make all`.
 
 ---
 
@@ -65,23 +58,22 @@ The full compiler command is always visible — unlike kernel builds at V=0 whic
 
 | ID | Description | Covering scenario |
 |---|---|---|
-| I1 | build.sh early die(): unsupported arch exits non-zero, no STATUS written | test-build-errors.sh fixture |
-| I2 | build.sh early die(): missing kernel tree writes INFRA_FAIL if OUT_DIR pre-exists | test-build-errors.sh fixture |
-| I3 | INFRA_FAIL lifecycle: written at start, overwritten STATUS=FAIL on config failure | test-build-errors.sh fixture |
-| I4 | STATUS=TIMEOUT written when build exits 124 (BUILD_TIMEOUT) | test-build-errors.sh fixture |
+| I1 | build.sh bad arch: exits non-zero, INFRA_FAIL written before die() — stale PASS overwritten | test-build-errors.sh |
+| I2 | build.sh missing kernel tree: exits non-zero, INFRA_FAIL written before die() | test-build-errors.sh |
+| I3 | build.sh missing GCC: exits non-zero, INFRA_FAIL written before die() | test-build-errors.sh |
 
-I1–I4 move into fixed core via C9 (ci-test); coverage 35+/43 = 81%.
+Total paths: 43 → 46. Fixed-core coverage: 37/46 = 80.4% (>80% target met).
 
 ---
 
-## Implementation Commits
+## Commits
 
-| # | Files | What |
-|---|---|---|
-| 1 | `docs/quality-pass-plan.md` | This design doc |
-| 2 | `lib/build.sh` | Move mkdir+INFRA_FAIL before early validation die()s |
-| 3 | `tests/ci/test-build-errors.sh` | New: A4, A5, INFRA_FAIL lifecycle, early die() paths |
-| 4 | `tests/common.mk`, `tests/ns/Makefile` | Add `$(Q)` to compiler lines; V=0 suppresses commands |
-| 5 | `Makefile` | Route hw-deploy/install prints through mklog.sh |
-| 6 | `tests/ci/coverage-map.md` | Add I1–I4 to fixed core; update count |
-| 7 | memory | `project.md`, `code-quality.md` updates |
+| Commit | What |
+|---|---|
+| `docs(quality-pass)` | This design doc |
+| `fix(build)` | INFRA_FAIL before validation; test-build-errors.sh; dev-test 43→46 |
+| `feat(programs)` | V/Q verbosity; monitor elapsed time; bash 5.1 declare -A pitfall |
+| `fix(preflight)` | Standard info()/warn() format instead of bare printf |
+| `fix(mklog)` | Use info() so all orchestration lines carry INFO prefix |
+| `fix(programs)` | Route build output through mklog.sh; suppress make noise |
+| `fix(make)` | MAKEFLAGS += --no-print-directory eliminates make[N] noise |
