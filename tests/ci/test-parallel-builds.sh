@@ -76,10 +76,10 @@ grep -q 'PARALLEL_BUILDS' "$BUILD" \
     && pass "PARALLEL_BUILDS referenced in build.sh" \
     || fail "PARALLEL_BUILDS not used in build.sh NPROC calculation"
 
-begin_test "build.sh: NPROC has floor of 1"
-grep -q 'NPROC.*-lt 1.*NPROC=1\|NPROC=1.*-lt 1' "$BUILD" \
-    && pass "NPROC floor >= 1 guard present" \
-    || fail "no floor guard found — NPROC could be 0"
+begin_test "build.sh: NPROC has floor of 2 (prevents 1-job builds on low-core hosts)"
+grep -q 'NPROC.*-lt 2.*NPROC=2\|NPROC=2.*-lt 2' "$BUILD" \
+    && pass "NPROC floor >= 2 guard present" \
+    || fail "no floor=2 guard found — on 4-core hosts with PARALLEL_BUILDS=4, NPROC would become 1"
 
 # ── 4. Build loop tier structure ─────────────────────────────────────────────
 

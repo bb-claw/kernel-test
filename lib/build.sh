@@ -44,7 +44,7 @@ LOG_FILE="$OUT_DIR/build.log"
 STATUS_FILE="$OUT_DIR/build.status"
 _host_cpus=$(nproc 2>/dev/null || echo 1)
 NPROC=$(( _host_cpus / ${PARALLEL_BUILDS:-1} ))
-[[ $NPROC -lt 1 ]] && NPROC=1
+[[ $NPROC -lt 2 ]] && NPROC=2
 
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
