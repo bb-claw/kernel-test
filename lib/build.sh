@@ -47,6 +47,16 @@ _host_cpus=$(nproc 2>/dev/null || echo 1)
 NPROC=$(( _host_cpus / ${PARALLEL_BUILDS:-1} ))
 [[ $NPROC -lt 2 ]] && NPROC=2
 
+# GNU make jobserver detection (make ≥4.2: fifo:/path survives exec() boundary).
+# When active: omit -j so kernel make inherits the shared token pool; stragglers
+# absorb freed tokens automatically as sibling builds finish.
+# NO_JOBSERVER=1 or no --jobserver-auth in MAKEFLAGS → static -j fallback.
+if [[ "${NO_JOBSERVER:-0}" != 1 && "${MAKEFLAGS:-}" == *--jobserver-auth* ]]; then
+    _build_j=()
+else
+    _build_j=("-j$NPROC")
+fi
+
 mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
@@ -507,13 +517,14 @@ info "Config SHA256: $CONFIG_SHA256 — $CONFIG / $ARCH"
 # Step 2: build bzImage
 # For build-only configs (allmodconfig, randconfig) the goal is catching
 # compilation errors; bzImage covers the core kernel.
+_build_j_desc=${_build_j[0]:+${_build_j[0]#-j} jobs}; _build_j_desc=${_build_j_desc:-jobserver}
 if [[ $BUILD_TIMEOUT -gt 0 ]]; then
-    info "Building $KERNEL_IMAGE_NAME ($NPROC jobs, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH"
+    info "Building $KERNEL_IMAGE_NAME ($_build_j_desc, timeout ${BUILD_TIMEOUT}s) — $CONFIG / $ARCH"
 else
-    info "Building $KERNEL_IMAGE_NAME ($NPROC jobs) — $CONFIG / $ARCH"
+    info "Building $KERNEL_IMAGE_NAME ($_build_j_desc) — $CONFIG / $ARCH"
 fi
 BUILD_EXIT=0
-kmake --timed -j"$NPROC" "$KERNEL_IMAGE_NAME" || BUILD_EXIT=$?
+kmake --timed "${_build_j[@]}" "$KERNEL_IMAGE_NAME" || BUILD_EXIT=$?
 if [[ $BUILD_EXIT -ne 0 ]]; then
     CONFIG_SHA256=$(sha256sum "$PWD/$OUT_DIR/.config" | awk '{print $1}')
     if [[ $BUILD_EXIT -eq 124 ]]; then
