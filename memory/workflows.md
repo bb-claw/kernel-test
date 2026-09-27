@@ -47,7 +47,7 @@
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 | `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
 | `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
-| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — lower on <8-core hosts; tier-0 bases complete before tier-1 dependents; per-build `-j` reduced to `nproc/PARALLEL_BUILDS` (floor 2); override in `local.mk` |
+| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — lower on <8-core hosts; tier-0 bases complete before tier-1 dependents; per-build `-j` = `nproc/min(PARALLEL_BUILDS, BUILD_TOTAL)` (floor 2) — small runs get more slots; override in `local.mk` |
 | `PARALLEL_VMS` | `4` | `PARALLEL_VMS=2` — lower on hosts with <8G RAM; each VM uses 512M–1G RAM (4 VMs ≈ 3G); override in `local.mk` |
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
@@ -60,6 +60,7 @@ make fetch                                            # auto-dispatches: mainlin
 make fetch-next                                       # linux-next only (kernel-test-next clone)
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
+make monitor                                          # live KPI dashboard (separate terminal); shows active builds/tests, -j, cc1/load/mem, delta vs last run
 make smoke                                            # tinyconfig kunitconfig, preset auto-selected
 make full                                             # defconfig tinyconfig kunitconfig randdefconfig rand500config (base-first order for sibling reuse)
 make ns-smoke                                         # tinynsconfig kunitnsconfig (requires make bootstrap)
@@ -69,7 +70,7 @@ make local                                            # localconfig x86_64, no b
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 make programs                                         # rebuild C test binaries (tests/programs/ + tests/ns/) without system packages; auto-runs in make all
-make perf-build                                       # build tools/perf from KERNEL_TREE; writes build/perf/build.status (PASS/FAIL/SKIP); report.sh includes result; NO_PERF_BUILD=1 to skip; hard deps on Debian: libelf-dev libdw-dev pkg-config python3-dev libtraceevent-dev (all in make bootstrap)
+make perf-build                                       # build tools/perf; writes build/perf/build.status; NO_PERF_BUILD=1 to skip; Debian deps via make bootstrap
 make hw-bootstrap [DRY_RUN=1]                         # install dnsmasq/networkd/udev for board testing (needs sudo)
 make hw-deploy                                        # copy kernel+initramfs to TFTP_DIR (default: ./tftp/)
 make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
@@ -136,7 +137,6 @@ The archived `-bisect-from-<sha>` suffix is always one level only (chaining is s
 make kconfig-build SUBSYSTEM=pinctrl DRY_RUN=1     # list options; omit DRY_RUN=1 to build+boot each
 make canary-patch && make all CANARY=1 CONFIGS=tinyconfig ARCHS=x86_64  # diagnose silent boots
 ```
-
 ### Patch verification / dmesg
 
 ```sh
