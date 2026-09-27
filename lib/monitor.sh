@@ -129,13 +129,14 @@ _snapshot() {
     fi
 
     # -- Delta vs last metrics.txt --
-    local last_metrics last_label prev_build_wall="" prev_ccache=""
+    local last_metrics last_label prev_build_wall="" prev_test_wall="" prev_ccache=""
     last_metrics=$(find "$REPORT_DIR" -maxdepth 2 -name 'metrics.txt' 2>/dev/null \
         | sort | tail -1)
     last_label=""
     if [[ -n ${last_metrics:-} && -f $last_metrics ]]; then
         last_label=$(basename "$(dirname "$last_metrics")")
         prev_build_wall=$(_field BUILD_WALL_TIME "$last_metrics")
+        prev_test_wall=$(_field TEST_WALL_TIME   "$last_metrics")
         prev_ccache=$(_field CCACHE_HIT_RATE_PCT "$last_metrics")
     fi
 
@@ -192,6 +193,8 @@ _snapshot() {
         printf '  vs last run: %s\n' "$last_label"
         [[ -n ${prev_build_wall:-} ]] && \
             printf '    build wall: %s\n' "$(_fmt_dur "$prev_build_wall")"
+        [[ -n ${prev_test_wall:-} ]] && \
+            printf '    test  wall: %s\n' "$(_fmt_dur "$prev_test_wall")"
         [[ -n ${prev_ccache:-} ]] && \
             printf '    ccache hit: %s%%\n' "$prev_ccache"
         printf '  %s\n' "$(printf '─%.0s' {1..60})"
