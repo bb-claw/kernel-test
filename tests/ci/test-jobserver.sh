@@ -28,12 +28,12 @@ grep -q '^build-%:' "$MK" \
 
 # ── 2. Top-level build uses jobserver token pool ──────────────────────────────
 
-begin_test "Makefile: top-level build: uses \$(MAKE) with nproc-based -j"
-# Accepts both direct -j\$(nproc) and the NO_JOBSERVER-aware _bj=\$(nproc||PARALLEL_BUILDS) pattern.
-if grep -A 15 '^build:' "$MK" | grep -qE '\$\(MAKE\).*nproc|\$\(MAKE\).*\$\(shell nproc\)|\$\(MAKE\).*_bj'; then
-    pass "\$(MAKE) with nproc-based -j found in build target"
+begin_test "Makefile: top-level build: uses \$(MAKE) with -j\$(PARALLEL_BUILDS)"
+# Outer -j is PARALLEL_BUILDS (queue-depth cap); inner makes inherit the jobserver token pool.
+if grep -A 15 '^build:' "$MK" | grep -qE '\$\(MAKE\).*PARALLEL_BUILDS'; then
+    pass "\$(MAKE) -j\$(PARALLEL_BUILDS) found in build target"
 else
-    fail "\$(MAKE) with nproc-based -j not found in build target — jobserver token pool not owned by harness"
+    fail "\$(MAKE) -j\$(PARALLEL_BUILDS) not found in build target"
 fi
 
 # ── 3. No unconditional -jN in bzImage kmake call ────────────────────────────
