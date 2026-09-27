@@ -60,7 +60,7 @@ make fetch                                            # auto-dispatches: mainlin
 make fetch-next                                       # linux-next only (kernel-test-next clone)
 make checkout TAG=v7.2-rc2 KERNEL_TREE=~/git/linux-stable  # pin specific version
 make all NO_FETCH=1                                   # run after pin (all configs + archs)
-make monitor                                          # live KPI dashboard (separate terminal); shows active builds/tests, -j, cc1/load/mem, delta vs last run
+make monitor                                          # live KPI dashboard (separate terminal); shows active builds/tests, -j, cc1/load/mem, live cache hit%, delta vs last run
 make smoke                                            # tinyconfig kunitconfig, preset auto-selected
 make full                                             # defconfig tinyconfig kunitconfig randdefconfig rand500config (base-first order for sibling reuse)
 make ns-smoke                                         # tinynsconfig kunitnsconfig (requires make bootstrap)
