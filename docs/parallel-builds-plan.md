@@ -137,6 +137,32 @@ Lower to `2` in `local.mk` on machines with <8 cores or <8G RAM.
 
 ---
 
+## Known Limitation: Straggler Tax
+
+`-j$NPROC` is computed once at `lib/build.sh` launch time (`nproc/PARALLEL_BUILDS`, floor 2)
+and cannot change mid-build. At the end of each tier the last surviving build holds its
+original reduced `-j` while the other slots are empty:
+
+```
+Hetzner (8 cores, PARALLEL_BUILDS=4):
+  tier-0 full:  4 builds × -j2 = 8 jobs  (fully utilised)
+  tier-0 end:   1 build  × -j2 = 2 jobs  (6 cores idle)
+
+Laptop (16 cores, PARALLEL_BUILDS=4):
+  tier-0 full:  4 builds × -j4 = 16 jobs  (fully utilised)
+  tier-0 end:   1 build  × -j4 =  4 jobs  (12 cores idle)
+```
+
+**Root cause:** each `build.sh` invocation passes an explicit `-jN` to the kernel `make`,
+which disconnects it from the GNU make jobserver and creates a private N-slot pool.
+
+**Fix (planned `feat/jobserver-builds`):** restructure build targets so the harness
+`make -j$(nproc)` owns the token pool; `build.sh` calls the kernel `make` without `-j`
+so it inherits the shared jobserver pipe via `MAKEFLAGS`. Stragglers then absorb freed
+tokens automatically. Estimated savings: Hetzner ~15–20 min/run (~20%), laptop ~4–6 min/run (~10%).
+
+---
+
 ## Testing
 
 ```sh
@@ -144,6 +170,6 @@ make dev-test
 make lint
 make ci-test
 
-# Slot utilization monitor during a run:
-watch -n1 'ps -ef | grep qemu-system | grep -v grep | grep -o "build/[a-zA-Z0-9_-]*" | grep -v initramfs | sort -u'
+# Build slot monitor:
+watch -n2 'printf "BUILD:\n"; ps -ef | grep "timeout.*bzImage" | grep -v grep | grep -o "build/[a-zA-Z0-9_-]*" | sort -u | sed "s/^/  /"; printf "TEST:\n"; ps -ef | grep qemu-system | grep -v grep | grep -o "build/[a-zA-Z0-9_-]*" | grep -v initramfs | sort -u | sed "s/^/  /"'
 ```
