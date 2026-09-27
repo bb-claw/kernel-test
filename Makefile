@@ -186,7 +186,6 @@ endif
 
 define _build_rule
 build/$(1)-$(2)/build.status: $$(KERNEL_TREE)/Makefile
-	@printf '[build] %-16s %s\n' $(1) $(2)
 	$$(Q)lib/build.sh $(1) $(2)
 endef
 $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a)))))
@@ -485,7 +484,6 @@ else
 	$(Q)rc=0; \
 	_pids=(); \
 	_enqueue() { \
-	    printf '[build] %-16s %s\n' "$$1" "$$2"; \
 	    lib/build.sh "$$1" "$$2" & _pids+=("$$!"); \
 	    while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
 	        wait "$${_pids[0]}" || rc=1; \
@@ -553,7 +551,6 @@ initramfs:
 	_pids=(); \
 	for config in $(BOOT_CONFIGS); do \
 	    for arch in $(ARCHS); do \
-	        printf '[initramfs] %s %s\n' "$$config" "$$arch"; \
 	        lib/initramfs.sh "$$config" "$$arch" & _pids+=("$$!"); \
 	        while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
 	            wait "$${_pids[0]}" || rc=1; \
@@ -581,7 +578,6 @@ test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.sta
 	            rc=1; \
 	            continue; \
 	        fi; \
-	        printf '[test] %-16s %s\n' "$$config" "$$arch"; \
 	        lib/vm.sh "$$config" "$$arch" & _pids+=("$$!"); \
 	        while [[ $${#_pids[@]} -ge $(PARALLEL_VMS) ]]; do \
 	            wait "$${_pids[0]}" || rc=1; \

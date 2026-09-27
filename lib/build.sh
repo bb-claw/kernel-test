@@ -7,6 +7,7 @@ set -euo pipefail
 
 CONFIG=${1:?usage: build.sh <config> <arch>}
 ARCH=${2:?usage: build.sh <config> <arch>}
+info "Starting build"
 
 require_env KERNEL_TREE BUILD_DIR CACHE_DIR RUN_STAMP
 BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
