@@ -28,6 +28,7 @@ Bash harness for testing Linux release-candidate kernels: build under multiple c
 make fetch                                     # fetch latest kernel for this clone (preset-aware)
 make all NO_FETCH=1                            # full pipeline: build + boot + test + report
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig  # fast iteration: repack + re-run tests only
+make monitor                                   # live KPI dashboard (run in a separate terminal during make all)
 make smoke                                     # quick sanity: tinyconfig kunitconfig, all archs
 make ns-smoke                                  # namespace smoke: tinynsconfig kunitnsconfig
 make ns-full                                   # namespace full: defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig

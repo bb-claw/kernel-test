@@ -162,6 +162,20 @@ else
     fail "ccache-stats-before snapshot not found in build target"
 fi
 
+begin_test "Makefile: .run-plan written in build target"
+if grep -A 10 '^build:' "$MK" | grep -q 'run-plan'; then
+    pass ".run-plan written in build target"
+else
+    fail ".run-plan not written in build target"
+fi
+
+begin_test "Makefile: .run-plan written in test target"
+if grep -A 5 '^test:' "$MK" | grep -q 'run-plan'; then
+    pass ".run-plan written in test target"
+else
+    fail ".run-plan not written in test target"
+fi
+
 # ── 11. report.sh calls metrics.sh ───────────────────────────────────────────
 
 begin_test "report.sh: calls lib/metrics.sh"
