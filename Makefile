@@ -576,8 +576,6 @@ initramfs:
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
 	@lib/mklog.sh "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel VMs: $(PARALLEL_VMS)"
-	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\nCONFIGS=%s\nARCHS=%s\nBOOT_CONFIGS=%s\n' \
-		$(_BUILD_TOTAL) $(_TEST_TOTAL) '$(CONFIGS)' '$(ARCHS)' '$(BOOT_CONFIGS)' > $(BUILD_DIR)/.run-plan 2>/dev/null || true
 	$(Q)rc=0; \
 	_pids=(); \
 	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \

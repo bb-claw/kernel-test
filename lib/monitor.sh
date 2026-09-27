@@ -101,20 +101,26 @@ _snapshot() {
     fi
 
     # Scope done counts to this run's combos so accumulated prior-run artifacts
-    # don't push done > total.
+    # don't push done > total. Only count files written after .run-plan so
+    # prior-run artifacts are ignored and done counts only go up.
     if [[ -n $_plan_configs && -n $_plan_archs ]]; then
-        local _bd=0 _td=0 _c _a _f
+        local _bd=0 _td=0 _c _a _f _plan_mt _f_mt
+        _plan_mt=$(stat -c %Y "$BUILD_DIR/.run-plan" 2>/dev/null) || _plan_mt=0
         for _c in $_plan_configs; do
             for _a in $_plan_archs; do
                 _f="$BUILD_DIR/$_c-$_a/build.status"
-                [[ -f $_f ]] && grep -qE '^STATUS=(PASS|FAIL|TIMEOUT)' "$_f" && _bd=$(( _bd + 1 ))
+                [[ -f $_f ]] || continue
+                _f_mt=$(stat -c %Y "$_f" 2>/dev/null) || continue
+                [[ $_f_mt -ge $_plan_mt ]] && grep -qE '^STATUS=(PASS|FAIL|TIMEOUT)' "$_f" && _bd=$(( _bd + 1 ))
             done
         done
         build_done=$_bd
         for _c in $_plan_boot; do
             for _a in $_plan_archs; do
                 _f="$BUILD_DIR/$_c-$_a/vm.status"
-                [[ -f $_f ]] && _td=$(( _td + 1 ))
+                [[ -f $_f ]] || continue
+                _f_mt=$(stat -c %Y "$_f" 2>/dev/null) || continue
+                [[ $_f_mt -ge $_plan_mt ]] && _td=$(( _td + 1 ))
             done
         done
         test_done=$_td

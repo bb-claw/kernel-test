@@ -169,11 +169,13 @@ else
     fail ".run-plan not written in build target"
 fi
 
-begin_test "Makefile: .run-plan written in test target"
+begin_test "Makefile: .run-plan not overwritten in test target"
+# test: must NOT rewrite .run-plan — its mtime is the reference point for
+# scoping build.status done counts; overwriting would make all builds appear old.
 if grep -A 5 '^test:' "$MK" | grep -q 'run-plan'; then
-    pass ".run-plan written in test target"
+    fail ".run-plan overwritten in test target (breaks mtime-based scoping)"
 else
-    fail ".run-plan not written in test target"
+    pass ".run-plan not overwritten in test target"
 fi
 
 # ── 11. report.sh calls metrics.sh ───────────────────────────────────────────
