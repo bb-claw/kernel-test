@@ -51,7 +51,7 @@ mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
 printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
-touch "$OUT_DIR/.build-active"                  # sentinel for make monitor / metrics: removed in EXIT trap
+printf '%d\n' "$NPROC" > "$OUT_DIR/.build-active"   # sentinel for make monitor; content is -j value; removed in EXIT trap
 
 # ── Linker selection ──────────────────────────────────────────────────────────
 LINKER=bfd

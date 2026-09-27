@@ -48,19 +48,28 @@ _snapshot() {
     local load1
     read -r load1 _ < /proc/loadavg
 
-    # -- Active builds (sentinel files) --
+    # -- Memory utilization --
+    local mem_used_g mem_total_g mem_pct _mem_total _mem_avail
+    _mem_total=$(grep '^MemTotal:'     /proc/meminfo | awk '{print $2}')
+    _mem_avail=$(grep '^MemAvailable:' /proc/meminfo | awk '{print $2}')
+    mem_used_g=$(awk "BEGIN{printf \"%.1f\", ($_mem_total - $_mem_avail)/1048576}")
+    mem_total_g=$(awk "BEGIN{printf \"%.1f\", $_mem_total/1048576}")
+    mem_pct=$(( (_mem_total - _mem_avail) * 100 / _mem_total ))
+
+    # -- Active builds (sentinel files; content written by build.sh is the -j value) --
     local build_active=() build_done=0
     while IFS= read -r _af; do
         [[ -f $_af ]] || continue
-        local _combo
+        local _combo _j
         _combo=${_af%/.build-active}; _combo=${_combo#"$BUILD_DIR"/}
-        build_active+=("$_combo $(_elapsed_fmt "$_af")")
+        _j=$(cat "$_af" 2>/dev/null)
+        build_active+=("${_combo}|${_j:-?}|$(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
     build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
         -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l || echo 0)
 
     # -- Active tests (sentinel files) --
-    local test_active=() test_done=0
+    local test_active=() test_done=0 test_wall_elapsed=0
     while IFS= read -r _af; do
         [[ -f $_af ]] || continue
         local _combo
@@ -68,6 +77,17 @@ _snapshot() {
         test_active+=("$_combo $(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
     test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l || echo 0)
+
+    # -- Test wall time: elapsed since oldest active VM sentinel --
+    if [[ ${#test_active[@]} -gt 0 ]]; then
+        local _oldest=0 _mt
+        while IFS= read -r _af; do
+            [[ -f $_af ]] || continue
+            _mt=$(stat -c %Y "$_af" 2>/dev/null) || continue
+            [[ $_oldest -eq 0 || $_mt -lt $_oldest ]] && _oldest=$_mt
+        done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null)
+        [[ $_oldest -gt 0 ]] && test_wall_elapsed=$(( $(date +%s) - _oldest ))
+    fi
 
     # -- Write monitor sample for metrics.sh peak aggregation --
     local _samples="$BUILD_DIR/.monitor-samples"
@@ -98,19 +118,26 @@ _snapshot() {
     printf '\n'
 
     printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
-    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s\n' \
-        "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1"
+    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s  mem: %s/%sG (%d%%)\n' \
+        "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1" \
+        "$mem_used_g" "$mem_total_g" "$mem_pct"
     if [[ ${#build_active[@]} -gt 0 ]]; then
         for _entry in "${build_active[@]}"; do
-            printf '    %-36s %s\n' "${_entry% *}" "${_entry##* }"
+            IFS='|' read -r _combo _j _elapsed <<< "$_entry"
+            printf '    %-36s -j%-3s %s\n' "$_combo" "$_j" "$_elapsed"
         done
     else
         printf '    (none)\n'
     fi
 
     printf '\n'
-    printf '  TESTS  (%d active / %d done)   VMs: %d\n' \
-        "${#test_active[@]}" "$test_done" "$qemu_count"
+    if [[ $test_wall_elapsed -gt 0 ]]; then
+        printf '  TESTS  (%d active / %d done)   VMs: %d   wall: %s\n' \
+            "${#test_active[@]}" "$test_done" "$qemu_count" "$(_fmt_dur "$test_wall_elapsed")"
+    else
+        printf '  TESTS  (%d active / %d done)   VMs: %d\n' \
+            "${#test_active[@]}" "$test_done" "$qemu_count"
+    fi
     if [[ ${#test_active[@]} -gt 0 ]]; then
         for _entry in "${test_active[@]}"; do
             printf '    %-36s %s\n' "${_entry% *}" "${_entry##* }"
