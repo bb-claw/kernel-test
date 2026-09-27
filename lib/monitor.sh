@@ -89,12 +89,35 @@ _snapshot() {
         [[ $_oldest -gt 0 ]] && test_wall_elapsed=$(( $(date +%s) - _oldest ))
     fi
 
-    # -- Run plan (total expected builds / tests for this run) --
-    local build_total=0 test_total=0
+    # -- Run plan (total expected builds / tests; scoped combos for done counts) --
+    local build_total=0 test_total=0 _plan_configs="" _plan_archs="" _plan_boot=""
     if [[ -f "$BUILD_DIR/.run-plan" ]]; then
-        build_total=$(grep '^BUILD_TOTAL=' "$BUILD_DIR/.run-plan" | cut -d= -f2)
-        test_total=$(grep '^TEST_TOTAL='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        build_total=$(grep '^BUILD_TOTAL='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        test_total=$(grep '^TEST_TOTAL='    "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        _plan_configs=$(grep '^CONFIGS='    "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        _plan_archs=$(grep '^ARCHS='        "$BUILD_DIR/.run-plan" | cut -d= -f2)
+        _plan_boot=$(grep '^BOOT_CONFIGS='  "$BUILD_DIR/.run-plan" | cut -d= -f2)
         build_total=${build_total:-0}; test_total=${test_total:-0}
+    fi
+
+    # Scope done counts to this run's combos so accumulated prior-run artifacts
+    # don't push done > total.
+    if [[ -n $_plan_configs && -n $_plan_archs ]]; then
+        local _bd=0 _td=0 _c _a _f
+        for _c in $_plan_configs; do
+            for _a in $_plan_archs; do
+                _f="$BUILD_DIR/$_c-$_a/build.status"
+                [[ -f $_f ]] && grep -qE '^STATUS=(PASS|FAIL|TIMEOUT)' "$_f" && _bd=$(( _bd + 1 ))
+            done
+        done
+        build_done=$_bd
+        for _c in $_plan_boot; do
+            for _a in $_plan_archs; do
+                _f="$BUILD_DIR/$_c-$_a/vm.status"
+                [[ -f $_f ]] && _td=$(( _td + 1 ))
+            done
+        done
+        test_done=$_td
     fi
 
     # -- Write monitor sample for metrics.sh peak aggregation --
