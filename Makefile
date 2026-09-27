@@ -179,7 +179,7 @@ else
 endif
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -478,6 +478,8 @@ preflight:
 
 build:
 	$(Q)lib/preflight.sh
+	$(Q)mkdir -p $(BUILD_DIR) && ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
+	$(Q)rm -f $(BUILD_DIR)/.monitor-samples
 ifeq ($(NO_BUILD),1)
 	@lib/mklog.sh "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
@@ -601,6 +603,12 @@ report:
 # Without arguments, compares the two most recent runs automatically.
 OLD ?=
 NEW ?=
+# Live KPI dashboard — run in a separate terminal while make all is active.
+# Shows: active builds/tests, cc1 count, kbuild-make depth, CPU%, load.
+# Also writes per-sample data to build/.monitor-samples for peak aggregation in metrics.txt.
+monitor:
+	@lib/monitor.sh
+
 diff:
 	$(Q)if [[ -z "$(OLD)" && -z "$(NEW)" ]]; then \
 	    lib/diff.sh; \

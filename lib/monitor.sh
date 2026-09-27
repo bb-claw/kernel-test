@@ -1,0 +1,145 @@
+#!/bin/bash
+# Live KPI dashboard for an in-progress kernel-test run.
+# Usage: make monitor            — refresh loop in a separate terminal
+#        lib/monitor.sh --once   — single snapshot (scripting / CI)
+# Reads: $BUILD_DIR/.build-active  $BUILD_DIR/.vm-active  (sentinels from build.sh / vm.sh)
+#        /proc/loadavg  ps         (cc1, kbuild-make, QEMU process counts)
+#        $REPORT_DIR                (last metrics.txt for delta section)
+set -uo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/common.sh
+. "$REPO/lib/common.sh"
+
+BUILD_DIR="${BUILD_DIR:-$REPO/build}"
+DATA_REPO="${DATA_REPO:-$HOME/git/kernel-test-data}"
+REPORT_DIR="${REPORT_DIR:-$DATA_REPO/reports}"
+INTERVAL=2
+_ONCE=0
+[[ "${1:-}" == "--once" ]] && _ONCE=1
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+_elapsed_fmt() {
+    local mtime now elapsed min sec
+    mtime=$(stat -c %Y "$1" 2>/dev/null) || { printf '?'; return; }
+    now=$(date +%s)
+    elapsed=$(( now - mtime ))
+    min=$(( elapsed / 60 )); sec=$(( elapsed % 60 ))
+    printf '%dm%02ds' "$min" "$sec"
+}
+
+_field() { grep "^${1}=" "$2" 2>/dev/null | cut -d= -f2; }
+
+_fmt_dur() { local s=$1; printf '%dm%02ds' "$(( s / 60 ))" "$(( s % 60 ))"; }
+
+# ── Snapshot + display ────────────────────────────────────────────────────────
+
+_snapshot() {
+    # -- Process counts (ps) --
+    # grep -c exits 1 when count is 0, which would add a second "0" inside $().
+    # Use || var=0 outside $() to handle the non-zero exit without double-capture.
+    local cc1_count cc1_cpu kbuild_count qemu_count
+    cc1_count=$(ps ax --no-headers -o comm 2>/dev/null | grep -c '^cc1$') || cc1_count=0
+    cc1_cpu=$(ps ax --no-headers -o '%cpu comm' 2>/dev/null | awk '/cc1$/{s+=$1}END{printf "%d",s+0}')
+    kbuild_count=$(ps ax --no-headers -o args 2>/dev/null | grep -c 'Makefile\.build') || kbuild_count=0
+    qemu_count=$(ps ax --no-headers -o comm 2>/dev/null | grep -c '^qemu-system') || qemu_count=0
+
+    # -- Load average --
+    local load1
+    read -r load1 _ < /proc/loadavg
+
+    # -- Active builds (sentinel files) --
+    local build_active=() build_done=0
+    while IFS= read -r _af; do
+        [[ -f $_af ]] || continue
+        local _combo
+        _combo=${_af%/.build-active}; _combo=${_combo#"$BUILD_DIR"/}
+        build_active+=("$_combo $(_elapsed_fmt "$_af")")
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
+    build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
+        -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l || echo 0)
+
+    # -- Active tests (sentinel files) --
+    local test_active=() test_done=0
+    while IFS= read -r _af; do
+        [[ -f $_af ]] || continue
+        local _combo
+        _combo=${_af%/.vm-active}; _combo=${_combo#"$BUILD_DIR"/}
+        test_active+=("$_combo $(_elapsed_fmt "$_af")")
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
+    test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l || echo 0)
+
+    # -- Write monitor sample for metrics.sh peak aggregation --
+    local _samples="$BUILD_DIR/.monitor-samples"
+    if [[ -d $BUILD_DIR ]]; then
+        printf '%d BUILDS=%d CC1=%d KBUILD=%d CPU=%d LOAD=%s\n' \
+            "$(date +%s)" "${#build_active[@]}" "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1" \
+            >> "$_samples" 2>/dev/null || true
+    fi
+
+    # -- Delta vs last metrics.txt --
+    local last_metrics last_label prev_build_wall="" prev_ccache=""
+    last_metrics=$(find "$REPORT_DIR" -maxdepth 2 -name 'metrics.txt' 2>/dev/null \
+        | sort | tail -1)
+    last_label=""
+    if [[ -n ${last_metrics:-} && -f $last_metrics ]]; then
+        last_label=$(basename "$(dirname "$last_metrics")")
+        prev_build_wall=$(_field BUILD_WALL_TIME "$last_metrics")
+        prev_ccache=$(_field CCACHE_HIT_RATE_PCT "$last_metrics")
+    fi
+
+    # -- Render --
+    [[ $_ONCE -eq 0 ]] && printf '\033[2J\033[H'   # clear screen (not in --once mode)
+
+    local ts
+    ts=$(date '+%H:%M:%S')
+    printf '  KERNEL-TEST MONITOR%41s%s\n' '' "$ts"
+    printf '  %s\n' "$(printf '─%.0s' {1..60})"
+    printf '\n'
+
+    printf '  BUILDS (%d active / %d done)' "${#build_active[@]}" "$build_done"
+    printf '   cc1: %d  kbuild: %d   CPU: %d%%  load: %s\n' \
+        "$cc1_count" "$kbuild_count" "$cc1_cpu" "$load1"
+    if [[ ${#build_active[@]} -gt 0 ]]; then
+        for _entry in "${build_active[@]}"; do
+            printf '    %-36s %s\n' "${_entry% *}" "${_entry##* }"
+        done
+    else
+        printf '    (none)\n'
+    fi
+
+    printf '\n'
+    printf '  TESTS  (%d active / %d done)   VMs: %d\n' \
+        "${#test_active[@]}" "$test_done" "$qemu_count"
+    if [[ ${#test_active[@]} -gt 0 ]]; then
+        for _entry in "${test_active[@]}"; do
+            printf '    %-36s %s\n' "${_entry% *}" "${_entry##* }"
+        done
+    else
+        printf '    (none)\n'
+    fi
+
+    if [[ -n $last_label ]]; then
+        printf '\n  %s\n' "$(printf '─%.0s' {1..60})"
+        printf '  vs last run: %s\n' "$last_label"
+        [[ -n ${prev_build_wall:-} ]] && \
+            printf '    build wall: %s\n' "$(_fmt_dur "$prev_build_wall")"
+        [[ -n ${prev_ccache:-} ]] && \
+            printf '    ccache hit: %s%%\n' "$prev_ccache"
+        printf '  %s\n' "$(printf '─%.0s' {1..60})"
+    fi
+    printf '\n'
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+if [[ $_ONCE -eq 1 ]]; then
+    _snapshot
+    exit 0
+fi
+
+printf 'kernel-test monitor — Ctrl-C to exit\n'
+while true; do
+    _snapshot
+    sleep "$INTERVAL"
+done

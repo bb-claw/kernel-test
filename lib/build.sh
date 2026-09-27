@@ -51,6 +51,7 @@ mkdir -p "$OUT_DIR"
 : > "$LOG_FILE"
 rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
 printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
+touch "$OUT_DIR/.build-active"                  # sentinel for make monitor / metrics: removed in EXIT trap
 
 # ── Linker selection ──────────────────────────────────────────────────────────
 LINKER=bfd
@@ -60,7 +61,7 @@ if detect_lld; then
     info "Linker: ld.lld ${LLD_VERSION}"
     command -v llvm-objcopy >/dev/null 2>&1 && LINKER_OBJCOPY="llvm-objcopy"
 fi
-trap 'printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
+trap 'rm -f "$OUT_DIR/.build-active"; printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 

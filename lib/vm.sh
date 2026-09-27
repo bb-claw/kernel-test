@@ -87,6 +87,7 @@ esac
 # ── Boot the kernel ───────────────────────────────────────────────────────────
 
 info "Booting $CONFIG / $ARCH (timeout: ${VM_TIMEOUT}s)"
+touch "$OUT_DIR/.vm-active"   # sentinel for make monitor / metrics: removed after vm.status is written
 
 VM_START_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 VM_START_EPOCH=$(date -u +%s)
@@ -113,6 +114,7 @@ VM_DURATION=$(( $(date -u +%s) - VM_START_EPOCH ))
 parse_serial_output   "$DMESG_FILE"
 determine_boot_status "$DMESG_FILE" "$QEMU_EXIT" 0
 write_run_status      "$STATUS_FILE" "$VM_START_TIME" "$VM_DURATION"
+rm -f "$OUT_DIR/.vm-active"
 
 if ! log_run_result "$CONFIG / $ARCH"; then
     # CANARY diagnostics on boot failure only (not on partial test failures).
