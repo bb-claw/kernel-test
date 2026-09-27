@@ -40,7 +40,7 @@ _fmt_duration() {
 
 # ── Build phase timings ───────────────────────────────────────────────────────
 
-declare -A _build_times
+declare -A _build_times=()
 _build_first_start=0
 _build_last_end=0
 
@@ -67,7 +67,7 @@ _build_wall=0
 
 # ── Test phase timings ────────────────────────────────────────────────────────
 
-declare -A _test_times
+declare -A _test_times=()
 _test_first_start=0
 _test_last_end=0
 
