@@ -518,8 +518,8 @@ endif
 programs:
 	@lib/mklog.sh "[programs] Building tests/programs/ and tests/ns/ binaries"
 	$(Q)rc=0; \
-	make -C tests/programs || rc=1; \
-	make -C tests/ns       || rc=1; \
+	$(MAKE) --no-print-directory --silent -C tests/programs || rc=1; \
+	$(MAKE) --no-print-directory --silent -C tests/ns       || rc=1; \
 	exit $$rc
 
 # Build tools/perf from KERNEL_TREE. Part of make extended.

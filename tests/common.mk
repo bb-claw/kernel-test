@@ -237,11 +237,11 @@ ifeq ($(HOST_ONLY),1)
 all: bin/$(BIN)-gcc bin/$(BIN)
 
 bin/$(BIN)-gcc: $(SRC) | bin
-	@printf '[$(LOG_TAG)] gcc   %s\n' $@
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] gcc $@"
 	$(Q)$(CC_GCC) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
 
 bin/$(BIN): $(SRC) | bin
-	@printf '[$(LOG_TAG)] clang %s\n' $@
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] clang $@"
 	$(Q)$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
 	$(if $(_STRIP_FLAGS),$(Q)$(STRIP_x86_64) $(_STRIP_FLAGS) $@)
 
@@ -252,7 +252,7 @@ valgrind-build: bin/$(BIN)-valgrind
 valgrind: valgrind-build
 
 bin/$(BIN)-valgrind: $(SRC) | bin
-	@printf '[$(LOG_TAG)] gcc   %s (valgrind/glibc)\n' $@
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] gcc $@ (valgrind/glibc)"
 	$(Q)$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
 
 clean:
@@ -269,7 +269,7 @@ all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-gcc bin/x86_64/$(B
 
 define build_rule
 bin/$(1)/$(BIN): $(SRC) | bin/$(1)
-	@printf '[$(LOG_TAG)] %-6s %s\n' $(1) $(BIN)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] $(1) $(BIN)"
 	$(Q)$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
 	$(if $(_STRIP_FLAGS),$(Q)$(STRIP_$(1)) $(_STRIP_FLAGS) $$@)
 endef
@@ -277,11 +277,11 @@ endef
 $(foreach a,$(ARCHES),$(eval $(call build_rule,$(a))))
 
 bin/x86_64/$(BIN)-gcc: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (gcc quality gate)\n' x86_64 $(BIN)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (gcc quality gate)"
 	$(Q)$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
 bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (clang quality gate)\n' x86_64 $(BIN)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (clang quality gate)"
 	$(Q)$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
 $(foreach a,$(ARCHES),$(eval bin/$(a):; $$(Q)mkdir -p $$@))
@@ -290,7 +290,7 @@ valgrind-build: bin/x86_64/$(BIN)-valgrind
 valgrind: valgrind-build
 
 bin/x86_64/$(BIN)-valgrind: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (valgrind/glibc)\n' x86_64 $(BIN)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (valgrind/glibc)"
 	$(Q)$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
 
 clean:
@@ -300,7 +300,7 @@ endif  # HOST_ONLY
 
 .PHONY: scan
 scan:
-	@printf '[$(LOG_TAG)] clang %s (analyzer)\n' $(SRC)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] clang $(SRC) (analyzer)"
 	$(Q)clang --analyze -Xanalyzer -analyzer-output=text \
 	    $(CFLAGS_COMMON) -Werror -o /dev/null $(SRC)
 

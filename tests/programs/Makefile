@@ -6,39 +6,39 @@
 all: arena-test perf-event serial-capture syscall-tests snapshot
 
 arena-test:
-	$(MAKE) -C arena-test
+	@$(MAKE) --no-print-directory --silent -C arena-test
 
 perf-event:
-	$(MAKE) -C perf-event
+	@$(MAKE) --no-print-directory --silent -C perf-event
 
 serial-capture:
-	$(MAKE) -C serial-capture
+	@$(MAKE) --no-print-directory --silent -C serial-capture
 
 syscall-tests:
-	$(MAKE) -C syscall-tests
+	@$(MAKE) --no-print-directory --silent -C syscall-tests
 
 snapshot:
-	$(MAKE) -C snapshot
+	@$(MAKE) --no-print-directory --silent -C snapshot
 
 clean:
-	$(MAKE) -C arena-test clean
-	$(MAKE) -C perf-event clean
-	$(MAKE) -C serial-capture clean
-	$(MAKE) -C syscall-tests clean
-	$(MAKE) -C snapshot clean
+	@$(MAKE) --no-print-directory --silent -C arena-test clean
+	@$(MAKE) --no-print-directory --silent -C perf-event clean
+	@$(MAKE) --no-print-directory --silent -C serial-capture clean
+	@$(MAKE) --no-print-directory --silent -C syscall-tests clean
+	@$(MAKE) --no-print-directory --silent -C snapshot clean
 
 valgrind-build:
-	$(MAKE) -C arena-test valgrind-build
-	$(MAKE) -C perf-event valgrind-build
-	$(MAKE) -C serial-capture valgrind-build
-	$(MAKE) -C syscall-tests valgrind-build
-	$(MAKE) -C snapshot valgrind-build
+	@$(MAKE) --no-print-directory --silent -C arena-test valgrind-build
+	@$(MAKE) --no-print-directory --silent -C perf-event valgrind-build
+	@$(MAKE) --no-print-directory --silent -C serial-capture valgrind-build
+	@$(MAKE) --no-print-directory --silent -C syscall-tests valgrind-build
+	@$(MAKE) --no-print-directory --silent -C snapshot valgrind-build
 
 valgrind: valgrind-build
 
 fmt:
-	$(MAKE) -C arena-test fmt
-	$(MAKE) -C perf-event fmt
-	$(MAKE) -C serial-capture fmt
-	$(MAKE) -C syscall-tests fmt
-	$(MAKE) -C snapshot fmt
+	@$(MAKE) --no-print-directory --silent -C arena-test fmt
+	@$(MAKE) --no-print-directory --silent -C perf-event fmt
+	@$(MAKE) --no-print-directory --silent -C serial-capture fmt
+	@$(MAKE) --no-print-directory --silent -C syscall-tests fmt
+	@$(MAKE) --no-print-directory --silent -C snapshot fmt
