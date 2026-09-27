@@ -47,6 +47,8 @@
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 | `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
 | `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
+| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — lower on <8-core hosts; tier-0 bases complete before tier-1 dependents; per-build `-j` reduced to `nproc/PARALLEL_BUILDS` (floor 2); override in `local.mk` |
+| `PARALLEL_VMS` | `4` | `PARALLEL_VMS=2` — lower on hosts with <8G RAM; each VM uses 512M–1G RAM (4 VMs ≈ 3G); override in `local.mk` |
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
 ## Common Workflows
@@ -143,8 +145,6 @@ make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host ke
 make valgrind                                   # build + run all C programs AND ns-* subcommands under Valgrind; EPERM→skip, exit 99→fail
 ```
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`. **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
-### CI / linting / preflight / dev-test / bug-hunt
-`make preflight` — validate host compiler (`GCC`), cross-compilers per `ARCHS`, QEMU binaries per `ARCHS`, disk space; auto-runs at `make build`.
-`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → programs → ci-test, i386 excluded). GitHub Actions: `lint → programs → ci-test` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu).
-`make dev-test` — ≤6-min branch gate; >70% of 43 paths (fixed core C1–C9 covers 32/43); random draw samples remaining VM combos for bonus coverage; SEED=N replays, BUDGET=N configures time cap; `make hook-dev-test` toggles pre-push opt-in. Coverage map: `tests/ci/coverage-map.md`. `make bug-hunt` — Claude Code agentic bug hunt; 3 high-severity bugs; results in `bug-hunt/` (gitignored); MAX_MINUTES=30, MAX_TURNS=80; requires `claude` CLI.
+**CI/preflight/dev-test:** `make preflight` — validate host compiler, cross-compilers per `ARCHS`, QEMU binaries, disk space; auto-runs at `make build`.
+`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → programs → ci-test, i386 excluded). GitHub Actions: `lint → programs → ci-test` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu). `make dev-test` — ≤6-min branch gate; >70% of 43 paths; SEED=N replays, BUDGET=N cap; `make hook-dev-test` toggles pre-push opt-in. `make bug-hunt` — 3 high-severity bugs; results in `bug-hunt/`; MAX_MINUTES=30, MAX_TURNS=80; requires `claude` CLI.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.2.1-rc1` is the rolling `linux-7.2.y` branch tip; use `make fetch-stable-rc`.

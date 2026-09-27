@@ -84,6 +84,15 @@ MIN_CACHE_SPACE_GB ?= 5
 # 0 = always use BFD (set in local.mk when LLD causes issues)
 USE_LLD            ?= 1
 
+# ── Parallelism controls ──────────────────────────────────────────────────────
+# PARALLEL_BUILDS: concurrent kernel builds. Each build's -j is reduced to nproc/PARALLEL_BUILDS
+#   (floor 2). Tier-0 base configs (defconfig, tinyconfig, etc.) always complete before tier-1
+#   so the sibling config cache remains effective. Override per-machine in local.mk.
+PARALLEL_BUILDS    ?= 4
+# PARALLEL_VMS: concurrent QEMU VMs. Each VM uses 512M (x86) or 1G (arm64/riscv).
+#   4 VMs ≈ 3G RAM peak. Lower to 2 on hosts with <8G RAM. Override per-machine in local.mk.
+PARALLEL_VMS       ?= 4
+
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
 HW_HOST_IP     ?= 192.168.100.1
@@ -141,9 +150,14 @@ BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
 ifndef RUN_STAMP
   RUN_STAMP := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 endif
+ifndef _LOG_START
+  _LOG_START := $(shell date -u +%s)
+endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
+export PARALLEL_BUILDS PARALLEL_VMS
+export _LOG_START
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD NO_CONFIG_CACHE
 export STABLE_RELEASE STABLE_KERNEL_TREE STABLE_RC_BRANCH LINUX_NEXT
@@ -174,7 +188,6 @@ endif
 
 define _build_rule
 build/$(1)-$(2)/build.status: $$(KERNEL_TREE)/Makefile
-	@printf '[build] %-16s %s\n' $(1) $(2)
 	$$(Q)lib/build.sh $(1) $(2)
 endef
 $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a)))))
@@ -183,7 +196,6 @@ $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _build_rule,$(c),$(a))
 # Per-(config,arch) so the watchdog-enabled marker can reflect the actual .config.
 define _initramfs_rule
 build/initramfs-$(1)-$(2).cpio.gz: build/$(1)-$(2)/build.status
-	@printf '[initramfs] %s %s\n' $(1) $(2)
 	$$(Q)lib/initramfs.sh $(1) $(2)
 endef
 $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(c),$(a)))))
@@ -417,45 +429,45 @@ all:
 # lib/fetch.sh falls back to local tags when ls-remote fails (e.g. transient TLS error).
 fetch:
 ifeq ($(NO_FETCH),1)
-	@echo "[fetch] Skipping (NO_FETCH=1) — using existing local state"
+	@lib/mklog.sh "[fetch] Skipping (NO_FETCH=1) — using existing local state"
 else ifeq ($(LINUX_NEXT),1)
 	$(error [fetch] linux-next does not use rc tags — use: make fetch-next)
 else ifneq ($(STABLE_RC_BRANCH),)
-	@echo "[fetch] stable-rc: fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch] stable-rc: fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
 	$(Q)lib/fetch-stable-rc.sh
 else ifneq ($(STABLE_RELEASE),)
-	@echo "[fetch] stable: fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch] stable: fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
 else
-	@echo "[fetch] mainline: fetching latest -rc tag from $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch] mainline: fetching latest -rc tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
 endif
 
 # Explicit override targets — useful when running outside the preset-managed clones.
 fetch-stable:
 ifeq ($(NO_FETCH),1)
-	@echo "[fetch-stable] Skipping (NO_FETCH=1) — using existing local tag"
+	@lib/mklog.sh "[fetch-stable] Skipping (NO_FETCH=1) — using existing local tag"
 else
 	$(if $(STABLE_RELEASE),,$(error STABLE_RELEASE is required — usage: make fetch-stable STABLE_RELEASE=7.1))
-	@echo "[fetch-stable] Fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch-stable] Fetching latest $(STABLE_RELEASE).y tag from $(KERNEL_TREE)"
 	$(Q)lib/fetch.sh
 endif
 
 fetch-stable-rc:
 ifeq ($(NO_FETCH),1)
-	@echo "[fetch-stable-rc] Skipping (NO_FETCH=1) — using existing local state"
+	@lib/mklog.sh "[fetch-stable-rc] Skipping (NO_FETCH=1) — using existing local state"
 else
 	$(if $(STABLE_RC_BRANCH),,$(error STABLE_RC_BRANCH is required — set it in presets/ or pass STABLE_RC_BRANCH=linux-7.1.y))
-	@echo "[fetch-stable-rc] Fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch-stable-rc] Fetching branch $(STABLE_RC_BRANCH) from $(KERNEL_TREE)"
 	$(Q)lib/fetch-stable-rc.sh
 endif
 
 fetch-next:
 ifeq ($(NO_FETCH),1)
-	@echo "[fetch-next] Skipping (NO_FETCH=1) — using existing local state"
+	@lib/mklog.sh "[fetch-next] Skipping (NO_FETCH=1) — using existing local state"
 else
 	$(if $(filter 1,$(LINUX_NEXT)),,$(error LINUX_NEXT=1 is required — set it in presets/kernel-test-next.mk or pass LINUX_NEXT=1))
-	@echo "[fetch-next] Fetching origin/master from linux-next tree $(KERNEL_TREE)"
+	@lib/mklog.sh "[fetch-next] Fetching origin/master from linux-next tree $(KERNEL_TREE)"
 	$(Q)lib/fetch-next.sh
 endif
 
@@ -467,16 +479,30 @@ preflight:
 build:
 	$(Q)lib/preflight.sh
 ifeq ($(NO_BUILD),1)
-	@echo "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
+	@lib/mklog.sh "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
-	@echo "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS)"
+	@lib/mklog.sh "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
+	_pids=(); \
+	_enqueue() { \
+	    lib/build.sh "$$1" "$$2" & _pids+=("$$!"); \
+	    while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
+	        wait -n || rc=1; \
+	        _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	        _pids=("$${_new[@]}"); \
+	    done; \
+	}; \
+	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
 	for config in $(CONFIGS); do \
-		for arch in $(ARCHS); do \
-			printf '[build] %-16s %s\n' "$$config" "$$arch"; \
-			lib/build.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) ;; *) continue ;; esac; \
+	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
 	done; \
+	_flush; \
+	for config in $(CONFIGS); do \
+	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) continue ;; esac; \
+	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
+	done; \
+	_flush; \
 	exit $$rc
 endif
 
@@ -484,7 +510,7 @@ endif
 # Runs automatically in 'make all' before initramfs, even when NO_BUILD=1.
 # Run directly after changing C helper source to avoid a stale binary in the initramfs.
 programs:
-	@echo "[programs] Building tests/programs/ and tests/ns/ binaries"
+	@lib/mklog.sh "[programs] Building tests/programs/ and tests/ns/ binaries"
 	$(Q)rc=0; \
 	make -C tests/programs || rc=1; \
 	make -C tests/ns       || rc=1; \
@@ -495,26 +521,26 @@ programs:
 # Skip with NO_PERF_BUILD=1 on hosts where bootstrap has not been run.
 perf-build:
 ifeq ($(NO_PERF_BUILD),1)
-	@echo "[perf-build] skipped (NO_PERF_BUILD=1)"
+	@lib/mklog.sh "[perf-build] skipped (NO_PERF_BUILD=1)"
 	$(Q)mkdir -p $(BUILD_DIR)/perf && printf 'STATUS=SKIP\n' > $(BUILD_DIR)/perf/build.status
 else
-	@echo "[perf-build] Building tools/perf from $(KERNEL_TREE)"
+	@lib/mklog.sh "[perf-build] Building tools/perf from $(KERNEL_TREE)"
 	$(Q)mkdir -p $(BUILD_DIR)/perf
 	$(Q)for _t in pkg-config python3; do \
 	    command -v "$$_t" >/dev/null 2>&1 || { \
-	        printf '[perf-build] ERROR: %s not found — run: make bootstrap\n' "$$_t" >&2; \
+	        lib/mklog.sh "[perf-build] ERROR: $$_t not found — run: make bootstrap" >&2; \
 	        printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; exit 1; }; done
 	$(Q)for _lib in libelf libdw libtraceevent; do \
 	    pkg-config --exists "$$_lib" 2>/dev/null || { \
-	        printf '[perf-build] ERROR: pkg-config %s not found — run: make bootstrap\n' "$$_lib" >&2; \
+	        lib/mklog.sh "[perf-build] ERROR: pkg-config $$_lib not found — run: make bootstrap" >&2; \
 	        printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; exit 1; }; done
 	$(Q)if $(MAKE) -j$$(nproc) -C $(KERNEL_TREE)/tools/perf O=$(CURDIR)/$(BUILD_DIR)/perf \
 	        >$(BUILD_DIR)/perf/build.log 2>&1; then \
-	    echo "[perf-build] PASS"; \
+	    lib/mklog.sh "[perf-build] PASS"; \
 	    printf 'STATUS=PASS\n' > $(BUILD_DIR)/perf/build.status; \
 	else \
 	    grep ': error:' $(BUILD_DIR)/perf/build.log | head -10 >&2; \
-	    echo "[perf-build] FAIL — see $(BUILD_DIR)/perf/build.log"; \
+	    lib/mklog.sh "[perf-build] FAIL — see $(BUILD_DIR)/perf/build.log"; \
 	    printf 'STATUS=FAIL\n' > $(BUILD_DIR)/perf/build.status; \
 	    exit 1; \
 	fi
@@ -522,14 +548,20 @@ endif
 
 # Build one initramfs per (config, arch) pair so each can include config-specific markers.
 initramfs:
-	@echo "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
+	@lib/mklog.sh "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
+	_pids=(); \
 	for config in $(BOOT_CONFIGS); do \
-		for arch in $(ARCHS); do \
-			printf '[initramfs] %s %s\n' "$$config" "$$arch"; \
-			lib/initramfs.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    for arch in $(ARCHS); do \
+	        lib/initramfs.sh "$$config" "$$arch" & _pids+=("$$!"); \
+	        while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
+	            wait -n || rc=1; \
+	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	            _pids=("$${_new[@]}"); \
+	        done; \
+	    done; \
 	done; \
+	for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; \
 	exit $$rc
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
@@ -537,24 +569,31 @@ initramfs:
 # File prerequisites trigger auto-build of missing/stale artifacts.
 test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.status)) \
      $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
-	@echo "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS)"
+	@lib/mklog.sh "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel VMs: $(PARALLEL_VMS)"
 	$(Q)rc=0; \
+	_pids=(); \
+	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
 	for config in $(BOOT_CONFIGS); do \
-		for arch in $(ARCHS); do \
-			bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
-			if [[ $$bstatus != PASS ]]; then \
-				printf '[test] %-16s %s  SKIP (build %s)\n' "$$config" "$$arch" "$${bstatus:-missing}"; \
-				rc=1; \
-				continue; \
-			fi; \
-			printf '[test] %-16s %s\n' "$$config" "$$arch"; \
-			lib/vm.sh "$$config" "$$arch" || rc=1; \
-		done; \
+	    for arch in $(ARCHS); do \
+	        bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
+	        if [[ $$bstatus != PASS ]]; then \
+	            lib/mklog.sh "[test] $$config $$arch  SKIP (build $${bstatus:-missing})"; \
+	            rc=1; \
+	            continue; \
+	        fi; \
+	        lib/vm.sh "$$config" "$$arch" & _pids+=("$$!"); \
+	        while [[ $${#_pids[@]} -ge $(PARALLEL_VMS) ]]; do \
+	            wait -n || rc=1; \
+	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
+	            _pids=("$${_new[@]}"); \
+	        done; \
+	    done; \
 	done; \
+	_flush; \
 	exit $$rc
 
 report:
-	@echo "[report] Writing to $(REPORT_DIR)/"
+	@lib/mklog.sh "[report] Writing to $(REPORT_DIR)/"
 	$(Q)lib/report.sh
 
 # Compare two report directories for behavioral changes (regressions / fixes).
@@ -850,6 +889,8 @@ Variables (current values):
   HW_RELAY            = $(HW_RELAY)  (USB relay device symlink for board_reset; default: /dev/vf2-relay)
   HW_RELAY_VID        = $(HW_RELAY_VID)  (USB vendor ID of relay; CH340 default: 1a86)
   HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
+  PARALLEL_BUILDS     = $(PARALLEL_BUILDS)  (concurrent kernel builds; per-build -j = nproc/N floor 2; lower on <8-core hosts)
+  PARALLEL_VMS        = $(PARALLEL_VMS)  (concurrent QEMU VMs; each VM uses 512M–1G RAM; 4 VMs ≈ 3G; lower to 2 on <8G RAM hosts)
   SEED                = $(if $(SEED),$(SEED),(not set — make dev-test SEED=N for reproducible random draw))
   BUDGET              = $(if $(BUDGET),$(BUDGET),(not set — make dev-test BUDGET=N overrides 300s time cap; default: 300))
   MAX_MINUTES         = $(if $(MAX_MINUTES),$(MAX_MINUTES),(not set — make bug-hunt MAX_MINUTES=N overrides 30 min time cap))

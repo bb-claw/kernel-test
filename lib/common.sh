@@ -8,7 +8,17 @@ else
     _GRN=''; _RED=''; _YLW=''; _RST=''
 fi
 
-log()  { printf '%s %s\n'          "$(date -u +%H:%M:%S)" "$*"; }
+# Epoch captured once per process at source time; used for [+Ns] elapsed prefix.
+_LOG_START=${_LOG_START:-$(date -u +%s)}
+
+# When CONFIG and ARCH are set (build.sh, vm.sh) each line is prefixed with
+# elapsed seconds and the combo identity so parallel output stays readable.
+log() {
+    local _ts _el
+    _ts=$(date -u +%H:%M:%S)
+    _el=$(( $(date -u +%s) - _LOG_START ))
+    printf '%s [%4d] %-16s %-6s %s\n' "$_ts" "$_el" "${CONFIG:--}" "${ARCH:--}" "$*"
+}
 info() { log "${_GRN}INFO${_RST}  $*"; }
 warn() { log "${_YLW}WARN${_RST}  $*" >&2; }
 die()  { log "${_RED}ERROR${_RST} $*" >&2; exit 1; }
