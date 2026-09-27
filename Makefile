@@ -104,8 +104,7 @@ _TIER0_CONFIGS     := $(filter $(_TIER0_BASE),$(CONFIGS))
 _TIER1_CONFIGS     := $(filter-out $(_TIER0_BASE),$(CONFIGS))
 _TIER0_BUILD_TGTS  := $(foreach c,$(_TIER0_CONFIGS),$(foreach a,$(ARCHS),build-$(c)-$(a)))
 _TIER1_BUILD_TGTS  := $(foreach c,$(_TIER1_CONFIGS),$(foreach a,$(ARCHS),build-$(c)-$(a)))
-_INITRAMFS_TGTS    := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),initramfs-$(c)-$(a)))
-_TEST_TGTS         := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),test-$(c)-$(a)))
+# _INITRAMFS_TGTS and _TEST_TGTS depend on BOOT_CONFIGS which is defined later — see below.
 
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
@@ -155,6 +154,8 @@ KERNEL_VERSION := $(shell \
 # kunitrandconfig is booted: defconfig base is bootable; KUnit emits KTAP to serial; KUNIT_PASS/FAIL tracked.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig randnsconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
+_INITRAMFS_TGTS    := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),initramfs-$(c)-$(a)))
+_TEST_TGTS         := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),test-$(c)-$(a)))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
 # ?= with $(shell) creates a lazy recursive variable — the shell command would
@@ -218,15 +219,16 @@ $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$
 # Aggregate targets: $(MAKE) -j$(nproc) _tier0-build dispatches all tier-0 combos
 # in parallel, with inner makes inheriting the shared jobserver token pool.
 # Empty lists resolve gracefully — phony with no prereqs succeeds immediately.
+# Aggregate targets are phony so they always dispatch to their prerequisites.
+# Per-combo targets (build-%, initramfs-%, test-%) are NOT declared phony — they
+# match the pattern rules below and never produce files, so make always considers
+# them out-of-date and runs the recipe. Explicit .PHONY by name would shadow the
+# pattern rule, creating an empty explicit rule and silently doing nothing.
 .PHONY: _tier0-build _tier1-build _all-initramfs _all-test
 _tier0-build: $(_TIER0_BUILD_TGTS) ;
 _tier1-build: $(_TIER1_BUILD_TGTS) ;
 _all-initramfs: $(_INITRAMFS_TGTS) ;
 _all-test: $(_TEST_TGTS) ;
-
-.PHONY: $(foreach c,$(CONFIGS),$(foreach a,$(ARCHS),build-$(c)-$(a)))
-.PHONY: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),initramfs-$(c)-$(a)))
-.PHONY: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),test-$(c)-$(a)))
 
 build-%:
 	$(Q)_combo=$*; _arch=$${_combo##*-}; _config=$${_combo%-$$_arch}; \
