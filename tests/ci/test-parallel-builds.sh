@@ -81,48 +81,42 @@ grep -q 'NPROC.*-lt 2.*NPROC=2\|NPROC=2.*-lt 2' "$BUILD" \
     && pass "NPROC floor >= 2 guard present" \
     || fail "no floor=2 guard found — on 4-core hosts with PARALLEL_BUILDS=4, NPROC would become 1"
 
-# ── 4. Build loop tier structure ─────────────────────────────────────────────
+# ── 4. Build tier structure ───────────────────────────────────────────────────
+# Jobserver implementation: tier-0 and tier-1 are separate $(MAKE) invocations so
+# the tier-0 barrier is enforced and the jobserver token pool is shared within each.
 
-begin_test "Makefile: build loop contains tier-0 case pattern"
-grep -q 'defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig' "$MK" \
-    && pass "tier-0 config list present in build loop" \
-    || fail "tier-0 case pattern not found in Makefile"
+begin_test "Makefile: _TIER0_BASE defines tier-0 config list"
+grep -q '_TIER0_BASE[[:space:]]*:=' "$MK" \
+    && pass "tier-0 config list present in _TIER0_BASE" \
+    || fail "_TIER0_BASE not found in Makefile"
 
-begin_test "Makefile: build loop has _flush between tier-0 and tier-1"
-# Tier-0 loop passes matching configs through; tier-1 uses 'continue' to skip them.
-# _flush must appear between the two case patterns in the Makefile.
-tier0_line=$(grep -n 'defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) ;;' "$MK" | head -1 | cut -d: -f1)
-# First _flush after tier0 (the one between tier-0 and tier-1)
-flush_line=$(awk -v t="${tier0_line:-0}" 'NR>t && /_flush;/{print NR; exit}' "$MK")
-tier1_line=$(grep -n 'defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) continue' "$MK" | head -1 | cut -d: -f1)
-if [[ -n "$tier0_line" && -n "$flush_line" && -n "$tier1_line" ]]; then
-    if [[ "$flush_line" -gt "$tier0_line" && "$tier1_line" -gt "$flush_line" ]]; then
-        pass "_flush (L$flush_line) is between tier-0 (L$tier0_line) and tier-1 (L$tier1_line)"
-    else
-        fail "ordering wrong: tier0=L$tier0_line flush=L$flush_line tier1=L$tier1_line"
-    fi
+begin_test "Makefile: build: invokes _tier0-build before _tier1-build"
+tier0_line=$(grep -n '_tier0-build' "$MK" | grep '\$(MAKE)' | head -1 | cut -d: -f1)
+tier1_line=$(grep -n '_tier1-build' "$MK" | grep '\$(MAKE)' | head -1 | cut -d: -f1)
+if [[ -n "$tier0_line" && -n "$tier1_line" && "$tier0_line" -lt "$tier1_line" ]]; then
+    pass "_tier0-build (L$tier0_line) before _tier1-build (L$tier1_line)"
 else
-    fail "could not locate tier-0 (L${tier0_line:-?}), _flush (L${flush_line:-?}), or tier-1 (L${tier1_line:-?})"
+    fail "could not verify tier0 (L${tier0_line:-?}) before tier1 (L${tier1_line:-?})"
 fi
 
-begin_test "Makefile: build loop uses background jobs (&) and wait"
-if grep -A 50 '^build:' "$MK" | grep -q '& _pids'; then
-    pass "background job pattern found in build loop"
+begin_test "Makefile: build: uses \$(MAKE) -j for parallel builds"
+if grep -A 10 '^build:' "$MK" | grep -qE '\$\(MAKE\).*-j'; then
+    pass "\$(MAKE) -j found in build target"
 else
-    fail "no '& _pids' pattern in build target — build may still be sequential"
+    fail "no \$(MAKE) -j in build target — builds may be sequential"
 fi
 
 # ── 5. Initramfs loop parallel pattern ───────────────────────────────────────
 
-begin_test "Makefile: initramfs loop uses background jobs"
-if grep -A 20 '^initramfs:' "$MK" | grep -q '& _pids'; then
-    pass "background job pattern found in initramfs loop"
+begin_test "Makefile: initramfs uses \$(MAKE) for parallel dispatch"
+if grep -A 5 '^initramfs:' "$MK" | grep -q '\$(MAKE)'; then
+    pass "\$(MAKE) dispatch found in initramfs target"
 else
-    fail "no '& _pids' pattern in initramfs target"
+    fail "no \$(MAKE) in initramfs target"
 fi
 
 begin_test "Makefile: initramfs loop uses PARALLEL_BUILDS cap"
-if grep -A 20 '^initramfs:' "$MK" | grep -q 'PARALLEL_BUILDS'; then
+if grep -A 5 '^initramfs:' "$MK" | grep -q 'PARALLEL_BUILDS'; then
     pass "PARALLEL_BUILDS cap present in initramfs loop"
 else
     fail "PARALLEL_BUILDS not used in initramfs loop"
@@ -130,25 +124,25 @@ fi
 
 # ── 6. Test loop uses PARALLEL_VMS ───────────────────────────────────────────
 
-begin_test "Makefile: test loop uses background jobs"
-if grep -A 30 '^test:' "$MK" | grep -q '& _pids'; then
-    pass "background job pattern found in test loop"
+begin_test "Makefile: test uses \$(MAKE) for parallel dispatch"
+if grep -A 5 '^test:' "$MK" | grep -q '\$(MAKE)'; then
+    pass "\$(MAKE) dispatch found in test target"
 else
-    fail "no '& _pids' pattern in test target"
+    fail "no \$(MAKE) in test target"
 fi
 
 begin_test "Makefile: test loop uses PARALLEL_VMS cap"
-if grep -A 30 '^test:' "$MK" | grep -q 'PARALLEL_VMS'; then
+if grep -A 5 '^test:' "$MK" | grep -q 'PARALLEL_VMS'; then
     pass "PARALLEL_VMS cap present in test loop"
 else
     fail "PARALLEL_VMS not used in test loop"
 fi
 
-begin_test "Makefile: test loop preserves build.status SKIP check"
-if grep -A 30 '^test:' "$MK" | grep -q 'bstatus.*PASS\|PASS.*bstatus'; then
-    pass "build.status PASS check preserved in test loop"
+begin_test "Makefile: test-% pattern preserves build.status SKIP check"
+if grep -A 10 '^test-%:' "$MK" | grep -q 'bstatus.*PASS\|PASS.*bstatus'; then
+    pass "build.status PASS check preserved in test-% pattern"
 else
-    fail "build.status PASS check missing from test loop"
+    fail "build.status PASS check missing from test-% pattern"
 fi
 
 # ── 7. Shellcheck ────────────────────────────────────────────────────────────

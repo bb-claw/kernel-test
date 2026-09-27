@@ -44,11 +44,11 @@
 | `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
 | `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
 | `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `25G` / `1` | ccache budget; `TUNE=0` disables `time_macros`+zstd+`base_dir` normalization; override in `local.mk` |
-| `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
-| `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
-| `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
-| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — lower on <8-core hosts; tier-0 bases complete before tier-1 dependents; per-build `-j` reduced to `nproc/PARALLEL_BUILDS` (floor 2); override in `local.mk` |
+| `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space (GB) thresholds for `make preflight`; `USE_LLD=0` disables LLD auto-detect (forces BFD) |
+| `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache; force fresh `kmake <base-config>`; output still written to cache |
+| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — queue-depth cap (memory); jobserver controls total compile jobs (CPU); override in `local.mk` |
 | `PARALLEL_VMS` | `4` | `PARALLEL_VMS=2` — lower on hosts with <8G RAM; each VM uses 512M–1G RAM (4 VMs ≈ 3G); override in `local.mk` |
+| `NO_JOBSERVER` | `0` | `NO_JOBSERVER=1` — static `-j(nproc/PARALLEL_BUILDS)` per build; use on make <4.2 or hosts where jobserver causes issues |
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
 ## Common Workflows

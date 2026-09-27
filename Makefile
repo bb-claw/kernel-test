@@ -85,13 +85,26 @@ MIN_CACHE_SPACE_GB ?= 5
 USE_LLD            ?= 1
 
 # ── Parallelism controls ──────────────────────────────────────────────────────
-# PARALLEL_BUILDS: concurrent kernel builds. Each build's -j is reduced to nproc/PARALLEL_BUILDS
-#   (floor 2). Tier-0 base configs (defconfig, tinyconfig, etc.) always complete before tier-1
-#   so the sibling config cache remains effective. Override per-machine in local.mk.
+# PARALLEL_BUILDS: concurrent kernel builds; also limits initramfs parallelism.
+#   With the jobserver active, -j here is the queue-depth cap (memory pressure),
+#   while nproc tokens control total compile jobs across all builds (CPU pressure).
+#   Lower to 2 on <8-core/<8G-RAM hosts. Override per-machine in local.mk.
 PARALLEL_BUILDS    ?= 4
 # PARALLEL_VMS: concurrent QEMU VMs. Each VM uses 512M (x86) or 1G (arm64/riscv).
 #   4 VMs ≈ 3G RAM peak. Lower to 2 on hosts with <8G RAM. Override per-machine in local.mk.
 PARALLEL_VMS       ?= 4
+# NO_JOBSERVER: set to 1 in local.mk to revert to static -j behaviour (make < 4.2,
+#   or hosts where the jobserver causes unexpected behaviour).
+NO_JOBSERVER       ?= 0
+
+# Tier split for jobserver: tier-0 base configs complete before tier-1 so the
+# sibling config cache is warm. Inner makes inherit the jobserver token pool.
+_TIER0_BASE        := defconfig tinyconfig allnoconfig allmodconfig randconfig
+_TIER0_CONFIGS     := $(filter $(_TIER0_BASE),$(CONFIGS))
+_TIER1_CONFIGS     := $(filter-out $(_TIER0_BASE),$(CONFIGS))
+_TIER0_BUILD_TGTS  := $(foreach c,$(_TIER0_CONFIGS),$(foreach a,$(ARCHS),build-$(c)-$(a)))
+_TIER1_BUILD_TGTS  := $(foreach c,$(_TIER1_CONFIGS),$(foreach a,$(ARCHS),build-$(c)-$(a)))
+# _INITRAMFS_TGTS and _TEST_TGTS depend on BOOT_CONFIGS which is defined later — see below.
 
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
@@ -141,6 +154,8 @@ KERNEL_VERSION := $(shell \
 # kunitrandconfig is booted: defconfig base is bootable; KUnit emits KTAP to serial; KUNIT_PASS/FAIL tracked.
 BUILD_ONLY_CONFIGS := allmodconfig randconfig randnsconfig
 BOOT_CONFIGS       := $(filter-out $(BUILD_ONLY_CONFIGS),$(CONFIGS))
+_INITRAMFS_TGTS    := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),initramfs-$(c)-$(a)))
+_TEST_TGTS         := $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),test-$(c)-$(a)))
 
 # Captured once at parse time; ?= prevents sub-makes from recomputing it
 # ?= with $(shell) creates a lazy recursive variable — the shell command would
@@ -156,7 +171,7 @@ endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
 export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
-export PARALLEL_BUILDS PARALLEL_VMS
+export PARALLEL_BUILDS PARALLEL_VMS NO_JOBSERVER
 export _LOG_START
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
 export TIMEOUT BUILD_TIMEOUT GCC REPORT_DIR DATA_REPO V RUN_STAMP NO_FETCH NO_BUILD NO_PERF_BUILD NO_CONFIG_CACHE
@@ -199,6 +214,38 @@ build/initramfs-$(1)-$(2).cpio.gz: build/$(1)-$(2)/build.status
 	$$(Q)lib/initramfs.sh $(1) $(2)
 endef
 $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$(c),$(a)))))
+
+# ── Per-combo phony targets (jobserver orchestration) ─────────────────────────
+# Aggregate targets: $(MAKE) -j$(nproc) _tier0-build dispatches all tier-0 combos
+# in parallel, with inner makes inheriting the shared jobserver token pool.
+# Empty lists resolve gracefully — phony with no prereqs succeeds immediately.
+# Aggregate targets are phony so they always dispatch to their prerequisites.
+# Per-combo targets (build-%, initramfs-%, test-%) are NOT declared phony — they
+# match the pattern rules below and never produce files, so make always considers
+# them out-of-date and runs the recipe. Explicit .PHONY by name would shadow the
+# pattern rule, creating an empty explicit rule and silently doing nothing.
+.PHONY: _tier0-build _tier1-build _all-initramfs _all-test
+_tier0-build: $(_TIER0_BUILD_TGTS) ;
+_tier1-build: $(_TIER1_BUILD_TGTS) ;
+_all-initramfs: $(_INITRAMFS_TGTS) ;
+_all-test: $(_TEST_TGTS) ;
+
+build-%:
+	$(Q)_combo=$*; _arch=$${_combo##*-}; _config=$${_combo%-$$_arch}; \
+	lib/build.sh "$$_config" "$$_arch"
+
+initramfs-%:
+	$(Q)_combo=$*; _arch=$${_combo##*-}; _config=$${_combo%-$$_arch}; \
+	lib/initramfs.sh "$$_config" "$$_arch"
+
+test-%:
+	$(Q)_combo=$*; _arch=$${_combo##*-}; _config=$${_combo%-$$_arch}; \
+	bstatus=$$(grep '^STATUS=' "build/$$_config-$$_arch/build.status" 2>/dev/null | cut -d= -f2); \
+	if [[ $$bstatus != PASS ]]; then \
+	    lib/mklog.sh "[test] $$_config $$_arch  SKIP (build $${bstatus:-missing})"; \
+	    exit 1; \
+	fi; \
+	lib/vm.sh "$$_config" "$$_arch"
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -481,28 +528,10 @@ build:
 ifeq ($(NO_BUILD),1)
 	@lib/mklog.sh "[build] Skipping (NO_BUILD=1) — using existing build artifacts"
 else
-	@lib/mklog.sh "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
+	@lib/mklog.sh "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS) | Queue: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
-	_pids=(); \
-	_enqueue() { \
-	    lib/build.sh "$$1" "$$2" & _pids+=("$$!"); \
-	    while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
-	        wait -n || rc=1; \
-	        _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
-	        _pids=("$${_new[@]}"); \
-	    done; \
-	}; \
-	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
-	for config in $(CONFIGS); do \
-	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) ;; *) continue ;; esac; \
-	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
-	done; \
-	_flush; \
-	for config in $(CONFIGS); do \
-	    case "$$config" in defconfig|tinyconfig|allnoconfig|allmodconfig|randconfig) continue ;; esac; \
-	    for arch in $(ARCHS); do _enqueue "$$config" "$$arch"; done; \
-	done; \
-	_flush; \
+	$(MAKE) --no-print-directory --keep-going -j$(PARALLEL_BUILDS) _tier0-build || rc=1; \
+	$(MAKE) --no-print-directory --keep-going -j$(PARALLEL_BUILDS) _tier1-build || rc=1; \
 	exit $$rc
 endif
 
@@ -550,18 +579,7 @@ endif
 initramfs:
 	@lib/mklog.sh "[initramfs] Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
-	_pids=(); \
-	for config in $(BOOT_CONFIGS); do \
-	    for arch in $(ARCHS); do \
-	        lib/initramfs.sh "$$config" "$$arch" & _pids+=("$$!"); \
-	        while [[ $${#_pids[@]} -ge $(PARALLEL_BUILDS) ]]; do \
-	            wait -n || rc=1; \
-	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
-	            _pids=("$${_new[@]}"); \
-	        done; \
-	    done; \
-	done; \
-	for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; \
+	$(MAKE) --no-print-directory --keep-going -j$(PARALLEL_BUILDS) _all-initramfs || rc=1; \
 	exit $$rc
 
 # Boot BOOT_CONFIGS × ARCHS in QEMU/KVM and run tests.
@@ -571,25 +589,7 @@ test: $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/$(c)-$(a)/build.sta
      $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),build/initramfs-$(c)-$(a).cpio.gz))
 	@lib/mklog.sh "[test] Kernel: $(KERNEL_VERSION) | Configs: $(BOOT_CONFIGS) | Archs: $(ARCHS) | Parallel VMs: $(PARALLEL_VMS)"
 	$(Q)rc=0; \
-	_pids=(); \
-	_flush() { local _p; for _p in "$${_pids[@]}"; do wait "$$_p" || rc=1; done; _pids=(); }; \
-	for config in $(BOOT_CONFIGS); do \
-	    for arch in $(ARCHS); do \
-	        bstatus=$$(grep '^STATUS=' "build/$$config-$$arch/build.status" 2>/dev/null | cut -d= -f2); \
-	        if [[ $$bstatus != PASS ]]; then \
-	            lib/mklog.sh "[test] $$config $$arch  SKIP (build $${bstatus:-missing})"; \
-	            rc=1; \
-	            continue; \
-	        fi; \
-	        lib/vm.sh "$$config" "$$arch" & _pids+=("$$!"); \
-	        while [[ $${#_pids[@]} -ge $(PARALLEL_VMS) ]]; do \
-	            wait -n || rc=1; \
-	            _new=(); for _p in "$${_pids[@]}"; do kill -0 "$$_p" 2>/dev/null && _new+=("$$_p") || true; done; \
-	            _pids=("$${_new[@]}"); \
-	        done; \
-	    done; \
-	done; \
-	_flush; \
+	$(MAKE) --no-print-directory --keep-going -j$(PARALLEL_VMS) _all-test || rc=1; \
 	exit $$rc
 
 report:
