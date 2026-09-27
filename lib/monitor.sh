@@ -106,7 +106,8 @@ _snapshot() {
         build_active+=("${_combo}|${_j:-?}|$(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
     build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
-        -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l || echo 0)
+        -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l 2>/dev/null || true)
+    build_done=${build_done:-0}
 
     # -- Active tests (sentinel files) --
     local test_active=() test_done=0 test_wall_elapsed=0
@@ -116,7 +117,8 @@ _snapshot() {
         _combo=${_af%/.vm-active}; _combo=${_combo#"$BUILD_DIR"/}
         test_active+=("$_combo $(_elapsed_fmt "$_af")")
     done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
-    test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l || echo 0)
+    test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l 2>/dev/null || true)
+    test_done=${test_done:-0}
 
     # -- Test wall time: elapsed since oldest active VM sentinel --
     if [[ ${#test_active[@]} -gt 0 ]]; then
