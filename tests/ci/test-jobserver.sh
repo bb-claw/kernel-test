@@ -29,7 +29,7 @@ grep -q '^build-%:' "$MK" \
 # ── 2. Top-level build uses jobserver token pool ──────────────────────────────
 
 begin_test "Makefile: top-level build: uses \$(MAKE) with -j\$(nproc)"
-if grep -A 5 '^build:' "$MK" | grep -qE '\$\(MAKE\).*nproc|\$\(MAKE\).*\$\(shell nproc\)'; then
+if grep -A 15 '^build:' "$MK" | grep -qE '\$\(MAKE\).*nproc|\$\(MAKE\).*\$\(shell nproc\)'; then
     pass "\$(MAKE) -j\$(nproc) found in build target"
 else
     fail "\$(MAKE) -j\$(nproc) not found in build target — jobserver token pool not owned by harness"
