@@ -22,14 +22,14 @@ BUILD="$REPO/lib/build.sh"
 # ── 1. Variable definitions ───────────────────────────────────────────────────
 
 begin_test "Makefile: PARALLEL_BUILDS variable defined"
-grep -q 'PARALLEL_BUILDS[[:space:]]*?=[[:space:]]*1' "$MK" \
-    && pass "PARALLEL_BUILDS ?= 1 present" \
-    || fail "PARALLEL_BUILDS ?= 1 not found in Makefile"
+grep -q 'PARALLEL_BUILDS[[:space:]]*?=[[:space:]]*[0-9]' "$MK" \
+    && pass "PARALLEL_BUILDS ?= N present" \
+    || fail "PARALLEL_BUILDS ?= N not found in Makefile"
 
 begin_test "Makefile: PARALLEL_VMS variable defined"
-grep -q 'PARALLEL_VMS[[:space:]]*?=[[:space:]]*1' "$MK" \
-    && pass "PARALLEL_VMS ?= 1 present" \
-    || fail "PARALLEL_VMS ?= 1 not found in Makefile"
+grep -q 'PARALLEL_VMS[[:space:]]*?=[[:space:]]*[0-9]' "$MK" \
+    && pass "PARALLEL_VMS ?= N present" \
+    || fail "PARALLEL_VMS ?= N not found in Makefile"
 
 begin_test "Makefile: PARALLEL_BUILDS exported"
 grep -q 'export.*PARALLEL_BUILDS' "$MK" \

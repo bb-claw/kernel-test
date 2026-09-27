@@ -47,8 +47,8 @@
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 | `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
 | `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
-| `PARALLEL_BUILDS` | `1` | `PARALLEL_BUILDS=4` — run 4 kernel builds concurrently; tier-0 bases complete before tier-1 dependents; per-build `-j` reduced to `nproc/PARALLEL_BUILDS`; override in `local.mk` |
-| `PARALLEL_VMS` | `1` | `PARALLEL_VMS=4` — run 4 QEMU VMs concurrently; each VM uses 512M–1G RAM (4 VMs ≈ 3G); override in `local.mk` |
+| `PARALLEL_BUILDS` | `4` | `PARALLEL_BUILDS=2` — lower on <8-core hosts; tier-0 bases complete before tier-1 dependents; per-build `-j` reduced to `nproc/PARALLEL_BUILDS` (floor 2); override in `local.mk` |
+| `PARALLEL_VMS` | `4` | `PARALLEL_VMS=2` — lower on hosts with <8G RAM; each VM uses 512M–1G RAM (4 VMs ≈ 3G); override in `local.mk` |
 `KERNEL_TREE` and `DATA_REPO` are tilde-expanded and absolutified at parse time. When `STABLE_RELEASE` is set, `KERNEL_TREE` is automatically overridden to `STABLE_KERNEL_TREE`.
 
 ## Common Workflows

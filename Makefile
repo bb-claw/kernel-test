@@ -85,15 +85,13 @@ MIN_CACHE_SPACE_GB ?= 5
 USE_LLD            ?= 1
 
 # ── Parallelism controls ──────────────────────────────────────────────────────
-# PARALLEL_BUILDS: concurrent kernel builds. Default 1 = sequential (exact current behaviour).
-#   Set to 4 to run 4 builds at once; each build's -j is reduced to nproc/PARALLEL_BUILDS.
-#   Tier-0 base configs (defconfig, tinyconfig, etc.) always complete before tier-1 starts
+# PARALLEL_BUILDS: concurrent kernel builds. Each build's -j is reduced to nproc/PARALLEL_BUILDS
+#   (floor 2). Tier-0 base configs (defconfig, tinyconfig, etc.) always complete before tier-1
 #   so the sibling config cache remains effective. Override per-machine in local.mk.
-PARALLEL_BUILDS    ?= 1
-# PARALLEL_VMS: concurrent QEMU VMs. Default 1 = sequential.
-#   Each VM uses 512M–1G RAM. Cap based on available RAM (4 VMs ≈ 3G, safe on all hosts).
-#   Override per-machine in local.mk.
-PARALLEL_VMS       ?= 1
+PARALLEL_BUILDS    ?= 4
+# PARALLEL_VMS: concurrent QEMU VMs. Each VM uses 512M (x86) or 1G (arm64/riscv).
+#   4 VMs ≈ 3G RAM peak. Lower to 2 on hosts with <8G RAM. Override per-machine in local.mk.
+PARALLEL_VMS       ?= 4
 
 # ── Hardware bootstrap — isolated test network + USB relay ────────────────────
 HW_IFACE       ?= eno1
@@ -891,8 +889,8 @@ Variables (current values):
   HW_RELAY            = $(HW_RELAY)  (USB relay device symlink for board_reset; default: /dev/vf2-relay)
   HW_RELAY_VID        = $(HW_RELAY_VID)  (USB vendor ID of relay; CH340 default: 1a86)
   HW_RELAY_PID        = $(HW_RELAY_PID)  (USB product ID of relay; CH340 default: 7523)
-  PARALLEL_BUILDS     = $(PARALLEL_BUILDS)  (concurrent kernel builds; 1=sequential; set to 4 to run 4 builds at once; per-build -j reduced proportionally)
-  PARALLEL_VMS        = $(PARALLEL_VMS)  (concurrent QEMU VMs; 1=sequential; each VM uses 512M–1G RAM; 4 VMs ≈ 3G)
+  PARALLEL_BUILDS     = $(PARALLEL_BUILDS)  (concurrent kernel builds; per-build -j = nproc/N floor 2; lower on <8-core hosts)
+  PARALLEL_VMS        = $(PARALLEL_VMS)  (concurrent QEMU VMs; each VM uses 512M–1G RAM; 4 VMs ≈ 3G; lower to 2 on <8G RAM hosts)
   SEED                = $(if $(SEED),$(SEED),(not set — make dev-test SEED=N for reproducible random draw))
   BUDGET              = $(if $(BUDGET),$(BUDGET),(not set — make dev-test BUDGET=N overrides 300s time cap; default: 300))
   MAX_MINUTES         = $(if $(MAX_MINUTES),$(MAX_MINUTES),(not set — make bug-hunt MAX_MINUTES=N overrides 30 min time cap))
