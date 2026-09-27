@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-43 functional decision paths across 8 groups.
-Fixed core (C1–C9) guarantees >70% coverage (32/43 paths, 31/43 without /proc/config.gz).
+46 functional decision paths across 9 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (37/46 paths; 36/46 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -10,10 +10,10 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | A1  | KVM available → `qemu -enable-kvm` (x86 fast boot)          | tinyconfig/x86_64 smoke (HAS_KVM=yes)      | A-pipeline  |
 | A2  | KVM absent → TCG fallback (arm64/riscv always; x86 fallback) | defconfig/arm64 smoke or IS_HETZNER        | A-pipeline  |
 | A3  | Build PASS → initramfs built → VM boots → tests run          | tinyconfig/x86_64 smoke                    | A-pipeline  |
-| A4  | Build FAIL → vm.status shows FAIL, no boot attempted         | random pool (weight 2)                     | A-pipeline  |
+| A4  | Build FAIL → vm.status shows FAIL, no boot attempted         | fixed core via C3 (test-report.sh)         | A-pipeline  |
 | A5  | Build TIMEOUT (exit 124) → vm.status shows TIMEOUT           | random pool (weight 2)                     | A-pipeline  |
 | A6  | BOOT=PASS → test scripts execute sequentially                | tinyconfig/x86_64 smoke                    | A-pipeline  |
-| A7  | BOOT=FAIL → TEST_DONE absent, vm.status BOOT=FAIL            | random pool (weight 2)                     | A-pipeline  |
+| A7  | BOOT=FAIL → TEST_DONE absent, vm.status BOOT=FAIL            | fixed core via C3 (test-vm-parser.sh)      | A-pipeline  |
 | A8  | NO_BUILD=1 → kernel build skipped, initramfs rebuilt         | tinyconfig/x86_64 smoke (NO_BUILD=1)       | A-pipeline  |
 | B1  | Standard config (defconfig/kunit) → arch default + fragment  | defconfig/x86_64 smoke                     | B-config    |
 | B2  | tinyconfig base + fragment → minimal bootable kernel          | tinyconfig/x86_64 smoke                    | B-config    |
@@ -50,3 +50,6 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | G3  | Static analysis: dead assignment guard, total_paths drift, build.sh sentinel, \r stripping | fixed core via C9 (test-static-analysis.sh) | G-valgrind |
 | H1  | programs/common.mk: structural checks (thin Makefiles, flags, HOST_ONLY, nolibc) + x86_64 compile | fixed core via C9 (test-programs-build.sh) | H-programs |
 | H2  | tests/ns/ Makefile: FLAGS_ONLY=1, common.mk include, Clang gate, C17 + extended warnings | fixed core via C9 (test-programs-build.sh) | H-programs |
+| I1  | build.sh bad arch: exits non-zero, INFRA_FAIL written before die() — stale PASS overwritten | fixed core via C9 (test-build-errors.sh)    | I-build-errors |
+| I2  | build.sh missing kernel tree: exits non-zero, INFRA_FAIL written before die()              | fixed core via C9 (test-build-errors.sh)    | I-build-errors |
+| I3  | build.sh missing GCC: exits non-zero, INFRA_FAIL written before die()                      | fixed core via C9 (test-build-errors.sh)    | I-build-errors |

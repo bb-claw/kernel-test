@@ -179,6 +179,7 @@ ifeq ($(V),1)
 else
   Q := @
 endif
+MAKEFLAGS += --no-print-directory
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
 .PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
@@ -353,18 +354,18 @@ hw-deploy:
 	img=$$(find "$$bd/arch" -name "Image" -o -name "bzImage" 2>/dev/null | head -1); \
 	if [[ -n "$$img" ]]; then \
 	    cp "$$img" "$(TFTP_DIR)/"; \
-	    printf '[hw-deploy] kernel   → %s/%s\n' '$(TFTP_DIR)' "$$(basename $$img)"; \
+	    bash lib/mklog.sh "[hw-deploy] kernel   → $(TFTP_DIR)/$$(basename $$img)"; \
 	else \
-	    printf '[hw-deploy] WARN: kernel not found in %s/arch — run: make build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n' "$$bd"; \
+	    bash lib/mklog.sh "[hw-deploy] WARN: kernel not found in $$bd/arch — run: make build CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first"; \
 	fi; \
 	if cp "$(BUILD_DIR)/initramfs-$(BOARD_CONFIG)-$(BOARD_ARCH).cpio.gz" "$(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz" 2>/dev/null; then \
-	    printf '[hw-deploy] initramfs → %s/initramfs-$(BOARD_ARCH).cpio.gz\n' '$(TFTP_DIR)'; \
+	    bash lib/mklog.sh "[hw-deploy] initramfs → $(TFTP_DIR)/initramfs-$(BOARD_ARCH).cpio.gz"; \
 	else \
-	    printf '[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first\n'; \
+	    bash lib/mklog.sh "[hw-deploy] WARN: initramfs not found — run: make initramfs CONFIGS=$(BOARD_CONFIG) ARCHS=$(BOARD_ARCH) first"; \
 	fi; \
 	dtb_file=$$(find "$$bd/arch" -name "$(BOARD_DTB).dtb" 2>/dev/null | head -1); \
 	if [[ -z "$$dtb_file" ]]; then \
-	    printf '[hw-deploy] building DTBs ($(BOARD_DTB).dtb) ...\n'; \
+	    bash lib/mklog.sh "[hw-deploy] building DTBs ($(BOARD_DTB).dtb) ..."; \
 	    case "$(BOARD_ARCH)" in \
 	        riscv) cross=riscv64-linux-gnu- ;; \
 	        arm64) cross=aarch64-linux-gnu- ;; \
@@ -376,9 +377,9 @@ hw-deploy:
 	fi; \
 	if [[ -n "$$dtb_file" ]]; then \
 	    cp "$$dtb_file" "$(TFTP_DIR)/vf2.dtb"; \
-	    printf '[hw-deploy] dtb      → %s/vf2.dtb\n' '$(TFTP_DIR)'; \
+	    bash lib/mklog.sh "[hw-deploy] dtb      → $(TFTP_DIR)/vf2.dtb"; \
 	else \
-	    printf '[hw-deploy] WARN: DTB $(BOARD_DTB).dtb not found — set BOARD_DTB or copy DTB manually to %s/vf2.dtb\n' '$(TFTP_DIR)'; \
+	    bash lib/mklog.sh "[hw-deploy] WARN: DTB $(BOARD_DTB).dtb not found — set BOARD_DTB or copy DTB manually to $(TFTP_DIR)/vf2.dtb"; \
 	fi
 
 hw-test:
@@ -518,8 +519,8 @@ endif
 programs:
 	@lib/mklog.sh "[programs] Building tests/programs/ and tests/ns/ binaries"
 	$(Q)rc=0; \
-	make -C tests/programs || rc=1; \
-	make -C tests/ns       || rc=1; \
+	$(MAKE) --no-print-directory --silent -C tests/programs || rc=1; \
+	$(MAKE) --no-print-directory --silent -C tests/ns       || rc=1; \
 	exit $$rc
 
 # Build tools/perf from KERNEL_TREE. Part of make extended.
@@ -662,10 +663,10 @@ valgrind:
 # (fast — reuses ccache), runs dkms autoinstall for out-of-tree modules
 # (nvidia, vbox, …), then needs sudo for /boot writes.
 install:
-	@echo "[install] Config: $(CONFIGS) | Arch: $(ARCHS)"
+	@bash lib/mklog.sh "[install] Config: $(CONFIGS) | Arch: $(ARCHS)"
 	$(Q)for config in $(CONFIGS); do \
 		for arch in $(ARCHS); do \
-			printf '[install] %-16s %s\n' "$$config" "$$arch"; \
+			bash lib/mklog.sh "[install] $$config $$arch"; \
 			lib/install.sh "$$config" "$$arch"; \
 		done; \
 	done

@@ -17,7 +17,7 @@ MIN_BUILD_SPACE_GB=${MIN_BUILD_SPACE_GB:-5}
 MIN_CACHE_SPACE_GB=${MIN_CACHE_SPACE_GB:-5}
 
 _errors=0
-_check_fail() { printf 'ERROR: %s\n' "$*" >&2; _errors=$(( _errors + 1 )); }
+_check_fail() { warn "ERROR: $*"; _errors=$(( _errors + 1 )); }
 
 # ── Host compiler ─────────────────────────────────────────────────────────────
 command -v "$GCC" >/dev/null 2>&1 || \
@@ -65,21 +65,20 @@ _check_space "$CACHE_DIR" "$MIN_CACHE_SPACE_GB" "CACHE_DIR"
 # ── LLD linker (informational) ────────────────────────────────────────────────
 if [[ "$USE_LLD" != "0" ]]; then
     if detect_lld; then
-        printf 'Preflight: LLD %s ≥ %s — using ld.lld\n' "$LLD_VERSION" "$LLD_MIN"
+        info "LLD $LLD_VERSION ≥ $LLD_MIN — using ld.lld"
         if ! command -v llvm-objcopy >/dev/null 2>&1; then
-            printf 'Preflight: llvm-objcopy not found — arm64/riscv will use BFD\n'
+            warn "llvm-objcopy not found — arm64/riscv will use BFD"
         fi
     elif [[ -n "$LLD_VERSION" ]]; then
-        printf 'Preflight: LLD %s < %s — using BFD (upgrade lld or set USE_LLD=0 in local.mk)\n' \
-            "$LLD_VERSION" "$LLD_MIN"
+        warn "LLD $LLD_VERSION < $LLD_MIN — using BFD (upgrade lld or set USE_LLD=0 in local.mk)"
     else
-        printf 'Preflight: ld.lld not found — using BFD\n'
+        info "ld.lld not found — using BFD"
     fi
 fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
 if [[ $_errors -gt 0 ]]; then
-    printf 'Preflight: %d error(s) — fix the above before building\n' "$_errors" >&2
+    warn "$_errors error(s) — fix the above before building"
     exit 1
 fi
-printf 'Preflight: all checks passed\n'
+info "all checks passed"

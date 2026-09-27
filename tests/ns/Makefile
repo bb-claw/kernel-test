@@ -19,34 +19,34 @@ all: $(foreach a,$(ARCHES),$(foreach b,$(BINS),bin/$(a)/$(b))) \
 
 define build_rule
 bin/$(1)/$(2): $(2).c | bin/$(1)
-	@printf '[ns] %-6s %s\n' $(1) $(2)
-	$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[ns] $(1) $(2)"
+	$(Q)$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
 endef
 
 $(foreach a,$(ARCHES),$(foreach b,$(BINS),$(eval $(call build_rule,$(a),$(b)))))
 
 define build_rule_gcc
 bin/x86_64/$(1)-gcc: $(1).c | bin/x86_64
-	@printf '[ns]  %-6s %s (gcc quality gate)\n' x86_64 $(1)
-	$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $$@ $$<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[ns] x86_64 $(1) (gcc quality gate)"
+	$(Q)$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $$@ $$<
 endef
 
 $(foreach b,$(BINS),$(eval $(call build_rule_gcc,$(b))))
 
 define build_rule_clang
 bin/x86_64/$(1)-clang: $(1).c | bin/x86_64
-	@printf '[ns]  %-6s %s (clang quality gate)\n' x86_64 $(1)
-	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $$@ $$<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[ns] x86_64 $(1) (clang quality gate)"
+	$(Q)$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $$@ $$<
 endef
 
 $(foreach b,$(BINS),$(eval $(call build_rule_clang,$(b))))
 
-$(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+$(foreach a,$(ARCHES),$(eval bin/$(a):; $$(Q)mkdir -p $$@))
 
 define valgrind_rule
 bin/x86_64/$(1)-valgrind: $(1).c | bin/x86_64
-	@printf '[ns]  %-6s %s (valgrind/glibc)\n' x86_64 $(1)
-	$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $$@ $$<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[ns] x86_64 $(1) (valgrind/glibc)"
+	$(Q)$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $$@ $$<
 endef
 
 $(foreach b,$(BINS),$(eval $(call valgrind_rule,$(b))))

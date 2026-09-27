@@ -52,7 +52,7 @@ Examples:
 ---
 ## C Program Compilation Baseline (tests/programs/)
 
-All programs share `tests/programs/common.mk` (included by thin per-program Makefiles). `tests/ns/Makefile` uses FLAGS_ONLY=1 to import flag variables from common.mk.
+All programs share `tests/programs/common.mk` (included by thin per-program Makefiles). `tests/ns/Makefile` uses FLAGS_ONLY=1 to import flag variables from common.mk. **V/Q verbosity:** compiler invocations prefixed with `$(Q)` (silent at default V=0); per-binary summary lines use `@bash $(_TESTS_DIR)../lib/mklog.sh` so they carry the standard `INFO  ` timestamp format; `tests/programs/Makefile` passes `--no-print-directory --silent` to sub-makes to suppress `make[N]: Entering/Leaving` and "Nothing to be done" noise.
 
 ```
 CFLAGS_COMMON   -std=c17 $(_OPT_COMMON) -D_DEFAULT_SOURCE -Wno-declaration-after-statement -Wno-implicit-function-declaration
@@ -72,6 +72,7 @@ OPTIMIZATION: `speed` (-O2+gc-sections) | `size` (-Os+gc-sections) | `ultra` (-O
 
 - **`${arr[-1]:-}` on empty array with `set -euo pipefail`** → bash evaluates the subscript before applying `:-`; prints `arr: bad array subscript` and `set -e` aborts the script. Triggered when `mapfile -t arr < <(...)` receives no output (e.g. `ls-remote` fails on transient TLS error). Fix: `[[ ${#arr[@]} -gt 0 ]] && VAR=${arr[-1]} || VAR=""`.
 - **`printf` with format string starting with `-`** → bash's `printf` builtin tries to parse it as an option; produces `printf: - : invalid option`. Fix: `printf -- '- [ ] ...' args`. Affects any shell lib script (`lib/`, `scripts/`) where the format string is a literal dash-prefixed string (e.g., Markdown list items).
+- **`declare -A arr` without `=()` on bash 5.1 with `set -u`** → `${#arr[@]}` on a declared-but-never-assigned associative array triggers `arr: unbound variable` on bash 5.1.16 (ubuntu-22.04 CI); bash 5.3 silently returns 0. Fix: always use `declare -A arr=()` for explicit empty initialization in lib scripts.
 
 ---
 
@@ -138,7 +139,6 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 | Change a git hook or quality gate | `code-quality.md` (hooks table) |
 
 ---
-
 ## Review Checklist (before opening a PR)
 - [ ] `make dev-test` passes (>70% decision paths, ≤6 min)
 - [ ] `shellcheck --severity=warning` clean (pre-push does this automatically)

@@ -100,7 +100,7 @@ if bash "$REPO_ROOT/tests/ci/test-vm-parser.sh"    &>/tmp/dev-test-citest-parser
     && bash "$REPO_ROOT/tests/ci/test-diff.sh"     &>/tmp/dev-test-citest-diff.log \
     && bash "$REPO_ROOT/tests/ci/test-syscall-tests.sh" &>/tmp/dev-test-citest-syscall.log; then
     result_pass "$ci_label" $(( $(date +%s) - t0 ))
-    cover C1 C2 C3 C4 C5
+    cover A4 A7 C1 C2 C3 C4 C5
 else
     result_fail "$ci_label" $(( $(date +%s) - t0 ))
     for f in parser report snapshot diff syscall; do
@@ -179,9 +179,9 @@ else
 fi
 }
 
-# ── C9: remaining CI tests (E1–F4 paths) ─────────────────────────────────────
+# ── C9: remaining CI tests (E1–I3 paths) ─────────────────────────────────────
 # These weight-1 entries used to live in the random pool; promoting them to
-# fixed core raises the guaranteed floor from 44% to >70% (32/43 paths).
+# fixed core raises the guaranteed floor from 44% to >81% (35/46 paths).
 ci9_tests=(
     "E1:test-arch-scripts.sh"
     "E2:test-common.sh"
@@ -197,6 +197,10 @@ ci9_tests=(
     "G2:test-toybox-pitfalls.sh"
     "G3:test-static-analysis.sh"
     "H1:test-programs-build.sh"
+    "H2:test-programs-build.sh"
+    "I1:test-build-errors.sh"
+    "I2:test-build-errors.sh"
+    "I3:test-build-errors.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
@@ -303,7 +307,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=43
+total_paths=46
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)

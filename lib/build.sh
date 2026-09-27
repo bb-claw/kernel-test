@@ -14,6 +14,16 @@ BUILD_TIMEOUT=${BUILD_TIMEOUT:-600}
 GCC=${GCC:-gcc}         # override with e.g. GCC=gcc-15 for older stable kernels
 USE_LLD=${USE_LLD:-1}
 
+# Write INFRA_FAIL sentinel before any validation that might die(), so a stale
+# STATUS=PASS from a prior run is never left in place when build.sh exits early.
+OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
+LOG_FILE="$OUT_DIR/build.log"
+STATUS_FILE="$OUT_DIR/build.status"
+mkdir -p "$OUT_DIR"
+: > "$LOG_FILE"
+rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
+printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
+
 # ── Architecture-specific settings ───────────────────────────────────────────
 
 CROSS_COMPILE=$(arch_cross_compile "$ARCH")
@@ -40,9 +50,6 @@ esac
 command -v "$GCC" >/dev/null 2>&1 || \
     die "Host compiler '$GCC' not found in PATH — override via GCC= in local.mk (e.g. GCC=gcc)"
 
-OUT_DIR="$BUILD_DIR/$CONFIG-$ARCH"
-LOG_FILE="$OUT_DIR/build.log"
-STATUS_FILE="$OUT_DIR/build.status"
 _host_cpus=$(nproc 2>/dev/null || echo 1)
 # Use min(PARALLEL_BUILDS, BUILD_TOTAL) as the divisor so small runs
 # (fewer combos than PARALLEL_BUILDS) get proportionally more -j slots.
@@ -54,10 +61,6 @@ fi
 NPROC=$(( _host_cpus / _effective_par ))
 [[ $NPROC -lt 2 ]] && NPROC=2
 
-mkdir -p "$OUT_DIR"
-: > "$LOG_FILE"
-rm -f "$OUT_DIR/vm.status"   # clear stale test results so a failed build never shows old PASS data
-printf 'STATUS=INFRA_FAIL\n' > "$STATUS_FILE"  # sentinel: overwritten on success; prevents stale STATUS=PASS if build.sh dies before the first config step
 printf '%d\n' "$NPROC" > "$OUT_DIR/.build-active"   # sentinel for make monitor; content is -j value; removed in EXIT trap
 
 # ── Linker selection ──────────────────────────────────────────────────────────

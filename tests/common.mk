@@ -34,6 +34,13 @@ _TESTS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # the all: target inside the guard (first target wins in make).
 .DEFAULT_GOAL := all
 
+V ?= 0
+ifeq ($(V),1)
+Q =
+else
+Q = @
+endif
+
 ARCHES ?= x86_64 i386 arm64 riscv
 
 CC_x86_64   ?= musl-gcc
@@ -90,10 +97,9 @@ _OPT_COMMON := -O2 -ffunction-sections -fdata-sections
 endif
 
 # Linker optimization flags, shared across all modes.
-# speed: gc-sections + print-gc-sections for dead-code removal and size feedback.
-# size/ultra: gc-sections only (sections already minimal; print is too verbose).
+# gc-sections in all non-debug modes; no --print-gc-sections (too verbose on static glibc).
 ifeq ($(OPTIMIZATION),speed)
-_LOPT_COMMON := -Wl,--gc-sections -Wl,--print-gc-sections
+_LOPT_COMMON := -Wl,--gc-sections
 else ifeq ($(OPTIMIZATION),size)
 _LOPT_COMMON := -Wl,--gc-sections
 else ifeq ($(OPTIMIZATION),ultra)
@@ -231,23 +237,23 @@ ifeq ($(HOST_ONLY),1)
 all: bin/$(BIN)-gcc bin/$(BIN)
 
 bin/$(BIN)-gcc: $(SRC) | bin
-	@printf '[$(LOG_TAG)] gcc   %s\n' $@
-	$(CC_GCC) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] gcc $@"
+	$(Q)$(CC_GCC) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
 
 bin/$(BIN): $(SRC) | bin
-	@printf '[$(LOG_TAG)] clang %s\n' $@
-	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
-	$(if $(_STRIP_FLAGS),$(STRIP_x86_64) $(_STRIP_FLAGS) $@)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] clang $@"
+	$(Q)$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(_LOPT_COMMON) -static -o $@ $<
+	$(if $(_STRIP_FLAGS),$(Q)$(STRIP_x86_64) $(_STRIP_FLAGS) $@)
 
 bin:
-	mkdir -p bin
+	$(Q)mkdir -p bin
 
 valgrind-build: bin/$(BIN)-valgrind
 valgrind: valgrind-build
 
 bin/$(BIN)-valgrind: $(SRC) | bin
-	@printf '[$(LOG_TAG)] gcc   %s (valgrind/glibc)\n' $@
-	$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] gcc $@ (valgrind/glibc)"
+	$(Q)$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
 
 clean:
 	rm -rf bin/
@@ -263,29 +269,29 @@ all: $(foreach a,$(ARCHES),bin/$(a)/$(BIN)) bin/x86_64/$(BIN)-gcc bin/x86_64/$(B
 
 define build_rule
 bin/$(1)/$(BIN): $(SRC) | bin/$(1)
-	@printf '[$(LOG_TAG)] %-6s %s\n' $(1) $(BIN)
-	$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
-	$(if $(_STRIP_FLAGS),$(STRIP_$(1)) $(_STRIP_FLAGS) $$@)
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] $(1) $(BIN)"
+	$(Q)$(CC_$(1)) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_$(1)) $(CFLAGS_$(1)_EXTRA) $(_LOPT_COMMON) -o $$@ $$<
+	$(if $(_STRIP_FLAGS),$(Q)$(STRIP_$(1)) $(_STRIP_FLAGS) $$@)
 endef
 
 $(foreach a,$(ARCHES),$(eval $(call build_rule,$(a))))
 
 bin/x86_64/$(BIN)-gcc: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (gcc quality gate)\n' x86_64 $(BIN)
-	$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (gcc quality gate)"
+	$(Q)$(CC_x86_64) $(CFLAGS_COMMON) $(CFLAGS_GCC) $(CFLAGS_GCC_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
 bin/x86_64/$(BIN)-clang: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (clang quality gate)\n' x86_64 $(BIN)
-	$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (clang quality gate)"
+	$(Q)$(CC_CLANG) $(CFLAGS_COMMON) $(CFLAGS_CLANG) $(CFLAGS_CLANG_EXTRA) $(CFLAGS_x86_64) $(_LOPT_COMMON) -o $@ $<
 
-$(foreach a,$(ARCHES),$(eval bin/$(a):; mkdir -p $$@))
+$(foreach a,$(ARCHES),$(eval bin/$(a):; $$(Q)mkdir -p $$@))
 
 valgrind-build: bin/x86_64/$(BIN)-valgrind
 valgrind: valgrind-build
 
 bin/x86_64/$(BIN)-valgrind: $(SRC) | bin/x86_64
-	@printf '[$(LOG_TAG)] %-6s %s (valgrind/glibc)\n' x86_64 $(BIN)
-	$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] x86_64 $(BIN) (valgrind/glibc)"
+	$(Q)$(CC_VALGRIND) $(CFLAGS_VALGRIND_FLAGS) $(CFLAGS_GCC_EXTRA) -o $@ $<
 
 clean:
 	rm -rf bin/
@@ -294,8 +300,8 @@ endif  # HOST_ONLY
 
 .PHONY: scan
 scan:
-	@printf '[$(LOG_TAG)] clang %s (analyzer)\n' $(SRC)
-	clang --analyze -Xanalyzer -analyzer-output=text \
+	@bash $(_TESTS_DIR)../lib/mklog.sh "[$(LOG_TAG)] clang $(SRC) (analyzer)"
+	$(Q)clang --analyze -Xanalyzer -analyzer-output=text \
 	    $(CFLAGS_COMMON) -Werror -o /dev/null $(SRC)
 
 endif  # FLAGS_ONLY
