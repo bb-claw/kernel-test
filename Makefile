@@ -530,8 +530,9 @@ ifeq ($(NO_BUILD),1)
 else
 	@lib/mklog.sh "[build] Kernel: $(KERNEL_VERSION) | Configs: $(CONFIGS) | Archs: $(ARCHS) | Queue: $(PARALLEL_BUILDS)"
 	$(Q)rc=0; \
-	$(MAKE) --no-print-directory --keep-going -j$$(nproc) _tier0-build || rc=1; \
-	$(MAKE) --no-print-directory --keep-going -j$$(nproc) _tier1-build || rc=1; \
+	_bj=$$([ "$(NO_JOBSERVER)" = 1 ] && echo $(PARALLEL_BUILDS) || nproc); \
+	$(MAKE) --no-print-directory --keep-going -j$$_bj _tier0-build || rc=1; \
+	$(MAKE) --no-print-directory --keep-going -j$$_bj _tier1-build || rc=1; \
 	exit $$rc
 endif
 
