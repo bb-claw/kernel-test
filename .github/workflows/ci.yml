@@ -29,7 +29,8 @@ jobs:
             gcc-aarch64-linux-gnu libc6-dev-arm64-cross \
             gcc-riscv64-linux-gnu libc6-dev-riscv64-cross \
             clang lld llvm \
-            socat
+            socat \
+            ccache
 
       - name: Create musl-clang wrapper
         run: |
