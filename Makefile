@@ -226,10 +226,9 @@ ccache-init:
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=max_size=75G
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=sloppiness=time_macros
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=compression_level=1
-	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=base_dir=$(dir $(KERNEL_TREE))
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --zero-stats
 	@bash lib/mklog.sh "[ccache-init] shared cache: $(SHARED_CCACHE_DIR) (75G)"
-	@bash lib/mklog.sh "[ccache-init] base_dir=$(dir $(KERNEL_TREE)) (standalone use; per-build CCACHE_BASEDIR overrides)"
+	@bash lib/mklog.sh "[ccache-init] cross-tree hits via CCACHE_BASEDIR env var set per-build in build.sh"
 	@bash lib/mklog.sh "[ccache-init] run 'make monitor' during builds to see live cache stats"
 
 # ccache-status: print active CCACHE_DIR (shared or local fallback).

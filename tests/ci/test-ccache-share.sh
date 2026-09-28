@@ -50,6 +50,6 @@ make -s -C "$REPO" ccache-init SHARED_CCACHE_DIR="$_shared" 2>/dev/null
 _conf=""
 [[ -f "$_shared/ccache.conf" ]] && _conf=$(cat "$_shared/ccache.conf")
 assert_contains "$_conf" "max_size = 75G"      "K4: max_size=75G in ccache.conf"
-assert_contains "$_conf" "base_dir ="          "K4: base_dir present in ccache.conf"
+assert_contains "$_conf" "sloppiness = time_macros" "K4: sloppiness=time_macros in ccache.conf"
 
 finish

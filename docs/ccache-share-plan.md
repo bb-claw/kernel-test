@@ -31,8 +31,7 @@ is identical across trees.
 
 1. Auto-detect `~/git/kernel-test-ccache/` at Makefile parse time; use it when present, fall back
    silently to `cache/` when absent. Zero config for the standard multi-clone setup.
-2. `make ccache-init` creates and configures the shared dir (75 G, sloppiness, base_dir for
-   standalone use). Idempotent.
+2. `make ccache-init` creates and configures the shared dir (75 G, sloppiness). Idempotent.
 3. Per-build `CCACHE_BASEDIR=$KERNEL_TREE` (env var, not ccache.conf) enables cross-tree cache
    hits when source content and normalized flags match.
 4. `make preflight` reports the active ccache dir (shared vs local) as an INFO line.
@@ -81,16 +80,10 @@ directory component.
 
 Setting `CCACHE_BASEDIR=$KERNEL_TREE` as an **environment variable** (not in ccache.conf) is the
 correct mechanism: it is per-build, overrides ccache.conf, and each clone sets it to its own tree
-path before compilation. The ccache.conf `base_dir` written by `make ccache-init` is set to
-`$(dir KERNEL_TREE)` (the parent directory) for the benefit of standalone `ccache` invocations
-only; it does not affect build-time normalization.
-
-### Why env var overrides ccache.conf for base_dir
-
-`ccache.conf` is shared between all three clones when using the shared dir. Writing a tree-specific
-absolute path into it would be overwritten by whichever clone ran last, and parallel builds would
-race on the file. The env var `CCACHE_BASEDIR` is process-local, set by `build.sh` for the
-duration of each compiler invocation, and never touches the shared ccache.conf.
+path before compilation. `make ccache-init` does NOT write `base_dir` to ccache.conf: ccache requires an absolute path
+and `KERNEL_TREE` defaults to `../linux` (relative). More importantly, writing a tree-specific
+absolute path to the shared ccache.conf would be overwritten by whichever clone ran `ccache-init`
+last, and parallel builds would race on the file. The env var is the only correct approach.
 
 ### Silent fallback vs warn on absent shared dir
 
@@ -113,7 +106,7 @@ and allows users to run it standalone without re-running the full bootstrap.
 | CC1 | shared dir present → CCACHE_DIR resolves to shared path | test-ccache-share.sh |
 | CC2 | shared dir absent → CCACHE_DIR falls back to local cache/ | test-ccache-share.sh |
 | CC3 | ccache-init is idempotent (run twice → same result) | test-ccache-share.sh |
-| CC4 | ccache.conf after init contains max_size=75G and base_dir | test-ccache-share.sh |
+| CC4 | ccache.conf after init contains max_size=75G and sloppiness=time_macros | test-ccache-share.sh |
 
 ---
 
