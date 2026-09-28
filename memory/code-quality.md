@@ -148,3 +148,4 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 - [ ] All error paths in lib scripts write `STATUS=FAIL` before `die`
 - [ ] Memory files updated (`memory/test-inventory.md`, `memory/code-quality.md`)
 - [ ] Design doc (`docs/<slug>-plan.md`) complete and accurate
+- [ ] README.md updated if new `make` targets, variables, or user-visible behaviors were added

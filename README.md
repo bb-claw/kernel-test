@@ -155,7 +155,7 @@ kernel-test/
 ├── docs/                 # Per-feature design docs (<slug>-plan.md) + workflow guides
 ├── memory/               # Persistent AI context (auto-memory for Claude Code)
 ├── reports/              # gitignored; HTML + text reports per run
-└── cache/                # gitignored; ccache
+└── cache/                # gitignored; local ccache (unused when ~/git/kernel-test-ccache/ exists)
 ```
 
 ## Make Targets
@@ -186,8 +186,10 @@ kernel-test/
 | `make install` | Install built kernel to `/boot`; update mkinitcpio + GRUB (Arch/Manjaro, needs sudo) |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
 | `make hooks` | Activate git hooks only (no package install) |
-| `make clean` | Remove `build/` and `cache/` |
-| `make distclean` | Remove `build/`, `cache/`, and `reports/` |
+| `make ccache-init` | Create `~/git/kernel-test-ccache/` and write `ccache.conf` (75G, sloppiness, base_dir); idempotent |
+| `make ccache-status` | Show active `CCACHE_DIR`, size limit, and full `ccache --show-stats` output |
+| `make clean` | Remove `build/` and local `cache/` (shared ccache at `~/git/kernel-test-ccache/` is preserved) |
+| `make distclean` | Remove `build/`, local `cache/`, and `reports/` |
 | `make help` | List all targets with descriptions |
 
 ## Fetching Kernels
@@ -256,6 +258,8 @@ Override on the command line:
 | `TIMEOUT` | `60` | VM boot timeout in seconds (arm64/riscv automatically doubled) |
 | `BUILD_TIMEOUT` | `1200` | Per-kernel build timeout in seconds; exit 124 recorded as `STATUS=TIMEOUT`; set to `0` for localconfig |
 | `GCC` | `gcc` | Compiler binary; e.g. `GCC=gcc-15` for stable kernels that predate GCC 16 |
+| `SHARED_CCACHE_DIR` | `~/git/kernel-test-ccache` | Shared ccache directory; auto-detected — when the dir exists all clones use it with 75G limit; absent = fallback to local `cache/` (25G) |
+| `CCACHE_MAX_SIZE` | `75G` (shared) / `25G` (local) | ccache size limit; auto-set based on whether `SHARED_CCACHE_DIR` exists; override on command line or in `local.mk` |
 | `REPORT_DIR` | `reports` | Output directory for test reports |
 | `V` | `0` | Set to `1` for verbose output |
 
