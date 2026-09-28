@@ -155,7 +155,7 @@ kernel-test/
 ├── docs/                 # Per-feature design docs (<slug>-plan.md) + workflow guides
 ├── memory/               # Persistent AI context (auto-memory for Claude Code)
 ├── reports/              # gitignored; HTML + text reports per run
-└── cache/                # gitignored; local ccache (unused when ~/git/kernel-test-ccache/ exists)
+└── cache/                # gitignored; Toybox binaries (cache/toybox-*) + local ccache fallback (unused when ~/git/kernel-test-ccache/ exists); do not delete — Toybox binaries require re-running make bootstrap
 ```
 
 ## Make Targets
