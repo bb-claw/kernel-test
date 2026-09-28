@@ -235,7 +235,8 @@ ccache-init:
 # ccache-status: print active CCACHE_DIR (shared or local fallback).
 # Used by CI tests and for quick human inspection.
 ccache-status:
-	@printf 'CCACHE_DIR=%s\nCCACHE_MAX_SIZE=%s\n' "$(CCACHE_DIR)" "$(CCACHE_MAX_SIZE)"
+	@printf 'CCACHE_DIR=%s\nCCACHE_MAX_SIZE=%s\n\n' "$(CCACHE_DIR)" "$(CCACHE_MAX_SIZE)"
+	@CCACHE_DIR=$(CCACHE_DIR) ccache --show-stats 2>/dev/null || true
 
 # hw-bootstrap: set up host infrastructure for hardware board testing.
 # Installs dnsmasq (DHCP+TFTP on HW_IFACE), systemd-networkd static-IP config
