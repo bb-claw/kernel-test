@@ -43,7 +43,7 @@
 | `HW_RELAY_VID`/`HW_RELAY_PID` | `1a86`/`7523` | USB VID:PID of relay (CH340 defaults); override in `local.mk` (e.g. CP210x: `10c4`/`ea60`) |
 | `SEED` / `BUDGET` | _(none)_ / `300` | `make dev-test`: SEED=N reproducible random draw; BUDGET=N overrides 300s time cap |
 | `NO_PERF_BUILD` | `0` | `NO_PERF_BUILD=1` — skip `make perf-build` on hosts where `make bootstrap` has not been run |
-| `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `25G` / `1` | ccache budget; `TUNE=0` disables `time_macros`+zstd+`base_dir` normalization; override in `local.mk` |
+| `SHARED_CCACHE_DIR` / `CCACHE_MAX_SIZE` / `CCACHE_TUNE` | `~/git/kernel-test-ccache` / `75G` (shared) `25G` (local) / `1` | shared dir auto-detected; sets `CCACHE_DIR`+`CCACHE_MAX_SIZE=75G` when present; `TUNE=0` disables `time_macros`+zstd+`CCACHE_BASEDIR`; override in `local.mk` |
 | `MIN_BUILD_SPACE_GB` / `MIN_CACHE_SPACE_GB` | `5` | disk space thresholds (GB) checked by `make preflight`; override in `local.mk` |
 | `USE_LLD` | `1` | `USE_LLD=0` disables LLD auto-detect (forces BFD); override in `local.mk` for hosts with linker issues |
 | `NO_CONFIG_CACHE` | `0` | `NO_CONFIG_CACHE=1` — skip config cache check; force fresh `kmake <base-config>`; new output still written to cache (mirrors `CCACHE_RECACHE=1`) |
@@ -76,10 +76,11 @@ make hw-deploy                                        # copy kernel+initramfs to
 make hw-test BOARD_TTY=/dev/ttyUSB0                  # capture serial; hardware equivalent of make test
 make hw BOARD_TTY=/dev/ttyUSB0                        # build → hw-deploy → hw-test → report
 make hw-full BOARD_TTY=/dev/ttyUSB0                   # build → test (QEMU) → hw-deploy → hw-test → report
+make ccache-init                                      # create/configure ~/git/kernel-test-ccache/ (75G, idempotent)
+make ccache-status                                    # show active CCACHE_DIR + --show-stats
 ```
 
-`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps. Per-series clones: `kernel-test-stable-rc-7.1` (`linux-stable-rc-7.1`, `linux-7.1.y`) and `kernel-test-stable-rc-7.2` (`linux-stable-rc-7.2`, `linux-7.2.y`) are version-pinned. Rolling `kernel-test-stable-rc` now tracks `linux-7.2.y` via `linux-stable-rc-7.2`.
-
+`make fetch` dispatches: `LINUX_NEXT=1` → error; `STABLE_RC_BRANCH` set → branch reset; `STABLE_RELEASE` set → stable tag; else → mainline rc tag. Falls back to local tags on TLS errors. Update `STABLE_RC_BRANCH` in `presets/kernel-test-stable-rc.mk` when the series bumps. Per-series pinned clones: `kernel-test-stable-rc-7.1` (linux-7.1.y) and `kernel-test-stable-rc-7.2` (linux-7.2.y); rolling clone tracks linux-7.2.y.
 ### Regression diff / baseline
 
 ```sh
@@ -145,6 +146,5 @@ make dmesg [DMESG_LABEL=stable] [SNAPSHOT=0]  # capture+analyse+snapshot host ke
 make valgrind                                   # build + run all C programs AND ns-* subcommands under Valgrind; EPERM→skip, exit 99→fail
 ```
 `BASE=` before/after comparison via git worktree; Clang needs `clang`+`lld`+`llvm`. **Rule:** Always use `make all NO_FETCH=1 ...` not chained targets.
-**CI/preflight/dev-test:** `make preflight` — validate host compiler, cross-compilers per `ARCHS`, QEMU binaries, disk space; auto-runs at `make build`.
-`make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → programs → ci-test, i386 excluded). GitHub Actions: `lint → programs → ci-test` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu). `make dev-test` — ≤6-min branch gate; >70% of 43 paths; SEED=N replays, BUDGET=N cap; `make hook-dev-test` toggles pre-push opt-in. `make bug-hunt` — 3 high-severity bugs; results in `bug-hunt/`; MAX_MINUTES=30, MAX_TURNS=80; requires `claude` CLI.
+**CI/preflight/dev-test:** `make preflight` — validate host compiler, cross-compilers per `ARCHS`, QEMU binaries, disk space; auto-runs at `make build`. `make lint` — Tier 1 (bash -n, shellcheck bash+sh, context sizes, test-inventory, design doc). `make ci-test` — Tier 2 (tests/ci/test-*.sh, no kernel/QEMU). `make ci` — full pipeline locally (lint → programs → ci-test, i386 excluded). GitHub Actions: `lint → programs → ci-test` on every PR to `main`; ubuntu-22.04 runner; i386 excluded (gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu). `make dev-test` — ≤6-min branch gate; >70% of 52 paths; SEED=N replays, BUDGET=N cap; `make hook-dev-test` toggles pre-push opt-in. `make bug-hunt` — 3 high-severity bugs; results in `bug-hunt/`; MAX_MINUTES=30, MAX_TURNS=80; requires `claude` CLI.
 **Operational:** `make clean` on tree switch; `GCC=gcc-15` for stable kernels pre-GCC 16; **Stable-rc is not a tag** — `v7.2.1-rc1` is the rolling `linux-7.2.y` branch tip; use `make fetch-stable-rc`.

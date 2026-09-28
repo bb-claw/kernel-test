@@ -37,10 +37,12 @@ make preflight                                 # validate host compiler, cross-c
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → programs → ci-test (no i386)
-make dev-test                                  # branch gate: ≤6 min, >70% of 43 decision paths; SEED=N replays, BUDGET=N cap
+make dev-test                                  # branch gate: ≤6 min, >70% of 52 decision paths; SEED=N replays, BUDGET=N cap
 make hook-dev-test                             # toggle dev-test in .githooks/pre-push (opt-in; run again removes)
 make bug-hunt                                  # Claude Code bug hunt: find 3 high-severity bugs; results in bug-hunt/ (requires claude CLI)
 make bootstrap                                 # install deps, download Toybox, activate git hooks
+make ccache-init                               # create/configure ~/git/kernel-test-ccache/ (75G); run once after bootstrap; idempotent
+make ccache-status                             # show active CCACHE_DIR + --show-stats
 make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-localconfig-<label>-<major.minor>-x86_64; writes /etc/grub.d/06_kernel-test
 make info                                      # show currently checked-out kernel
 make diff                                      # diff latest vs previous run
