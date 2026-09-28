@@ -83,9 +83,12 @@ TREE_URL=$(git -C "$KERNEL_TREE" remote get-url origin 2>/dev/null || echo "(no 
 info "Kernel: $TREE_TAG ($TREE_COMMIT) — $TREE_URL"
 info "Tree:   $KERNEL_TREE"
 
-# ccache: point at our local cache dir and expose via CC/HOSTCC
-# shellcheck disable=SC2153  # CACHE_DIR is exported by the Makefile, not set here
-export CCACHE_DIR="$PWD/$CACHE_DIR"
+# ccache: use CCACHE_DIR from Makefile if exported (shared cache); otherwise
+# construct from CACHE_DIR (local fallback).
+# shellcheck disable=SC2153  # CACHE_DIR / CCACHE_DIR exported by Makefile
+if [[ -z "${CCACHE_DIR:-}" ]]; then
+    export CCACHE_DIR="$PWD/$CACHE_DIR"
+fi
 mkdir -p "$CCACHE_DIR"
 
 # Validate ccache is available
@@ -97,11 +100,15 @@ ccache --set-config="max_size=${CCACHE_MAX_SIZE:-25G}"
 if [[ "${CCACHE_TUNE:-1}" == "1" ]]; then
     ccache --set-config="sloppiness=time_macros"  # ignore __DATE__/__TIME__ in cache key
     ccache --set-config="compression_level=1"     # zstd level 1: faster on NVMe, ~5% larger
-    ccache --set-config="base_dir=$HOME"           # normalize absolute paths in cache keys
+    # Set CCACHE_BASEDIR to this build's kernel tree so absolute -I paths are stripped
+    # to relative paths in the cache key.  With shared cache, two trees at different paths
+    # that have identical source content will produce the same cache entry.
+    # env var overrides ccache.conf base_dir — no ccache.conf write needed, no race condition.
+    export CCACHE_BASEDIR="$KERNEL_TREE"
 else
     ccache --set-config="sloppiness="
     ccache --set-config="compression_level=0"
-    ccache --set-config="base_dir="
+    unset CCACHE_BASEDIR 2>/dev/null || true
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
