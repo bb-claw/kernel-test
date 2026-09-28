@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-48 functional decision paths across 10 groups.
-Fixed core (C1–C9) guarantees ≥80% coverage (39/48 paths; 38/48 without /proc/config.gz).
+52 functional decision paths across 11 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (43/52 paths; 42/52 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -55,3 +55,7 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | I3  | build.sh missing GCC: exits non-zero, INFRA_FAIL written before die()                      | fixed core via C9 (test-build-errors.sh)    | I-build-errors |
 | M1  | monitor --once exits 0 with no active run (absent build dir)                                | fixed core via C9 (test-monitor.sh)         | J-monitor      |
 | M2  | monitor --once output contains BUILDS and TESTS section headers                             | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| K1  | CCACHE_DIR resolves to shared path when SHARED_CCACHE_DIR exists                            | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
+| K2  | CCACHE_DIR falls back to local cache/ when SHARED_CCACHE_DIR absent                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
+| K3  | make ccache-init is idempotent: ccache.conf unchanged on second run                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
+| K4  | ccache.conf after ccache-init contains max_size=75G and base_dir                            | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
