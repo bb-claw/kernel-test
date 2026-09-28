@@ -227,9 +227,9 @@ ccache-init:
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=sloppiness=time_macros
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=compression_level=1
 	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --zero-stats
-	@bash lib/mklog.sh "[ccache-init] shared cache: $(SHARED_CCACHE_DIR) (75G)"
-	@bash lib/mklog.sh "[ccache-init] cross-tree hits via CCACHE_BASEDIR env var set per-build in build.sh"
-	@bash lib/mklog.sh "[ccache-init] run 'make monitor' during builds to see live cache stats"
+	@bash lib/mklog.sh "[ccache-init] shared cache: $(SHARED_CCACHE_DIR) (75G)" 2>/dev/null || true
+	@bash lib/mklog.sh "[ccache-init] cross-tree hits via CCACHE_BASEDIR env var set per-build in build.sh" 2>/dev/null || true
+	@bash lib/mklog.sh "[ccache-init] run 'make monitor' during builds to see live cache stats" 2>/dev/null || true
 
 # ccache-status: print active CCACHE_DIR (shared or local fallback).
 # Used by CI tests and for quick human inspection.
