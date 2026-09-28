@@ -32,7 +32,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | Bash only | No extra runtimes; any Linux box can run it |
 | Toybox static binary | No package manager, no rootfs; just a cpio + the binary |
 | Out-of-tree builds `O=build/<config>-<arch>/` | Isolates artifacts; enables parallel builds |
-| ccache always on | 2–10× rebuild speedup; `cache/` is gitignored |
+| ccache always on | 2–10× rebuild speedup; shared cache at `~/git/kernel-test-ccache/` (75G) auto-detected; falls back to `cache/` (25G) when absent; `cache/` gitignored |
 | `make all` always runs `report` | Even on build/test failure there is always an artifact |
 | Config fragment via `cat >> .config + olddefconfig` | Reliable for all targets; `KCONFIG_ALLCONFIG` is overridden by `tinyconfig` internally |
 | `BUILD_TIMEOUT` wraps only bzImage step | Prevents runaway builds; exit 124 = TIMEOUT |
@@ -47,7 +47,7 @@ are subprocesses (not sourced), so they carry no shell state between stages.
 | Per-(config,arch) initramfs | watchdog marker requires grepping per-build `.config` for `CONFIG_WATCHDOG=y`; one `initramfs-$CONFIG-$ARCH.cpio.gz` per pair → markers reflect actual config state; `build.status` prerequisite auto-rebuilds initramfs after kernel build |
 | `KERNEL_VERSION` computed via grep, not `make kernelversion` | `make -s -C KERNEL_TREE kernelversion` triggers full Kbuild at Makefile parse time, adding 20+ s to every `make` invocation; direct grep of VERSION/PATCHLEVEL/SUBLEVEL/EXTRAVERSION from `KERNEL_TREE/Makefile` is instant — same logic as `lib/common.sh:read_kernel_makefile_version()` |
 | `make info` uses `--exact-match` only for Tag (git) | `git describe HEAD` (no depth limit) walks the full DAG; on stable-rc clones with one stale mainline tag 1.4 M commits back this takes 10+ s; `Tag (Makefile)` and `Version file` already show the correct version |
-| `CCACHE_MAX_SIZE=25G` default, tuning via `--set-config` | 5G default caused cache thrashing on localconfig builds (~4.6G output, 82% miss rate); settings written to `ccache.conf` via `--set-config` so they persist for standalone `ccache` invocations; `hard_link` excluded — `objtool` modifies `.o` files in-place for ORC unwinder, incompatible with read-only hard-linked cache entries |
+| Shared ccache `~/git/kernel-test-ccache/` (75G); local fallback `cache/` (25G) | Makefile auto-detects shared dir at parse time; all three clones (mainline, stable, stable-rc) share one 75G cache — no `local.mk` changes needed. `make ccache-init` creates and configures the shared dir (idempotent). `CCACHE_BASEDIR=$KERNEL_TREE` set per-build via env var (not ccache.conf) so each tree normalizes its own `-I$(srctree)/...` paths, enabling cross-tree object reuse when source content is identical. `hard_link` excluded — `objtool` modifies `.o` files in-place for ORC unwinder. |
 | LLD auto-detected; `LINKER=lld\|bfd` written to `build.status` | Warm-cache builds spend nearly all time in vmlinux link; LLD is 6.8× faster on partial link (0.22s vs 1.50s), 1.6× on final link. `detect_lld()` in `common.sh` checks `ld.lld` ≥ kernel minimum (`scripts/min-tool-version.sh lld`, fallback 17.0.1). `USE_LLD=0` in `local.mk` disables. `LINKER=` appended to `build.status` via EXIT trap; shown in report headers. |
 | `OBJCOPY=llvm-objcopy` alongside `LD=ld.lld` for cross-arch | LLD 18+ emits arm64/riscv ELF with section types that `aarch64-linux-gnu-objcopy` (binutils 2.40) does not recognise. When `llvm-objcopy` is in PATH: passed for all arches. When absent: LLD still used for x86_64/i386 (native ELF unaffected); arm64/riscv fall back to BFD; preflight warns. |
 | Config cache: `.config-base` + `.config-cache-hash` per combo | `make tinyconfig ARCH=riscv` takes 29 s (kconfig scans full tree 3–4×); output is deterministic for a fixed kernel commit + fragment set. `build.sh` caches the pre-fragment `.config-base` keyed on `sha256(commit + fragments)`; on hit `kmake <base-config>` is skipped (~0 s). Sibling reuse (`_try_sibling_base`): random configs (rand500/randdef/kunitrand) borrow tinyconfig/defconfig base on cold runs; deterministic configs (kunitconfig/kunitnsconfig→defconfig; tinynsconfig→tinyconfig; defnsconfig→defconfig; vf2config→defconfig) do the same and write their own per-combo cache so warm runs skip the sibling. `make full`/`ns-full` order base configs first to maximise same-session hits. `NO_CONFIG_CACHE=1` forces regen. Not cached: `randconfig`, `localconfig`. |
@@ -83,7 +83,7 @@ kernel-test/
 ├── memory/         this directory — persistent AI context
 ├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
 ├── build/          gitignored; out-of-tree kernel builds + initramfs
-├── cache/          gitignored; ccache
+├── cache/          gitignored; local ccache fallback (unused when ~/git/kernel-test-ccache/ exists)
 └── reports/        gitignored; HTML + txt reports per run
 ```
 

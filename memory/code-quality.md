@@ -138,7 +138,6 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 | Discover a new Toybox sh bug | `code-quality.md` (Toybox pitfalls list) |
 | Change a git hook or quality gate | `code-quality.md` (hooks table) |
 
----
 ## Review Checklist (before opening a PR)
 - [ ] `make dev-test` passes (>70% decision paths, ≤6 min)
 - [ ] `shellcheck --severity=warning` clean (pre-push does this automatically)
@@ -148,3 +147,4 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 - [ ] All error paths in lib scripts write `STATUS=FAIL` before `die`
 - [ ] Memory files updated (`memory/test-inventory.md`, `memory/code-quality.md`)
 - [ ] Design doc (`docs/<slug>-plan.md`) complete and accurate
+- [ ] README.md updated if new `make` targets, variables, or user-visible behaviors were added

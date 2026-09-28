@@ -8,9 +8,10 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # ── Makefile: variable defaults ───────────────────────────────────────────────
 
-begin_test "CCACHE_MAX_SIZE default is 25G"
-line=$(grep '^CCACHE_MAX_SIZE' "$REPO/Makefile" | head -1)
-assert_contains "$line" "25G" "CCACHE_MAX_SIZE ?= 25G"
+begin_test "CCACHE_MAX_SIZE: 75G shared branch, 25G local fallback"
+lines=$(grep '^CCACHE_MAX_SIZE' "$REPO/Makefile")
+assert_contains "$lines" "75G" "CCACHE_MAX_SIZE ?= 75G present (shared branch)"
+assert_contains "$lines" "25G" "CCACHE_MAX_SIZE ?= 25G present (local fallback)"
 
 begin_test "CCACHE_TUNE default is 1"
 line=$(grep '^CCACHE_TUNE' "$REPO/Makefile" | head -1)
@@ -37,9 +38,9 @@ begin_test "build.sh persists compression_level=1 when CCACHE_TUNE=1"
 assert_contains "$(cat "$REPO/lib/build.sh")" 'compression_level=1' \
     "build.sh sets compression_level=1"
 
-begin_test "build.sh persists base_dir when CCACHE_TUNE=1"
-assert_contains "$(cat "$REPO/lib/build.sh")" 'base_dir=' \
-    "build.sh sets base_dir"
+begin_test "build.sh sets CCACHE_BASEDIR for cross-tree hits when CCACHE_TUNE=1"
+assert_contains "$(cat "$REPO/lib/build.sh")" 'CCACHE_BASEDIR' \
+    "build.sh exports CCACHE_BASEDIR"
 
 begin_test "build.sh does not set hard_link (objtool modifies .o files in-place)"
 assert_not_contains "$(cat "$REPO/lib/build.sh")" 'hard_link=true' \

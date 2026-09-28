@@ -69,11 +69,20 @@ BOARD_TTY      ?= /dev/ttyUSB0
 TFTP_DIR       ?= $(CURDIR)/tftp
 
 # ── ccache tuning ──────────────────────────────────────────────────────────────
-# 5G default causes cache thrashing on localconfig builds (~4.6G output); 25G
-# fits localconfig + all CI (config × arch) combos without eviction.
-# Override per-machine in local.mk.
-CCACHE_MAX_SIZE    ?= 25G
-# 1 = enable time_macros sloppiness + zstd compression level 1 + base_dir=$HOME
+# Shared cache: if ~/git/kernel-test-ccache/ exists, all clones (mainline,
+# stable, stable-rc) share it.  Cross-tree hits are enabled by per-build
+# CCACHE_BASEDIR=$KERNEL_TREE normalization in build.sh.  Falls back silently
+# to the local cache/ dir on machines without the shared dir.
+# Override SHARED_CCACHE_DIR in local.mk to use a different path.
+SHARED_CCACHE_DIR ?= $(HOME)/git/kernel-test-ccache
+ifneq ($(wildcard $(SHARED_CCACHE_DIR)),)
+CCACHE_DIR      := $(SHARED_CCACHE_DIR)
+CCACHE_MAX_SIZE ?= 75G
+else
+CCACHE_DIR      := $(CURDIR)/cache
+CCACHE_MAX_SIZE ?= 25G
+endif
+# 1 = enable time_macros sloppiness + zstd compression level 1 + base_dir per build
 # 0 = size increase only (no behaviour changes beyond max_size)
 CCACHE_TUNE        ?= 1
 
@@ -157,7 +166,7 @@ ifndef _LOG_START
 endif
 
 # ── Exports (inherited by lib scripts as environment variables) ────────────────
-export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
+export KERNEL_TREE BUILD_DIR CACHE_DIR CCACHE_DIR CCACHE_MAX_SIZE CCACHE_TUNE MIN_BUILD_SPACE_GB MIN_CACHE_SPACE_GB USE_LLD
 export PARALLEL_BUILDS PARALLEL_VMS
 export _LOG_START
 export ARCHS ARCHS_ALL CONFIGS BOOT_CONFIGS BUILD_ONLY_CONFIGS
@@ -182,7 +191,7 @@ endif
 MAKEFLAGS += --no-print-directory
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch lint lint-context ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -207,6 +216,26 @@ $(foreach c,$(BOOT_CONFIGS),$(foreach a,$(ARCHS),$(eval $(call _initramfs_rule,$
 
 bootstrap:
 	$(Q)lib/bootstrap.sh "$(ARCHS)" "$(DATA_REPO)"
+
+# ccache-init: create and configure the shared ccache directory.
+# Idempotent — safe to re-run after resizing or migration.
+# After running: point all clones at the same dir by keeping SHARED_CCACHE_DIR
+# at its default ($(HOME)/git/kernel-test-ccache) — no local.mk changes needed.
+ccache-init:
+	@mkdir -p $(SHARED_CCACHE_DIR)
+	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=max_size=75G
+	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=sloppiness=time_macros
+	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --set-config=compression_level=1
+	@CCACHE_DIR=$(SHARED_CCACHE_DIR) ccache --zero-stats
+	@bash lib/mklog.sh "[ccache-init] shared cache: $(SHARED_CCACHE_DIR) (75G)" 2>/dev/null || true
+	@bash lib/mklog.sh "[ccache-init] cross-tree hits via CCACHE_BASEDIR env var set per-build in build.sh" 2>/dev/null || true
+	@bash lib/mklog.sh "[ccache-init] run 'make monitor' during builds to see live cache stats" 2>/dev/null || true
+
+# ccache-status: print active CCACHE_DIR (shared or local fallback).
+# Used by CI tests and for quick human inspection.
+ccache-status:
+	@printf 'CCACHE_DIR=%s\nCCACHE_MAX_SIZE=%s\n\n' "$(CCACHE_DIR)" "$(CCACHE_MAX_SIZE)"
+	@CCACHE_DIR=$(CCACHE_DIR) ccache --show-stats 2>/dev/null || true
 
 # hw-bootstrap: set up host infrastructure for hardware board testing.
 # Installs dnsmasq (DHCP+TFTP on HW_IFACE), systemd-networkd static-IP config
@@ -481,7 +510,7 @@ preflight:
 
 build:
 	$(Q)lib/preflight.sh
-	$(Q)mkdir -p $(BUILD_DIR) && CCACHE_DIR=$(CURDIR)/$(CACHE_DIR) ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
+	$(Q)mkdir -p $(BUILD_DIR) && CCACHE_DIR=$(CCACHE_DIR) ccache -s > $(BUILD_DIR)/.ccache-stats-before 2>/dev/null || true
 	$(Q)rm -f $(BUILD_DIR)/.monitor-samples
 	$(Q)printf 'BUILD_TOTAL=%d\nTEST_TOTAL=%d\nCONFIGS=%s\nARCHS=%s\nBOOT_CONFIGS=%s\n' \
 		$(_BUILD_TOTAL) $(_TEST_TOTAL) '$(CONFIGS)' '$(ARCHS)' '$(BOOT_CONFIGS)' > $(BUILD_DIR)/.run-plan

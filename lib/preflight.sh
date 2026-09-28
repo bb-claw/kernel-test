@@ -13,6 +13,8 @@ USE_LLD=${USE_LLD:-1}
 ARCHS=${ARCHS:-x86_64 i386 arm64 riscv}
 BUILD_DIR=${BUILD_DIR:-build}
 CACHE_DIR=${CACHE_DIR:-cache}
+# CCACHE_DIR exported by Makefile auto-detect; fall back to local cache/ if unset
+CCACHE_DIR="${CCACHE_DIR:-$PWD/$CACHE_DIR}"
 MIN_BUILD_SPACE_GB=${MIN_BUILD_SPACE_GB:-5}
 MIN_CACHE_SPACE_GB=${MIN_CACHE_SPACE_GB:-5}
 
@@ -59,8 +61,8 @@ _check_space() {
     [[ "$avail_gb" -ge "$min_gb" ]] || \
         _check_fail "$label ($dir) has ${avail_gb}G free, need ${min_gb}G — free space or set MIN_BUILD_SPACE_GB / MIN_CACHE_SPACE_GB in local.mk"
 }
-_check_space "$BUILD_DIR" "$MIN_BUILD_SPACE_GB" "BUILD_DIR"
-_check_space "$CACHE_DIR" "$MIN_CACHE_SPACE_GB" "CACHE_DIR"
+_check_space "$BUILD_DIR"  "$MIN_BUILD_SPACE_GB" "BUILD_DIR"
+_check_space "$CCACHE_DIR" "$MIN_CACHE_SPACE_GB" "CCACHE_DIR"
 
 # ── LLD linker (informational) ────────────────────────────────────────────────
 if [[ "$USE_LLD" != "0" ]]; then
@@ -81,4 +83,8 @@ if [[ $_errors -gt 0 ]]; then
     warn "$_errors error(s) — fix the above before building"
     exit 1
 fi
+_ccache_label="local"
+[[ "$CCACHE_DIR" != "$PWD/$CACHE_DIR" && "$CCACHE_DIR" != "$(realpath -m "$PWD/$CACHE_DIR" 2>/dev/null)" ]] \
+    && _ccache_label="shared"
+info "ccache: $CCACHE_DIR ($_ccache_label)"
 info "all checks passed"
