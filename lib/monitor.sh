@@ -104,7 +104,8 @@ _snapshot() {
         _combo=${_af%/.build-active}; _combo=${_combo#"$BUILD_DIR"/}
         _j=$(cat "$_af" 2>/dev/null)
         build_active+=("${_combo}|${_j:-?}|$(_elapsed_fmt "$_af")")
-    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' \
+        -newer "$BUILD_DIR/.run-plan" 2>/dev/null | sort)
     build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
         -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l 2>/dev/null || true)
     build_done=${build_done:-0}
@@ -116,7 +117,8 @@ _snapshot() {
         local _combo
         _combo=${_af%/.vm-active}; _combo=${_combo#"$BUILD_DIR"/}
         test_active+=("$_combo $(_elapsed_fmt "$_af")")
-    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' \
+        -newer "$BUILD_DIR/.run-plan" 2>/dev/null | sort)
     test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l 2>/dev/null || true)
     test_done=${test_done:-0}
 
@@ -127,7 +129,8 @@ _snapshot() {
             [[ -f $_af ]] || continue
             _mt=$(stat -c %Y "$_af" 2>/dev/null) || continue
             [[ $_oldest -eq 0 || $_mt -lt $_oldest ]] && _oldest=$_mt
-        done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null)
+        done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' \
+            -newer "$BUILD_DIR/.run-plan" 2>/dev/null)
         [[ $_oldest -gt 0 ]] && test_wall_elapsed=$(( $(date +%s) - _oldest ))
     fi
 
