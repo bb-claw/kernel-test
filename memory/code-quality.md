@@ -73,6 +73,7 @@ OPTIMIZATION: `speed` (-O2+gc-sections) | `size` (-Os+gc-sections) | `ultra` (-O
 - **`${arr[-1]:-}` on empty array with `set -euo pipefail`** → bash evaluates the subscript before applying `:-`; prints `arr: bad array subscript` and `set -e` aborts the script. Triggered when `mapfile -t arr < <(...)` receives no output (e.g. `ls-remote` fails on transient TLS error). Fix: `[[ ${#arr[@]} -gt 0 ]] && VAR=${arr[-1]} || VAR=""`.
 - **`printf` with format string starting with `-`** → bash's `printf` builtin tries to parse it as an option; produces `printf: - : invalid option`. Fix: `printf -- '- [ ] ...' args`. Affects any shell lib script (`lib/`, `scripts/`) where the format string is a literal dash-prefixed string (e.g., Markdown list items).
 - **`declare -A arr` without `=()` on bash 5.1 with `set -u`** → `${#arr[@]}` on a declared-but-never-assigned associative array triggers `arr: unbound variable` on bash 5.1.16 (ubuntu-22.04 CI); bash 5.3 silently returns 0. Fix: always use `declare -A arr=()` for explicit empty initialization in lib scripts.
+- **`var=$(grep ... | cut ...)` with `set -o pipefail` aborts when grep finds nothing** → with `pipefail`, a grep exit code of 1 (no match) or 2 (file not found) propagates through the pipeline; `set -e` aborts the script. Silent in production (file always present) but fatal in standalone / CI invocations. Fix: `var=$(grep ... | cut ... || true)`.
 
 ---
 
@@ -125,7 +126,6 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 ```
 
 ---
-
 ## Memory File Update Triggers
 
 | When you… | Update |
