@@ -54,7 +54,7 @@ _host_cpus=$(nproc 2>/dev/null || echo 1)
 # Use min(PARALLEL_BUILDS, BUILD_TOTAL) as the divisor so small runs
 # (fewer combos than PARALLEL_BUILDS) get proportionally more -j slots.
 _effective_par=${PARALLEL_BUILDS:-1}
-_plan_total=$(grep '^BUILD_TOTAL=' "${BUILD_DIR}/.run-plan" 2>/dev/null | cut -d= -f2)
+_plan_total=$(grep '^BUILD_TOTAL=' "${BUILD_DIR}/.run-plan" 2>/dev/null | cut -d= -f2 || true)
 if [[ -n ${_plan_total:-} && $_plan_total -gt 0 && $_plan_total -lt $_effective_par ]]; then
     _effective_par=$_plan_total
 fi
