@@ -162,6 +162,19 @@ _snapshot() {
             done
         done
         build_done=$_bd
+        # Filter build_active to current run combos only (eliminates stale sentinels from prior runs)
+        local _ba_filtered=() _ba_entry _ba_combo _ba_match
+        for _ba_entry in "${build_active[@]+"${build_active[@]}"}"; do
+            _ba_combo=${_ba_entry%%|*}
+            _ba_match=0
+            for _c in $_plan_configs; do
+                for _a in $_plan_archs; do
+                    [[ $_ba_combo == "$_c-$_a" ]] && { _ba_match=1; break 2; }
+                done
+            done
+            [[ $_ba_match -eq 1 ]] && _ba_filtered+=("$_ba_entry")
+        done
+        build_active=("${_ba_filtered[@]+"${_ba_filtered[@]}"}")
         for _c in $_plan_boot; do
             for _a in $_plan_archs; do
                 _f="$BUILD_DIR/$_c-$_a/vm.status"
@@ -171,6 +184,19 @@ _snapshot() {
             done
         done
         test_done=$_td
+        # Filter test_active to current run combos only
+        local _ta_filtered=() _ta_entry _ta_combo _ta_match
+        for _ta_entry in "${test_active[@]+"${test_active[@]}"}"; do
+            _ta_combo=${_ta_entry%% *}
+            _ta_match=0
+            for _c in $_plan_boot; do
+                for _a in $_plan_archs; do
+                    [[ $_ta_combo == "$_c-$_a" ]] && { _ta_match=1; break 2; }
+                done
+            done
+            [[ $_ta_match -eq 1 ]] && _ta_filtered+=("$_ta_entry")
+        done
+        test_active=("${_ta_filtered[@]+"${_ta_filtered[@]}"}")
     fi
 
     # -- ETA: estimated remaining time based on done/total progress --
