@@ -62,6 +62,7 @@ NPROC=$(( _host_cpus / _effective_par ))
 [[ $NPROC -lt 2 ]] && NPROC=2
 
 printf '%d\n' "$NPROC" > "$OUT_DIR/.build-active"   # sentinel for make monitor; content is -j value; removed in EXIT trap
+_cleanup_sentinel() { rm -f "$OUT_DIR/.build-active"; printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"; }
 
 # ── Linker selection ──────────────────────────────────────────────────────────
 LINKER=bfd
@@ -71,7 +72,7 @@ if detect_lld; then
     info "Linker: ld.lld ${LLD_VERSION}"
     command -v llvm-objcopy >/dev/null 2>&1 && LINKER_OBJCOPY="llvm-objcopy"
 fi
-trap 'rm -f "$OUT_DIR/.build-active"; printf "LINKER=%s\n" "${LINKER:-bfd}" >> "${STATUS_FILE}"' EXIT
+trap '_cleanup_sentinel' EXIT
 
 # ── Kernel source identity ────────────────────────────────────────────────────
 
@@ -260,7 +261,7 @@ elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     # 500 lines compensates for dependency attrition: many options get discarded by
     # olddefconfig when their prerequisites are absent in the tinyconfig base.
     RAND_TMP=$(mktemp -d)
-    trap 'rm -rf "$RAND_TMP"' EXIT
+    trap '{ rm -rf "$RAND_TMP"; _cleanup_sentinel; }' EXIT
     make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
     cat "$SCRIPT_DIR/configs/randconfig.config" >> "$RAND_TMP/.config"
@@ -270,7 +271,7 @@ elif [[ $EFFECTIVE_CONFIG == rand500config ]]; then
     grep '^CONFIG_[A-Z0-9_]*=y$' "$RAND_TMP/.config" | shuf -n 500 \
         | tee "$OUT_DIR/rand-sampled.config" >> "$PWD/$OUT_DIR/.config"
     rm -rf "$RAND_TMP"
-    trap - EXIT
+    trap '_cleanup_sentinel' EXIT
 elif [[ $EFFECTIVE_CONFIG == randdefconfig ]]; then
     # Base: defconfig (broad, coherent, realistic baseline).
     # Random config: never write own per-combo cache (output changes each run).
@@ -329,7 +330,7 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
         fi
     fi
     RAND_TMP=$(mktemp -d)
-    trap 'rm -rf "$RAND_TMP"' EXIT
+    trap '{ rm -rf "$RAND_TMP"; _cleanup_sentinel; }' EXIT
     make -C "$KERNEL_TREE" O="$RAND_TMP" ARCH="$ARCH" \
         KBUILD_BUILD_TIMESTAMP="$RUN_STAMP" randconfig >> "$LOG_FILE" 2>&1
     # Force =m → =y: initramfs cannot load modules, tests must be built-in.
@@ -337,7 +338,7 @@ elif [[ $EFFECTIVE_CONFIG == kunitrandconfig ]]; then
         | sed 's/=[ym]$/=y/' \
         | tee "$OUT_DIR/kunitrand-sampled.config" >> "$PWD/$OUT_DIR/.config" || true
     rm -rf "$RAND_TMP"
-    trap - EXIT
+    trap '_cleanup_sentinel' EXIT
 elif [[ $EFFECTIVE_CONFIG == vf2config ]]; then
     # vf2config: StarFive JH7110 (VisionFive 2) — riscv-only; uses defconfig as base.
     # Deterministic: write own cache after any miss so warm runs never need the sibling.
