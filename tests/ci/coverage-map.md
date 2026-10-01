@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-65 functional decision paths across 13 groups.
-Fixed core (C1–C9) guarantees ≥80% coverage (53/65 paths; 52/65 without /proc/config.gz).
+62 functional decision paths across 12 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (53/62 paths; 52/62 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
