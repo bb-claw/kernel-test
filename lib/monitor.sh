@@ -104,7 +104,8 @@ _snapshot() {
         _combo=${_af%/.build-active}; _combo=${_combo#"$BUILD_DIR"/}
         _j=$(cat "$_af" 2>/dev/null)
         build_active+=("${_combo}|${_j:-?}|$(_elapsed_fmt "$_af")")
-    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' 2>/dev/null | sort)
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.build-active' \
+        -newer "$BUILD_DIR/.run-plan" 2>/dev/null | sort)
     build_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'build.status' \
         -exec grep -l '^STATUS=\(PASS\|FAIL\|TIMEOUT\)' {} + 2>/dev/null | wc -l 2>/dev/null || true)
     build_done=${build_done:-0}
@@ -116,7 +117,8 @@ _snapshot() {
         local _combo
         _combo=${_af%/.vm-active}; _combo=${_combo#"$BUILD_DIR"/}
         test_active+=("$_combo $(_elapsed_fmt "$_af")")
-    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null | sort)
+    done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' \
+        -newer "$BUILD_DIR/.run-plan" 2>/dev/null | sort)
     test_done=$(find "$BUILD_DIR" -maxdepth 2 -name 'vm.status' 2>/dev/null | wc -l 2>/dev/null || true)
     test_done=${test_done:-0}
 
@@ -127,7 +129,8 @@ _snapshot() {
             [[ -f $_af ]] || continue
             _mt=$(stat -c %Y "$_af" 2>/dev/null) || continue
             [[ $_oldest -eq 0 || $_mt -lt $_oldest ]] && _oldest=$_mt
-        done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' 2>/dev/null)
+        done < <(find "$BUILD_DIR" -maxdepth 2 -name '.vm-active' \
+            -newer "$BUILD_DIR/.run-plan" 2>/dev/null)
         [[ $_oldest -gt 0 ]] && test_wall_elapsed=$(( $(date +%s) - _oldest ))
     fi
 
@@ -162,6 +165,19 @@ _snapshot() {
             done
         done
         build_done=$_bd
+        # Filter build_active to current run combos only (eliminates stale sentinels from prior runs)
+        local _ba_filtered=() _ba_entry _ba_combo _ba_match
+        for _ba_entry in "${build_active[@]+"${build_active[@]}"}"; do
+            _ba_combo=${_ba_entry%%|*}
+            _ba_match=0
+            for _c in $_plan_configs; do
+                for _a in $_plan_archs; do
+                    [[ $_ba_combo == "$_c-$_a" ]] && { _ba_match=1; break 2; }
+                done
+            done
+            [[ $_ba_match -eq 1 ]] && _ba_filtered+=("$_ba_entry")
+        done
+        build_active=("${_ba_filtered[@]+"${_ba_filtered[@]}"}")
         for _c in $_plan_boot; do
             for _a in $_plan_archs; do
                 _f="$BUILD_DIR/$_c-$_a/vm.status"
@@ -171,6 +187,19 @@ _snapshot() {
             done
         done
         test_done=$_td
+        # Filter test_active to current run combos only
+        local _ta_filtered=() _ta_entry _ta_combo _ta_match
+        for _ta_entry in "${test_active[@]+"${test_active[@]}"}"; do
+            _ta_combo=${_ta_entry%% *}
+            _ta_match=0
+            for _c in $_plan_boot; do
+                for _a in $_plan_archs; do
+                    [[ $_ta_combo == "$_c-$_a" ]] && { _ta_match=1; break 2; }
+                done
+            done
+            [[ $_ta_match -eq 1 ]] && _ta_filtered+=("$_ta_entry")
+        done
+        test_active=("${_ta_filtered[@]+"${_ta_filtered[@]}"}")
     fi
 
     # -- ETA: estimated remaining time based on done/total progress --

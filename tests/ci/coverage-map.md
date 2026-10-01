@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-52 functional decision paths across 11 groups.
-Fixed core (C1–C9) guarantees ≥80% coverage (43/52 paths; 42/52 without /proc/config.gz).
+62 functional decision paths across 12 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (53/62 paths; 52/62 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -55,6 +55,16 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | I3  | build.sh missing GCC: exits non-zero, INFRA_FAIL written before die()                      | fixed core via C9 (test-build-errors.sh)    | I-build-errors |
 | M1  | monitor --once exits 0 with no active run (absent build dir)                                | fixed core via C9 (test-monitor.sh)         | J-monitor      |
 | M2  | monitor --once output contains BUILDS and TESTS section headers                             | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M3  | build sentinel for combo not in run-plan → filtered from active display (combo filter)      | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M4  | build sentinel older than .run-plan → filtered from active display (mtime filter)           | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M5  | valid in-plan build sentinel newer than .run-plan → shown as active build                   | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M6  | test sentinel for combo not in boot-plan → filtered from active test display                | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M7  | stale test sentinel older than .run-plan → filtered from active test display                | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| M8  | valid in-plan test sentinel newer than .run-plan → shown as active test                     | fixed core via C9 (test-monitor.sh)         | J-monitor      |
+| I4  | build.sh: .build-active not written when script exits before sentinel line (bad arch)       | fixed core via C9 (test-build-sentinel.sh)  | L-sentinel     |
+| I5  | build.sh: base EXIT trap cleans .build-active + writes LINKER= on post-sentinel failure     | fixed core via C9 (test-build-sentinel.sh)  | L-sentinel     |
+| I6  | build.sh rand500config: compound EXIT trap cleans sentinel after make randconfig fails      | fixed core via C9 (test-build-sentinel.sh)  | L-sentinel     |
+| I7  | build.sh kunitrandconfig: compound EXIT trap cleans sentinel after make randconfig fails    | fixed core via C9 (test-build-sentinel.sh)  | L-sentinel     |
 | K1  | CCACHE_DIR resolves to shared path when SHARED_CCACHE_DIR exists                            | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
 | K2  | CCACHE_DIR falls back to local cache/ when SHARED_CCACHE_DIR absent                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
 | K3  | make ccache-init is idempotent: ccache.conf unchanged on second run                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |

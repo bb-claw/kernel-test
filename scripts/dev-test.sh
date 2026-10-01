@@ -179,9 +179,9 @@ else
 fi
 }
 
-# ── C9: remaining CI tests (E1–I3 paths) ─────────────────────────────────────
+# ── C9: remaining CI tests (E1–L sentinel paths) ─────────────────────────────
 # These weight-1 entries used to live in the random pool; promoting them to
-# fixed core raises the guaranteed floor from 44% to >81% (35/46 paths).
+# fixed core raises the guaranteed floor from 44% to >85% (53/62 paths).
 ci9_tests=(
     "E1:test-arch-scripts.sh"
     "E2:test-common.sh"
@@ -203,10 +203,20 @@ ci9_tests=(
     "I3:test-build-errors.sh"
     "M1:test-monitor.sh"
     "M2:test-monitor.sh"
+    "M3:test-monitor.sh"
+    "M4:test-monitor.sh"
+    "M5:test-monitor.sh"
+    "M6:test-monitor.sh"
+    "M7:test-monitor.sh"
+    "M8:test-monitor.sh"
     "K1:test-ccache-share.sh"
     "K2:test-ccache-share.sh"
     "K3:test-ccache-share.sh"
     "K4:test-ccache-share.sh"
+    "I4:test-build-sentinel.sh"
+    "I5:test-build-sentinel.sh"
+    "I6:test-build-sentinel.sh"
+    "I7:test-build-sentinel.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
@@ -313,7 +323,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=52
+total_paths=62
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)
