@@ -1,0 +1,41 @@
+/* benni.tech — one small stylesheet, no fonts, no JS, no external requests. */
+:root {
+  --bg: #fdfdfb;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --accent: #0a6e5c;
+  --rule: #dcdcd6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171a;
+    --fg: #d8d8d2;
+    --muted: #8a8a84;
+    --accent: #5fd3b8;
+    --rule: #2c2f33;
+  }
+}
+html { background: var(--bg); color: var(--fg); }
+body {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+  font: 15px/1.6 ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover, a:focus { text-decoration: underline; }
+header { border-bottom: 1px solid var(--rule); padding-bottom: .5rem; margin-bottom: 1.5rem; }
+header h1 { font-size: 1.25rem; margin: 0; }
+header h1 a { color: var(--fg); }
+nav { margin-top: .25rem; color: var(--muted); }
+nav a { margin-right: 1rem; }
+h2 { font-size: 1rem; margin: 2rem 0 .5rem; }
+h2::before { content: "## "; color: var(--muted); }
+ul { padding-left: 1.25rem; }
+li { margin: .2rem 0; }
+.date { color: var(--muted); }
+.muted { color: var(--muted); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+footer { border-top: 1px solid var(--rule); margin-top: 3rem; padding-top: .5rem; color: var(--muted); font-size: .85rem; }
