@@ -700,6 +700,15 @@ install:
 		done; \
 	done
 
+install-fast:
+	@bash lib/mklog.sh "[install-fast] Config: $(CONFIGS) | Arch: $(ARCHS)"
+	$(Q)for config in $(CONFIGS); do \
+		for arch in $(ARCHS); do \
+			bash lib/mklog.sh "[install-fast] $$config $$arch"; \
+			lib/install-fast.sh "$$config" "$$arch"; \
+		done; \
+	done
+
 # ── Config archive ────────────────────────────────────────────────────────────
 
 # Scan all report directories and populate configs/archive_passed/ and
@@ -846,6 +855,7 @@ Targets:
   warnings         Analyse compiler warnings from build logs; writes warnings-summary.txt + per-combo files to latest report dir; also runs automatically after every 'make all'
   warnings-baseline  Pin the latest report dir as the warning baseline; future runs auto-diff warnings against it
   install          Install built kernel to /boot as vmlinuz-kt-<config>-<label>-<version>-<arch> (e.g. kt-localconfig-stable-rc-7.2.13-rc2-x86_64); writes /etc/grub.d/06_kernel-test for explicit GRUB menu entries; olddefconfig + modules + dkms + mkinitcpio + grub-mkconfig (needs sudo, x86_64 only)
+  install-fast     Bisect shortcut: copy bzImage to the existing /boot/vmlinuz-kt-* file only; skips modules/mkinitcpio/grub-mkconfig; fails if the target file does not already exist (needs sudo, x86_64 only)
   dmesg            Capture host kernel dmesg, analyse errors/hardware, run snapshot, diff both vs previous (writes DATA_REPO/dmesg/)
   valgrind         Run all C programs under Valgrind (local only; glibc/static build; logs in valgrind/)
   init-data-repo   Initialise DATA_REPO from scratch (one-time; bootstrap handles clone+pull on existing machines)
