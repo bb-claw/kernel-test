@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-62 functional decision paths across 12 groups.
-Fixed core (C1–C9) guarantees ≥80% coverage (53/62 paths; 52/62 without /proc/config.gz).
+66 functional decision paths across 13 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (57/66 paths; 56/66 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -69,3 +69,7 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | K2  | CCACHE_DIR falls back to local cache/ when SHARED_CCACHE_DIR absent                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
 | K3  | make ccache-init is idempotent: ccache.conf unchanged on second run                         | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
 | K4  | ccache.conf after ccache-init contains max_size=75G and base_dir                            | fixed core via C9 (test-ccache-share.sh)    | K-ccache       |
+| N1  | install.sh: BOOT_SUFFIX has kt- prefix for stable-rc kernel                                 | fixed core via C9 (test-install-versioned-names.sh) | N-install |
+| N2  | install.sh: BOOT_SUFFIX includes full version (sublevel + extraversion, not major.minor)    | fixed core via C9 (test-install-versioned-names.sh) | N-install |
+| N3  | GRUB glob vmlinuz-*config*-x86_64 matches new kt- files and legacy short-named files        | fixed core via C9 (test-install-versioned-names.sh) | N-install |
+| N4  | GRUB glob does not match distro kernels (vmlinuz-6.12-x86_64 etc.)                          | fixed core via C9 (test-install-versioned-names.sh) | N-install |

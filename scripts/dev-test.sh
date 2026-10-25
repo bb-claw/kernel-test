@@ -217,6 +217,10 @@ ci9_tests=(
     "I5:test-build-sentinel.sh"
     "I6:test-build-sentinel.sh"
     "I7:test-build-sentinel.sh"
+    "N1:test-install-versioned-names.sh"
+    "N2:test-install-versioned-names.sh"
+    "N3:test-install-versioned-names.sh"
+    "N4:test-install-versioned-names.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
@@ -323,7 +327,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=62
+total_paths=66
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)
