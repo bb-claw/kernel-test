@@ -39,6 +39,12 @@ BUILT_TREE=$(grep '^KERNEL_TREE=' "$STATUS_FILE" | cut -d= -f2-)
 KVER=$(cat "$OUT_DIR/include/config/kernel.release")
 MAJOR_MINOR=$(grep -oE '^[0-9]+\.[0-9]+' <<< "$KVER")
 
+# Full kernel version from the Makefile (e.g. 7.2.13-rc2, 7.3.0-rc2).
+# KMV_FULL is set as a side-effect; fall back to MAJOR_MINOR if the tree is
+# somehow unreadable (should not happen — KERNEL_TREE is verified above).
+read_kernel_makefile_version > /dev/null || true
+KERNEL_FULL_VERSION="${KMV_FULL:-$MAJOR_MINOR}"
+
 # Derive LABEL if not set by preset (mirrors report.sh auto-detection).
 if [[ -z ${LABEL:-} ]]; then
     if [[ -n ${STABLE_RELEASE:-} ]]; then
@@ -54,7 +60,9 @@ if [[ -z ${LABEL:-} ]]; then
     fi
 fi
 
-BOOT_SUFFIX="${CONFIG}-${LABEL}-${MAJOR_MINOR}-${ARCH}"   # e.g. localconfig-mainline-7.2-x86_64
+# kt- prefix keeps the GRUB glob tight — distro kernels never start with "kt-".
+# Full version (7.2.13-rc2) distinguishes rc1/rc2/rc3 in the boot menu.
+BOOT_SUFFIX="kt-${CONFIG}-${LABEL}-${KERNEL_FULL_VERSION}-${ARCH}"
 NPROC=$(nproc 2>/dev/null || echo 1)
 
 # ccache: reuse the build cache for the modules compile
@@ -170,7 +178,10 @@ sudo mkinitcpio -p "$BOOT_SUFFIX"
 # vmlinuz binary, not the filename. All localconfig kernels share the same
 # LOCALVERSION ("-localconfig"), so auto-generated entries are indistinguishable.
 # Write /etc/grub.d/06_kernel-test — executed by grub-mkconfig on every run —
-# to emit explicit entries labelled with the full filename (e.g. localconfig-stable-rc-7.2-x86_64).
+# to emit explicit entries labelled with the full filename.
+# New style: kt-localconfig-stable-rc-7.2.13-rc2-x86_64
+# Old style (legacy installs, left in /boot): localconfig-mainline-7.2-x86_64
+# The glob vmlinuz-*config*-x86_64 matches both; distro kernels (vmlinuz-6.12-x86_64) do not contain "config".
 GRUB_SCRIPT=/etc/grub.d/06_kernel-test
 info "Writing $GRUB_SCRIPT (sudo)..."
 sudo tee "$GRUB_SCRIPT" > /dev/null <<'GRUBSCRIPT'
@@ -180,7 +191,7 @@ sudo tee "$GRUB_SCRIPT" > /dev/null <<'GRUBSCRIPT'
 ROOT_UUID=$(grub-probe -t fs_uuid / 2>/dev/null || true)
 [ -n "$ROOT_UUID" ] || exit 0
 
-for vmlinuz in /boot/vmlinuz-localconfig-*-x86_64; do
+for vmlinuz in /boot/vmlinuz-*config*-x86_64; do
     [ -f "$vmlinuz" ] || continue
     suffix="${vmlinuz#/boot/vmlinuz-}"
     initramfs="/boot/initramfs-${suffix}.img"

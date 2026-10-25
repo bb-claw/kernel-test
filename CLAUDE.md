@@ -43,7 +43,7 @@ make bug-hunt                                  # Claude Code bug hunt: find 3 hi
 make bootstrap                                 # install deps, download Toybox, activate git hooks
 make ccache-init                               # create/configure ~/git/kernel-test-ccache/ (75G); run once after bootstrap; idempotent
 make ccache-status                             # show active CCACHE_DIR + --show-stats
-make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-localconfig-<label>-<major.minor>-x86_64; writes /etc/grub.d/06_kernel-test
+make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-kt-localconfig-<label>-<version>-x86_64 (e.g. 7.2.13-rc2); writes /etc/grub.d/06_kernel-test
 make info                                      # show currently checked-out kernel
 make diff                                      # diff latest vs previous run
 make baseline                                  # pin a reference run for regression comparison
