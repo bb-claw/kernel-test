@@ -105,6 +105,11 @@ make build   NO_FETCH=1 STABLE_RELEASE=7.1 CONFIGS=localconfig ARCHS=x86_64 BUIL
 
 # Install — KERNEL_TREE is read automatically from build.status; no need to repeat STABLE_RELEASE
 make install CONFIGS=localconfig ARCHS=x86_64
+
+# Bisect shortcut: rebuild bzImage only and copy to existing /boot entry (skips mkinitcpio + grub)
+# Use BOOT_SUFFIX when bisecting commits that report an older version (e.g. stable-rc intermediates)
+make install-fast CONFIGS=localconfig ARCHS=x86_64
+make install-fast CONFIGS=localconfig ARCHS=x86_64 BOOT_SUFFIX=kt-localconfig-stable-rc-7.2.13-rc3-x86_64
 ```
 
 ### Quick single-arch build to verify a config
@@ -184,6 +189,7 @@ kernel-test/
 | `make kconfig-check SUBSYSTEM=` | Static analysis for missing Kconfig `select` dependencies |
 | `make canary-patch` | Patch kernel tree with boot canary built-in module |
 | `make install` | Install built kernel to `/boot`; update mkinitcpio + GRUB (Arch/Manjaro, needs sudo) |
+| `make install-fast` | Bisect shortcut: copy bzImage only to existing `/boot` entry; skip mkinitcpio + GRUB; `BOOT_SUFFIX=` overrides target filename |
 | `make bootstrap` | Install build/test dependencies (distro-aware, needs sudo) + activate git hooks |
 | `make hooks` | Activate git hooks only (no package install) |
 | `make ccache-init` | Create `~/git/kernel-test-ccache/` and write `ccache.conf` (75G, sloppiness, base_dir); idempotent |

@@ -11,7 +11,7 @@
 | `kunitrandconfig` | yes | defconfig | `configs/kunitrandconfig.config` | defconfig + all available KUnit modules (enumerated from randconfig, olddefconfig drops unmet deps); random set per run — rebuild required each time; KUnit KTAP tracked; use `kunitconfig` for deterministic results |
 | `rand500config` | yes | tinyconfig | `configs/rand500config.config` | 500 random =y lines sampled from constrained randconfig |
 | `randdefconfig` | yes | defconfig | `configs/randdefconfig.config` | 300 random options disabled; heavy subsystems forced off |
-| `localconfig` | yes | /proc/config.gz | `configs/localconfig.config` | Daily-driver: full Manjaro config + laptop hardware fragment; `make install` deploys to /boot |
+| `localconfig` | yes | /proc/config.gz | `configs/localconfig.config` | Daily-driver: full Manjaro config + laptop hardware fragment; `make install` deploys to /boot; `make install-fast` for bisect (bzImage-only) |
 | `vf2config` | yes | riscv defconfig | `configs/vf2config.config` | VisionFive 2 (JH7110); riscv-only; key JH7110 drivers =m→=y; LOCALVERSION=-vf2; not in default CONFIGS |
 | `allmodconfig` | no | all-modules | none | Build-only: image too large for minimal initramfs |
 | `randconfig` | no | random | `configs/randconfig.config` | Build-only: unpredictable boot; value is compile coverage |
@@ -137,7 +137,7 @@ Fragment pins:
 - `CONFIG_LOCALVERSION="-localconfig"` — distinguishes from distro kernel in uname -r
 
 Build time: 15–25 min on 16 cores (full Manjaro config). Use `BUILD_TIMEOUT=0`.
-Install: `make install CONFIGS=localconfig ARCHS=x86_64` → `/boot/vmlinuz-kt-localconfig-<label>-<version>-x86_64` (e.g. `kt-localconfig-stable-rc-7.2.13-rc2-x86_64`); preset `/etc/mkinitcpio.d/kt-localconfig-<label>-<version>-x86_64.preset`; writes `/etc/grub.d/06_kernel-test` for explicit GRUB menu entries labelled `kernel-test: kt-localconfig-<label>-<version>-x86_64`.
+Install: `make install CONFIGS=localconfig ARCHS=x86_64` → `/boot/vmlinuz-kt-localconfig-<label>-<version>-x86_64` (e.g. `kt-localconfig-stable-rc-7.2.13-rc2-x86_64`); preset `/etc/mkinitcpio.d/kt-localconfig-<label>-<version>-x86_64.preset`; writes `/etc/grub.d/06_kernel-test` for explicit GRUB menu entries labelled `kernel-test: kt-localconfig-<label>-<version>-x86_64`. Bisect shortcut: `make install-fast CONFIGS=localconfig ARCHS=x86_64 [BOOT_SUFFIX=kt-localconfig-stable-rc-7.2.13-rc3-x86_64]` — copies bzImage only; requires target file to already exist; skips mkinitcpio/grub-mkconfig.
 
 ---
 

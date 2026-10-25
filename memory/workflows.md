@@ -66,7 +66,7 @@ make full                                             # defconfig tinyconfig kun
 make ns-smoke                                         # tinynsconfig kunitnsconfig (requires make bootstrap)
 make ns-full                                          # defnsconfig tinynsconfig kunitnsconfig randdefnsconfig rand500nsconfig (base-first order)
 make extended                                         # perf-build first (so status is in both reports), then full + ns-full; all phases run even on partial failure; exit non-zero if any failed; report.sh sentinel merges both phases into one 10-config summary.txt
-make local                                            # localconfig x86_64, no build timeout
+make local                                            # localconfig x86_64, no build timeout; follow with make install-fast for bisect (bzImage-only copy, skips mkinitcpio)
 make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64  # single config/arch
 make all NO_FETCH=1 NO_BUILD=1 CONFIGS=tinyconfig    # fast iteration (no rebuild)
 make programs                                         # rebuild C test binaries (tests/programs/ + tests/ns/) without system packages; auto-runs in make all
