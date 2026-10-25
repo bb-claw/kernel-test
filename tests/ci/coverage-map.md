@@ -1,7 +1,7 @@
 # dev-test Coverage Map
 
-70 functional decision paths across 14 groups.
-Fixed core (C1–C9) guarantees ≥80% coverage (61/70 paths; 60/70 without /proc/config.gz).
+71 functional decision paths across 14 groups.
+Fixed core (C1–C9) guarantees ≥80% coverage (62/71 paths; 61/71 without /proc/config.gz).
 dev-test fails if coverage ≤ 70% or any step fails.
 Updated whenever a new lib branch, config profile, or CI test is added.
 
@@ -77,3 +77,4 @@ Updated whenever a new lib branch, config profile, or CI test is added.
 | O2  | install-fast fails when /boot target file absent (make install not yet run)                  | fixed core via C9 (test-install-fast.sh)    | O-install-fast |
 | O3  | install-fast copies bzImage to existing target file (no mkinitcpio, no grub-mkconfig)        | fixed core via C9 (test-install-fast.sh)    | O-install-fast |
 | O4  | install-fast BOOT_SUFFIX uses kt- prefix and full version for stable-rc tree                 | fixed core via C9 (test-install-fast.sh)    | O-install-fast |
+| O5  | explicit BOOT_SUFFIX env var overrides derived version (bisect use case)                     | fixed core via C9 (test-install-fast.sh)    | O-install-fast |

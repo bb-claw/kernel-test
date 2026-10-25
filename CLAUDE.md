@@ -45,6 +45,7 @@ make ccache-init                               # create/configure ~/git/kernel-t
 make ccache-status                             # show active CCACHE_DIR + --show-stats
 make install CONFIGS=localconfig ARCHS=x86_64  # deploy to /boot as vmlinuz-kt-localconfig-<label>-<version>-x86_64 (e.g. 7.2.13-rc2); writes /etc/grub.d/06_kernel-test
 make install-fast CONFIGS=localconfig ARCHS=x86_64  # bisect shortcut: copy bzImage only; skips mkinitcpio/grub-mkconfig; fails if target file absent
+make install-fast CONFIGS=localconfig ARCHS=x86_64 BOOT_SUFFIX=kt-localconfig-stable-rc-7.2.13-rc3-x86_64  # explicit target for bisect (version mismatch between source and installed kernel)
 make info                                      # show currently checked-out kernel
 make diff                                      # diff latest vs previous run
 make baseline                                  # pin a reference run for regression comparison

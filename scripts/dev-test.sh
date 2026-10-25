@@ -225,6 +225,7 @@ ci9_tests=(
     "O2:test-install-fast.sh"
     "O3:test-install-fast.sh"
     "O4:test-install-fast.sh"
+    "O5:test-install-fast.sh"
 )
 for ci_entry in "${ci9_tests[@]}"; do
     ci_id=${ci_entry%%:*}; ci_script=${ci_entry##*:}
@@ -331,7 +332,7 @@ printf "%s\n" "$BAR"
 
 # Deduplicate covered paths
 mapfile -t unique_covered < <(printf '%s\n' "${covered_paths[@]}" | sort -u)
-total_paths=70
+total_paths=71
 covered_count=${#unique_covered[@]}
 pct=$(( covered_count * 100 / total_paths ))
 elapsed_total=$(elapsed)

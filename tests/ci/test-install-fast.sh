@@ -139,6 +139,55 @@ assert_contains "$suffix" "kt-"        "kt- prefix present"
 assert_contains "$suffix" "7.2.13-rc3" "full version in suffix"
 assert_not_contains "$suffix" "stable-rc-7.2-" "short major.minor format not used"
 
+# ── O5: explicit BOOT_SUFFIX override skips derivation ───────────────────────
+
+begin_test "O5: explicit BOOT_SUFFIX overrides derived version"
+setup_stable_rc_tree 7 2 13 -rc3
+tmpdir; bd="$_LAST_TMPDIR"
+mkdir -p "$bd/localconfig-x86_64/arch/x86/boot" "$bd/localconfig-x86_64/include/config"
+printf 'new-content\n' > "$bd/localconfig-x86_64/arch/x86/boot/bzImage"
+printf '7.2.12-localconfig+\n' > "$bd/localconfig-x86_64/include/config/kernel.release"
+printf 'STATUS=PASS\nKERNEL_TREE=%s\n' "$KERNEL_TREE" > "$bd/localconfig-x86_64/build.status"
+
+tmpdir; fake_boot="$_LAST_TMPDIR"
+explicit_suffix="kt-localconfig-stable-rc-7.2.13-rc3-x86_64"
+printf 'old-content\n' > "$fake_boot/vmlinuz-$explicit_suffix"
+
+tmpdir; fake_bin="$_LAST_TMPDIR"
+printf '#!/bin/sh\nshift; exec "$@"\n' > "$fake_bin/sudo"
+chmod +x "$fake_bin/sudo"
+
+PATH="$fake_bin:$PATH" \
+BUILD_DIR="$bd" \
+KERNEL_TREE="$KERNEL_TREE" \
+BOOT_SUFFIX="$explicit_suffix" \
+    bash -c "
+        set -euo pipefail
+        . '$REPO/lib/common.sh'
+        BOOT_SUFFIX='$explicit_suffix'
+        TARGET='$fake_boot/vmlinuz-$explicit_suffix'
+        [[ -f \$TARGET ]] || { echo 'no target'; exit 1; }
+        cp '$bd/localconfig-x86_64/arch/x86/boot/bzImage' \"\$TARGET\"
+    " 2>&1
+
+content=$(cat "$fake_boot/vmlinuz-$explicit_suffix")
+assert_contains "$content"     "new-content"              "explicit suffix target updated"
+assert_not_contains "$content" "old-content"              "old content replaced"
+
+begin_test "O5b: install-fast.sh logs explicit BOOT_SUFFIX when set"
+setup_stable_rc_tree 7 2 13 -rc3
+tmpdir; bd="$_LAST_TMPDIR"
+mkdir -p "$bd/localconfig-x86_64/arch/x86/boot" "$bd/localconfig-x86_64/include/config"
+printf 'fake\n' > "$bd/localconfig-x86_64/arch/x86/boot/bzImage"
+printf '7.2.12-localconfig+\n' > "$bd/localconfig-x86_64/include/config/kernel.release"
+printf 'STATUS=PASS\nKERNEL_TREE=%s\n' "$KERNEL_TREE" > "$bd/localconfig-x86_64/build.status"
+explicit_suffix="kt-localconfig-stable-rc-7.2.13-rc3-x86_64"
+# target absent — but explicit log message should appear before the die
+out=$(BUILD_DIR="$bd" KERNEL_TREE="$KERNEL_TREE" BOOT_SUFFIX="$explicit_suffix" \
+    bash "$REPO/lib/install-fast.sh" localconfig x86_64 2>&1) && rc=0 || rc=$?
+assert_contains "$out" "explicit BOOT_SUFFIX" "logs explicit BOOT_SUFFIX"
+assert_contains "$out" "$explicit_suffix"     "logs the actual suffix value"
+
 # ── Source-level checks ───────────────────────────────────────────────────────
 
 begin_test "install-fast.sh: fails for non-x86_64 arch"

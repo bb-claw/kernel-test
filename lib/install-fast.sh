@@ -26,27 +26,31 @@ if [[ -f $STATUS_FILE ]]; then
     [[ -n $BUILT_TREE ]] && KERNEL_TREE="$BUILT_TREE"
 fi
 
-# Derive LABEL (mirrors install.sh logic).
-KVER=$(cat "$OUT_DIR/include/config/kernel.release" 2>/dev/null || true)
-MAJOR_MINOR=$(grep -oE '^[0-9]+\.[0-9]+' <<< "${KVER:-0.0}")
-read_kernel_makefile_version > /dev/null || true
-KERNEL_FULL_VERSION="${KMV_FULL:-$MAJOR_MINOR}"
+if [[ -n ${BOOT_SUFFIX:-} ]]; then
+    info "install-fast: using explicit BOOT_SUFFIX=$BOOT_SUFFIX"
+else
+    # Derive LABEL (mirrors install.sh logic).
+    KVER=$(cat "$OUT_DIR/include/config/kernel.release" 2>/dev/null || true)
+    MAJOR_MINOR=$(grep -oE '^[0-9]+\.[0-9]+' <<< "${KVER:-0.0}")
+    read_kernel_makefile_version > /dev/null || true
+    KERNEL_FULL_VERSION="${KMV_FULL:-$MAJOR_MINOR}"
 
-if [[ -z ${LABEL:-} ]]; then
-    if [[ -n ${STABLE_RELEASE:-} ]]; then
-        LABEL=stable
-    elif [[ $KERNEL_TREE == *linux-next* ]]; then
-        LABEL=linux-next
-    elif [[ $KERNEL_TREE == *stable-rc* ]]; then
-        LABEL=stable-rc
-    elif [[ ! ${KVER:-} =~ -rc ]]; then
-        LABEL=stable
-    else
-        LABEL=mainline
+    if [[ -z ${LABEL:-} ]]; then
+        if [[ -n ${STABLE_RELEASE:-} ]]; then
+            LABEL=stable
+        elif [[ $KERNEL_TREE == *linux-next* ]]; then
+            LABEL=linux-next
+        elif [[ $KERNEL_TREE == *stable-rc* ]]; then
+            LABEL=stable-rc
+        elif [[ ! ${KVER:-} =~ -rc ]]; then
+            LABEL=stable
+        else
+            LABEL=mainline
+        fi
     fi
-fi
 
-BOOT_SUFFIX="kt-${CONFIG}-${LABEL}-${KERNEL_FULL_VERSION}-${ARCH}"
+    BOOT_SUFFIX="kt-${CONFIG}-${LABEL}-${KERNEL_FULL_VERSION}-${ARCH}"
+fi
 TARGET="/boot/vmlinuz-$BOOT_SUFFIX"
 
 if [[ ! -f $TARGET ]]; then
