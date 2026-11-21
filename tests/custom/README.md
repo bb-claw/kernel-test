@@ -25,7 +25,7 @@ See `memory/test-inventory.md` for the full list of what each script tests.
 
 ## Rules
 
-- `#!/bin/sh` shebang — Toybox 0.8.14 sh (POSIX only, no bash extensions)
+- `#!/bin/sh` shebang — Toybox 0.8.15 sh (POSIX only, no bash extensions)
 - No `awk` — not compiled into the Toybox binary; use `grep | cut`
 - No `[[ ]]` — use `[ ]`
 - No `elif` — Toybox 0.8.9 bug; use nested `if/else/fi`
