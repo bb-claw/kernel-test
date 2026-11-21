@@ -1,0 +1,14 @@
+---
+name: shepherd
+"on":
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  agent:
+    uses: bboortz/shepherd/.github/workflows/reusable-shepherd.yml@44d8cd7d78d7f8630fbd1cf176b18da5a1af9b86
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
