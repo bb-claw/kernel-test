@@ -51,10 +51,11 @@ else
 
     BOOT_SUFFIX="kt-${CONFIG}-${LABEL}-${KERNEL_FULL_VERSION}-${ARCH}"
 fi
-TARGET="/boot/vmlinuz-$BOOT_SUFFIX"
+BOOT_DIR=${BOOT_DIR:-/boot}
+TARGET="$BOOT_DIR/vmlinuz-$BOOT_SUFFIX"
 
 if [[ ! -f $TARGET ]]; then
-    die "/boot/vmlinuz-$BOOT_SUFFIX does not exist — run 'make install' first to create the GRUB entry and initramfs"
+    die "$TARGET does not exist — run 'make install' first to create the GRUB entry and initramfs"
 fi
 
 info "install-fast: copying bzImage → $TARGET"
