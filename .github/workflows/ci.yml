@@ -58,7 +58,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Cache Toybox binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: cache/
           key: toybox-${{ steps.toybox.outputs.version }}
