@@ -1,0 +1,27 @@
+---
+schema_version: 1
+version: 1
+risk: low
+build: make
+test: make test
+
+auto_merge:
+  patch: true
+  minor: true
+  major: false
+
+gates:
+  monitored_pipelines: all
+  max_diff_lines: 50
+  rescan_scope: high_critical
+  waiting_period_hours: 24
+
+dry_run: true
+needs_human_label: needs-human
+security_fix: pr-only
+notify: ntfy
+owner: bb-claw
+
+dependabot:
+  enforce_enabled: true
+  auto_merge: false

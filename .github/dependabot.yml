@@ -1,0 +1,11 @@
+# Shepherd-managed .github/dependabot.yml (SH-011).
+# Ecosystems: github-actions (shell-first repo).
+---
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, github-actions]

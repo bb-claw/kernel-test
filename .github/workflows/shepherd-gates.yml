@@ -1,0 +1,54 @@
+---
+# Shepherd gates caller (SH-009). Acts on shepherd-agent-labelled PRs.
+# Re-fires via workflow_run when the shepherd agent workflow completes
+# (resolves the PR number by SHA lookup, defers cleanly if no PR found).
+# Pin @44d8cd7d78d7f8630fbd1cf176b18da5a1af9b86 to a tagged SHA from R1 onward.
+name: shepherd-gates
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_run:
+    workflows: ["shepherd"]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+jobs:
+  resolve-pr:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pick.outputs.pr_number }}
+    steps:
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            pull_request)
+              n="${{ github.event.pull_request.number }}"
+              labels='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+              if echo "$labels" | grep -Fq 'shepherd-agent'; then
+                echo "pr_number=$n" >> "$GITHUB_OUTPUT"
+              else
+                echo "pr_number=0" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            workflow_run)
+              sha="${{ github.event.workflow_run.head_sha }}"
+              n=$(gh pr list -R "$REPO" --search "sha:$sha" --state open \
+                --json number,labels --jq '[.[] | select(.labels[].name | contains("shepherd-agent"))][0].number // 0')
+              echo "pr_number=${n:-0}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "pr_number=0" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+  gates:
+    needs: resolve-pr
+    if: needs.resolve-pr.outputs.pr_number != '0'
+    uses: bboortz/shepherd/.github/workflows/reusable-shepherd-gates.yml@44d8cd7d78d7f8630fbd1cf176b18da5a1af9b86
+    with:
+      pr_number: ${{ fromJSON(needs.resolve-pr.outputs.pr_number) }}
