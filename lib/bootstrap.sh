@@ -187,7 +187,7 @@ install_packages
 
 # ── Toybox: download static binaries for each arch ───────────────────────────
 
-TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.14}
+TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.15}
 CACHE_DIR=${CACHE_DIR:-cache}
 
 download_toybox() {

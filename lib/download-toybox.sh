@@ -1,12 +1,13 @@
 #!/bin/bash
 # Download a Toybox static binary for one architecture to the cache directory.
 # Usage: download-toybox.sh <arch>   (arch = x86_64 | i386 | arm64 | riscv)
-# Idempotent — skips download if the binary is already cached.
+# Idempotent — skips download if the binary is already cached at the current version.
+# Version stamp: cache/.toybox-<arch>-version — re-downloads when TOYBOX_VERSION changes.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
 ARCH="${1:?usage: download-toybox.sh <arch>}"
-TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.14}
+TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.15}
 CACHE_DIR=${CACHE_DIR:-cache}
 TOYBOX_BASE_URL="https://www.landley.net/toybox/downloads/binaries/${TOYBOX_VERSION}"
 
@@ -20,9 +21,16 @@ TOYBOX_ARCH=$(arch_toybox_name "$ARCH")
 download_toybox() {
     mkdir -p "$CACHE_DIR"
     local dest="$CACHE_DIR/toybox-${TOYBOX_ARCH}"
-    if [[ -f $dest && -x $dest ]]; then
-        info "toybox-${TOYBOX_ARCH} already cached: $dest"
+    local stamp="$CACHE_DIR/.toybox-${TOYBOX_ARCH}-version"
+    local cached_ver=""
+    [[ -f "$stamp" ]] && cached_ver=$(cat "$stamp")
+    if [[ -f "$dest" && -x "$dest" && "$cached_ver" == "$TOYBOX_VERSION" ]]; then
+        info "toybox-${TOYBOX_ARCH} ${TOYBOX_VERSION} already cached: $dest"
         return
+    fi
+    if [[ -f "$dest" && "$cached_ver" != "$TOYBOX_VERSION" ]]; then
+        info "toybox-${TOYBOX_ARCH}: version mismatch (cached ${cached_ver:-unknown} → ${TOYBOX_VERSION}), re-downloading"
+        rm -f "$dest"
     fi
     local url="${TOYBOX_BASE_URL}/toybox-${TOYBOX_ARCH}"
     info "Downloading toybox-${TOYBOX_ARCH} ${TOYBOX_VERSION}..."
@@ -36,6 +44,7 @@ download_toybox() {
         die "Neither curl nor wget found — cannot download Toybox"
     fi
     chmod +x "$dest"
+    echo "$TOYBOX_VERSION" > "$stamp"
     info "Cached: $dest"
 }
 

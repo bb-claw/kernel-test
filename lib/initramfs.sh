@@ -71,6 +71,7 @@ mount -t devtmpfs none /dev       2>/dev/null || {
     # devtmpfs not compiled in (e.g. tinyconfig) — create minimum devices
     mknod -m 600 /dev/console c 5 1 2>/dev/null || true
     mknod -m 666 /dev/null    c 1 3 2>/dev/null || true
+    mknod -m 600 /dev/kmsg    c 1 11 2>/dev/null || true
 }
 
 # Silence console during tests: deferred kernel printk messages (e.g. mmc probe
