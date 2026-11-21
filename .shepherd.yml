@@ -14,7 +14,7 @@ gates:
   monitored_pipelines: all
   max_diff_lines: 50
   rescan_scope: high_critical
-  waiting_period_hours: 24
+  waiting_period_hours: 6
 
 dry_run: true
 needs_human_label: needs-human
