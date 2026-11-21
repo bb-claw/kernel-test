@@ -182,8 +182,9 @@ printf 'fake\n' > "$bd/localconfig-x86_64/arch/x86/boot/bzImage"
 printf '7.2.12-localconfig+\n' > "$bd/localconfig-x86_64/include/config/kernel.release"
 printf 'STATUS=PASS\nKERNEL_TREE=%s\n' "$KERNEL_TREE" > "$bd/localconfig-x86_64/build.status"
 explicit_suffix="kt-localconfig-stable-rc-7.2.13-rc3-x86_64"
-# target absent — but explicit log message should appear before the die
+tmpdir; fake_boot_O5b="$_LAST_TMPDIR"   # empty — target absent; log message appears before die
 out=$(BUILD_DIR="$bd" KERNEL_TREE="$KERNEL_TREE" BOOT_SUFFIX="$explicit_suffix" \
+    BOOT_DIR="$fake_boot_O5b" \
     bash "$REPO/lib/install-fast.sh" localconfig x86_64 2>&1) && rc=0 || rc=$?
 assert_contains "$out" "explicit BOOT_SUFFIX" "logs explicit BOOT_SUFFIX"
 assert_contains "$out" "$explicit_suffix"     "logs the actual suffix value"
@@ -203,7 +204,8 @@ mkdir -p "$bd/localconfig-x86_64/arch/x86/boot" "$bd/localconfig-x86_64/include/
 printf 'fake\n' > "$bd/localconfig-x86_64/arch/x86/boot/bzImage"
 printf '7.2.13-rc3-localconfig+\n' > "$bd/localconfig-x86_64/include/config/kernel.release"
 printf 'STATUS=PASS\nKERNEL_TREE=%s\n' "$KERNEL_TREE" > "$bd/localconfig-x86_64/build.status"
-out=$(BUILD_DIR="$bd" KERNEL_TREE="$KERNEL_TREE" \
+tmpdir; fake_boot_last="$_LAST_TMPDIR"   # empty — target absent regardless of LABEL from env
+out=$(BUILD_DIR="$bd" KERNEL_TREE="$KERNEL_TREE" BOOT_DIR="$fake_boot_last" \
     bash "$REPO/lib/install-fast.sh" localconfig x86_64 2>&1) && rc=0 || rc=$?
 [[ $rc -ne 0 ]] && pass "exits non-zero" || fail "should have failed"
 assert_contains "$out" "make install" "error mentions make install"
