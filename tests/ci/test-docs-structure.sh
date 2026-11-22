@@ -1,6 +1,7 @@
 #!/bin/bash
 # Tests for docs/ directory structure: plans/, specs/, stories/ subdirectories,
-# templates present, hook enforces docs/plans/<slug>-plan.md path.
+# templates present, hook enforces docs/plans/<slug>-plan.md path, and all
+# cross-file doc references resolve to files that actually exist.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=tests/ci/lib.sh
@@ -70,5 +71,49 @@ assert_contains "$lint_content" "docs/plans/*.md" "ci-lint globs docs/plans/"
 begin_test "story-template.md uses KT-NNN format"
 tmpl=$(cat "$REPO/docs/stories/story-template.md")
 assert_contains "$tmpl" "KT-NNN" "story template has KT-NNN prefix"
+
+# ── Cross-file reference stability ───────────────────────────────────────────
+# Every file in the repo that hard-codes a docs/ path must point to a file
+# that actually exists after the restructure.
+
+begin_test "docs refs in scripts/valgrind.sh resolve"
+assert_file_exists "$REPO/docs/plans/programs-build-unification-plan.md" \
+    "docs/plans/programs-build-unification-plan.md (referenced by valgrind.sh)"
+
+begin_test "docs refs in scripts/init-data-repo.sh resolve"
+assert_file_exists "$REPO/docs/plans/data-repo-plan.md" \
+    "docs/plans/data-repo-plan.md (referenced by init-data-repo.sh)"
+
+begin_test "docs refs in memory/patch-workflow.md resolve"
+assert_file_exists "$REPO/docs/specs/patch-quality-workflow.md" \
+    "docs/specs/patch-quality-workflow.md (referenced by memory/patch-workflow.md)"
+assert_file_exists "$REPO/docs/specs/upstream-patch-workflow.md" \
+    "docs/specs/upstream-patch-workflow.md (referenced by memory/patch-workflow.md)"
+
+begin_test "docs refs in tests/ci/test-vf2config.sh resolve"
+assert_file_exists "$REPO/docs/plans/visionfive2-config-plan.md" \
+    "docs/plans/visionfive2-config-plan.md (referenced by test-vf2config.sh)"
+
+# ── No stale docs/ root references in scripts ────────────────────────────────
+
+begin_test "no stale docs/ root plan references in scripts"
+stale=$(grep -rn "docs/[a-z].*-plan\.md" \
+    "$REPO/scripts" "$REPO/.githooks" "$REPO/memory" "$REPO/CLAUDE.md" "$REPO/README.md" \
+    2>/dev/null | grep -v "docs/plans/" | grep -v "docs/stories/" | grep -v "docs/specs/" || true)
+if [[ -z $stale ]]; then
+    pass "no stale docs/ root plan references in scripts/hooks/memory"
+else
+    fail "stale references to docs/ root found (should be docs/plans/ or docs/specs/):"$'\n'"$stale"
+fi
+
+begin_test "no stale docs/ root workflow references in scripts"
+stale=$(grep -rn "docs/[a-z].*-workflow\.md" \
+    "$REPO/scripts" "$REPO/.githooks" "$REPO/memory" "$REPO/CLAUDE.md" "$REPO/README.md" \
+    2>/dev/null | grep -v "docs/specs/" || true)
+if [[ -z $stale ]]; then
+    pass "no stale docs/ root workflow references"
+else
+    fail "stale references to docs/ root workflow files found:"$'\n'"$stale"
+fi
 
 finish

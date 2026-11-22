@@ -152,7 +152,7 @@ run_vg_serial
 # (namespace syscall unavailable, missing capability, EPERM, etc.).
 # ns-uts setns requires a live namespace path argument — skipped here.
 #
-# Coverage gaps (documented in docs/programs-build-unification-plan.md):
+# Coverage gaps (documented in docs/plans/programs-build-unification-plan.md):
 # - 14 subcommands skip unprivileged (need CAP_SYS_ADMIN); covered by VM tests
 #   290–360 but not under --track-fds=yes.
 # - ns-time/setns-mt likely exits via the SKIP path (child unshare EPERM);
