@@ -33,7 +33,7 @@ Examples:
 ## When Creating a Branch
 
 1. Name: `<type>/<kebab-slug>` (e.g. `feat/200-ipc-test`, `fix/190-scheduler-i386`)
-2. Create `docs/plans/<slug>-plan.md` from `docs/plans/plan-template.md` — required for `feat/*` and `fix/*` (enforced by pre-push)
+2. Create `docs/plans/<slug>-plan.md` from `docs/plans/plan-template.md` — required for `feat/*` and `fix/*` (enforced by pre-push); for story-driven work: `docs/plans/KT-NNN-<slug>-plan.md`
 3. Open a PR to `main` — never commit directly to `main`
 4. **Merge strategy**: always merge commits (never squash or rebase); PR title = merge commit subject; `main` has branch protection (PRs required, force-push disabled)
 
@@ -146,5 +146,6 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 - [ ] New test: skip guard present for missing kernel options
 - [ ] All error paths in lib scripts write `STATUS=FAIL` before `die`
 - [ ] Memory files updated (`memory/test-inventory.md`, `memory/code-quality.md`)
-- [ ] Design doc (`docs/plans/<slug>-plan.md`) complete and accurate
+- [ ] Design doc (`docs/plans/<slug>-plan.md`) complete and accurate; Shipping evidence table filled
+- [ ] `make verify-traceability` passes (if story adds CAP ids to `docs/CAPABILITIES.md`)
 - [ ] README.md updated if new `make` targets, variables, or user-visible behaviors were added
