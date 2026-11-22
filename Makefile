@@ -1061,3 +1061,33 @@ export HELP_TEXT
 
 help:
 	@echo "$$HELP_TEXT"
+
+##@ Shepherd dev-cycle contract (SH-014 / SH-019)
+#
+# Spec: https://github.com/bboortz/shepherd/blob/main/docs/specs/dev-cycle-contract.md
+#
+# Kernel-test's native `build` + `test` targets need a kernel tree; they are
+# too heavy for a 5-min CI gate. The dev-cycle doc flagged the prescription:
+# "set build: make programs and test: make ci-test". The contract tiers below
+# bypass the heavy natives and invoke `programs` + `ci-test` directly, which
+# work on a clean runner. The `.shepherd.yml` test command is updated to
+# `make ci-test` in the same PR.
+#
+# Repo has no affected-only mechanism today — `test-affected: ci-test` is the
+# fast identity path. SH-024 extends with an artifact-cache-keyed (ref,config,
+# toolchain) nightly kernel smoke.
+
+.PHONY: test-affected release-artifacts \
+        ci-branch ci-patch ci-release ci-nightly ci-nightly-body
+
+# Contract entry points — anchor on the fast, clean-runnable natives.
+test-affected: ci-test          # framework tests only (fast; no kernel tree required)
+release-artifacts: ; @true       # kernel-test has no artifact to promote across tiers
+
+# Tier bodies — bypass heavy natives (build/test need kernel tree).
+ci-branch: lint programs ci-test     # 5-min PR gate: lint + test-program build + framework tests
+ci-patch:  ci-test                   # post-merge smoke (fast)
+ci-release:
+	@echo "ci-release: n/a — kernel-test produces no release artifact"
+ci-nightly: ci-nightly-body
+ci-nightly-body: smoke               # nightly: tinyconfig + kunitconfig kernel smoke (SH-024 extends)
