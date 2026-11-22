@@ -1080,8 +1080,10 @@ help:
 .PHONY: test-affected release-artifacts \
         ci-branch ci-patch ci-release ci-nightly ci-nightly-body
 
-# Contract entry points — anchor on the fast, clean-runnable natives.
-test-affected: ci-test          # framework tests only (fast; no kernel tree required)
+# Contract entry points. test-affected is diff-aware via SH-038 (shepherd SH-036 pattern);
+# release-artifacts stays as a no-op (kernel-test has no artifact).
+test-affected:
+	@sh scripts/test-affected.sh
 release-artifacts: ; @true       # kernel-test has no artifact to promote across tiers
 
 # Tier bodies — bypass heavy natives (build/test need kernel tree).
