@@ -92,11 +92,11 @@ fi
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')
 case "$BRANCH" in feat/*|fix/*)
     info "design doc check (branch: $BRANCH) ..."
-    mapfile -t DOC_FILES < <(git -C "$REPO_ROOT" ls-files 'docs/*.md')
+    mapfile -t DOC_FILES < <(git -C "$REPO_ROOT" ls-files 'docs/plans/*.md')
     if [[ ${#DOC_FILES[@]} -gt 0 ]]; then
-        ok "design doc present (${#DOC_FILES[@]} file(s) in docs/)"
+        ok "design doc present (${#DOC_FILES[@]} file(s) in docs/plans/)"
     else
-        fail "no docs/*.md found — feat/* and fix/* branches require a design doc"
+        fail "no docs/plans/*.md found — feat/* and fix/* branches require a design doc in docs/plans/"
     fi
     ;;
 esac

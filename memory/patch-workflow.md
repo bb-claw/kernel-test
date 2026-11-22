@@ -7,8 +7,8 @@ metadata:
 
 # Patch quality and review workflow
 
-Full doc: `docs/patch-quality-workflow.md`
-Authoring mechanics: `docs/upstream-patch-workflow.md`
+Full doc: `docs/specs/patch-quality-workflow.md`
+Authoring mechanics: `docs/specs/upstream-patch-workflow.md`
 
 ---
 

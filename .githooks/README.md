@@ -38,7 +38,7 @@ Runs on every `git push`. Full-repo sweep:
 - **shellcheck** `--severity=warning` on all tracked `.sh` files
 - **Executable bit** on all `tests/**/*.sh` scripts
 - **Inventory coverage** — every `tests/custom/*.sh` and `tests/001_smoke.sh` must appear in `memory/test-inventory.md`
-- **Design doc** — `feat/*` and `fix/*` branches must have a `docs/<slug>-plan.md`
+- **Design doc** — `feat/*` and `fix/*` branches must have a `docs/plans/<slug>-plan.md`
 - **Memory file sizes** — every `memory/*.md` (except `MEMORY.md`) must be ≤ 150 lines
 - **`awk` ban** — VM test scripts (`tests/custom/*.sh`, `tests/001_smoke.sh`) must not call `awk`; use `grep | cut` instead
 

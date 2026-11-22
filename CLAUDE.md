@@ -79,7 +79,7 @@ Pre-push hook enforces all of the following — fix before pushing:
 - **shellcheck** on all tracked `.sh` files
 - **executable bit** on all `tests/**/*.sh`
 - **test-inventory coverage** — every `tests/custom/*.sh` name in `memory/test-inventory.md`
-- **design doc** — `docs/<slug>-plan.md` required for `feat/*` and `fix/*` branches
+- **design doc** — `docs/plans/<slug>-plan.md` required for `feat/*` and `fix/*` branches
 - **memory files ≤ 150 lines** — `memory/*.md` (except `MEMORY.md`)
 - **CLAUDE.md ≤ 200 lines** — this file
 - **no `awk`** in VM test scripts — not compiled into the Toybox binary; use `grep | cut`

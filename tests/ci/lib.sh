@@ -53,6 +53,12 @@ assert_file_exists() {
     else fail "$msg"; fi
 }
 
+assert_dir_exists() {
+    local path="$1" msg="${2:-dir-exists: $1}"
+    if [[ -d "$path" ]]; then pass "$msg"
+    else fail "$msg"; fi
+}
+
 assert_exit0() {
     local msg="${1:-exit0}"; shift
     if "$@" >/dev/null 2>&1; then pass "$msg"

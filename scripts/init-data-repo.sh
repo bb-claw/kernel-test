@@ -36,4 +36,4 @@ printf '  # Add the GitHub remote and push:\n'
 printf '  git -C %s remote add origin git@github.com:bb-claw/kernel-test-data.git\n' "$DATA_REPO"
 printf '  git -C %s push -u origin main\n' "$DATA_REPO"
 printf '\n'
-printf '  # Migrate existing configs from the harness repo (see docs/data-repo-plan.md)\n'
+printf '  # Migrate existing configs from the harness repo (see docs/plans/data-repo-plan.md)\n'
