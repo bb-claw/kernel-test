@@ -1,0 +1,143 @@
+---
+# Shepherd Dependabot auto-merge (SH-011).
+# Copy into a managed repo as .github/workflows/dependabot-automerge.yml AFTER
+# the repo's .shepherd.yml sets `dependabot.auto_merge: true`.
+#
+# Enforces §12 gates minus `scan-not-worse` (which arrives with SH-009):
+#   bump_level in {patch, minor}
+#   diff_lines (excluding lockfiles) ≤ 50
+#   age_hours   ≥ 24          # since upstream release; npm + github_actions only
+#
+# Supply chain (SH-001): no third-party Actions in this workflow. The whole job
+# is pure `run:` steps using the pre-installed GitHub CLI; PR classification
+# is title-based, so no helper action is pulled in.
+#
+# Required repo settings: "Allow auto-merge" + "Allow GitHub Actions to create
+# and approve pull requests" (Settings → Actions → General).
+
+name: dependabot-automerge
+
+"on":
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  gate:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Classify + gate + maybe enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          decision() { echo "::notice::auto-merge decision: $1"; exit 0; }
+
+          # --- Parse PR title -----------------------------------------------
+          # Dependabot format: "[prefix: ]Bump <name> from X.Y.Z to A.B.C"
+          # Pre-releases (e.g. "1.2.3-rc.1") are captured but may fall back
+          # to "unknown" if the semver cores don't match on digits-only.
+          NAME=$(printf '%s' "$TITLE" | sed -n 's/.*[Bb]ump \([^ ]*\) from .*/\1/p')
+          FROM=$(printf '%s' "$TITLE" | sed -n 's/.* from \([^ ]*\) to .*/\1/p')
+          TO=$(  printf '%s' "$TITLE" | sed -n 's/.* to \([^ )]*\).*/\1/p')
+          if [ -z "$NAME" ] || [ -z "$FROM" ] || [ -z "$TO" ]; then
+            decision "unknown title shape — leaving PR open: $TITLE"
+          fi
+
+          # --- Classify bump level (patch|minor|major|unknown) --------------
+          # Strip any `+build` / `-prerelease` suffix for the semver core only.
+          core() { printf '%s' "$1" | awk -F'[-+]' '{print $1}'; }
+          FC=$(core "$FROM"); TC=$(core "$TO")
+          FMAJ=$(printf '%s' "$FC" | cut -d. -f1)
+          TMAJ=$(printf '%s' "$TC" | cut -d. -f1)
+          FMIN=$(printf '%s' "$FC" | cut -d. -f2 -s)
+          TMIN=$(printf '%s' "$TC" | cut -d. -f2 -s)
+          case "$FMAJ$TMAJ$FMIN$TMIN" in
+            *[!0-9]*) decision "non-numeric semver — leaving open: $FROM -> $TO" ;;
+          esac
+          if [ "$FMAJ" != "$TMAJ" ]; then LEVEL=major
+          elif [ "$FMIN" != "$TMIN" ]; then LEVEL=minor
+          else LEVEL=patch; fi
+          echo "bump: $NAME $FROM -> $TO ($LEVEL)"
+          if [ "$LEVEL" = major ]; then
+            decision "major bump — leaving PR open for human review"
+          fi
+
+          # --- Diff-size gate (lockfile paths exempt, per CAP gate.diff-size) --
+          # jq strings reject `\.` as an invalid escape, so `.` must be `\\.`
+          # to reach jq's regex engine as a literal dot.
+          LOCK_RE='(^|/)(package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|go\\.sum|Cargo\\.lock|Pipfile\\.lock|poetry\\.lock)$'
+          LINES=$(gh pr view "$PR_NUMBER" -R "$REPO" --json files \
+            --jq "[.files[] | select(.path | test(\"$LOCK_RE\") | not) | (.additions + .deletions)] | add // 0")
+          echo "non-lockfile line delta: $LINES"
+          if [ "$LINES" -gt 50 ]; then
+            decision "diff exceeds 50 non-lockfile lines ($LINES) — leaving PR open"
+          fi
+
+          # --- Age gate: ≥24h since upstream release (npm + gh-actions only) ---
+          # Ecosystem from Dependabot branch: dependabot/<eco>/<path>
+          ECO=$(printf '%s' "$HEAD_REF" | awk -F/ '{print $2}')
+          RELEASED_AT=""
+          case "$ECO" in
+            npm_and_yarn)
+              # NAME may be "@scope/pkg" — curl needs url-encoding for the slash.
+              ENC=$(printf '%s' "$NAME" | sed 's|/|%2F|g')
+              RELEASED_AT=$(curl -sfL "https://registry.npmjs.org/$ENC" \
+                | jq -r --arg v "$TO" '.time[$v] // empty' 2>/dev/null || true)
+              ;;
+            pip)
+              # PyPI exposes per-version upload times at .releases[<ver>][*].upload_time.
+              # Multiple files per release (wheel + sdist); any element's upload_time works.
+              RELEASED_AT=$(curl -sfL "https://pypi.org/pypi/$NAME/json" \
+                | jq -r --arg v "$TO" '.releases[$v][0].upload_time // empty' 2>/dev/null || true)
+              ;;
+            github_actions)
+              # NAME is typically owner/repo. Try v-prefix first, then bare.
+              RELEASED_AT=$(gh api "repos/$NAME/releases/tags/v$TO" --jq .published_at 2>/dev/null || true)
+              if [ -z "$RELEASED_AT" ]; then
+                RELEASED_AT=$(gh api "repos/$NAME/releases/tags/$TO" --jq .published_at 2>/dev/null || true)
+              fi
+              ;;
+            *)
+              decision "ecosystem '$ECO' has no release-date lookup — leaving PR open"
+              ;;
+          esac
+          if [ -z "$RELEASED_AT" ]; then
+            decision "release date for $NAME $TO not found on $ECO registry — leaving open"
+          fi
+          RELEASED_EPOCH=$(date -d "$RELEASED_AT" +%s)
+          NOW_EPOCH=$(date +%s)
+          AGE_HOURS=$(( (NOW_EPOCH - RELEASED_EPOCH) / 3600 ))
+          echo "released_at=$RELEASED_AT  age_hours=$AGE_HOURS"
+          if [ "$AGE_HOURS" -lt 24 ]; then
+            decision "release is $AGE_HOURS h old (<24h) — leaving PR open; re-run after waiting-period"
+          fi
+
+          # --- All gates green: enable auto-merge ---------------------------
+          # GitHub merges when all required status checks pass.
+          # `gh pr merge --auto` requires branch protection on the base branch —
+          # without it, the API rejects with "Protected branch rules not configured".
+          # Treat that failure as "leave open, needs setup", not as a crashing
+          # workflow (the step always exits 0; the decision is in the annotation).
+          echo "all gates green — enabling auto-merge"
+          if err=$(gh pr merge "$PR_NUMBER" -R "$REPO" --auto --merge 2>&1); then
+            echo "::notice::auto-merge decision: enabled for PR #$PR_NUMBER ($NAME $FROM -> $TO, $LEVEL)"
+          else
+            case "$err" in
+              *"Protected branch rules not configured"*)
+                decision "auto-merge needs branch protection on base; set a required status check on this branch, then rebase this PR" ;;
+              *)
+                echo "::warning::auto-merge enable failed: $err"
+                decision "auto-merge enable failed; see workflow log" ;;
+            esac
+          fi
