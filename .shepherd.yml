@@ -2,8 +2,8 @@
 schema_version: 1
 version: 1
 risk: low
-build: make
-test: make test
+build: make programs       # SH-019: dev-cycle contract — clean-runnable build
+test: make ci-test          # SH-019: dev-cycle contract — framework tests only (no kernel tree)
 
 auto_merge:
   patch: true
