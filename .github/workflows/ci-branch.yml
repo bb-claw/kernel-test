@@ -1,10 +1,10 @@
 ---
-name: CI
+# Dev-cycle contract (SH-014) — tier 1: feature-branch / PR gate.
+# Renamed from ci.yml → ci-branch.yml via SH-035 (workflow filename convergence).
+name: ci-branch
 
 "on":
   pull_request:
-    branches:
-      - main
 
 # Cancel in-progress runs on the same PR when a new commit is pushed.
 concurrency:
