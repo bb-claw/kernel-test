@@ -2,7 +2,7 @@
 # Shepherd gates caller (SH-009). Acts on shepherd-agent-labelled PRs.
 # Re-fires via workflow_run when the shepherd agent workflow completes
 # (resolves the PR number by SHA lookup, defers cleanly if no PR found).
-# Pin @d60e728ff5f6f546d251e9ef9dce741d221c1ee9 to a tagged SHA from R1 onward.
+# Pin @a0733f789845723b17afa5181d23c1f1fbcce058 to a tagged SHA from R1 onward.
 name: shepherd-gates
 "on":
   pull_request:
@@ -49,6 +49,6 @@ jobs:
   gates:
     needs: resolve-pr
     if: needs.resolve-pr.outputs.pr_number != '0'
-    uses: bboortz/shepherd/.github/workflows/reusable-shepherd-gates.yml@d60e728ff5f6f546d251e9ef9dce741d221c1ee9
+    uses: bboortz/shepherd/.github/workflows/reusable-shepherd-gates.yml@a0733f789845723b17afa5181d23c1f1fbcce058
     with:
       pr_number: ${{ fromJSON(needs.resolve-pr.outputs.pr_number) }}
