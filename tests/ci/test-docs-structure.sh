@@ -66,11 +66,50 @@ assert_file_exists "$lint" "ci-lint.sh present"
 lint_content=$(cat "$lint")
 assert_contains "$lint_content" "docs/plans/*.md" "ci-lint globs docs/plans/"
 
-# ── Story template has KT-NNN format ─────────────────────────────────────────
+# ── Story template has KT-NNN format and 9-question sections ─────────────────
 
-begin_test "story-template.md uses KT-NNN format"
+begin_test "story-template.md uses KT-NNN format and 9 sections"
 tmpl=$(cat "$REPO/docs/stories/story-template.md")
-assert_contains "$tmpl" "KT-NNN" "story template has KT-NNN prefix"
+assert_contains "$tmpl" "KT-NNN"             "story template has KT-NNN prefix"
+assert_contains "$tmpl" "## 9."              "story template has section 9 (capabilities)"
+assert_contains "$tmpl" "Gherkin"            "story template has Gherkin acceptance section"
+assert_contains "$tmpl" "CAPABILITIES.md"    "story template references CAPABILITIES.md"
+
+begin_test "docs/stories/_9-questions.md present"
+assert_file_exists "$REPO/docs/stories/_9-questions.md" "_9-questions.md present"
+q9=$(cat "$REPO/docs/stories/_9-questions.md")
+assert_contains "$q9" "9." "_9-questions.md has 9 questions"
+
+begin_test "docs/stories/INDEX.md present"
+assert_file_exists "$REPO/docs/stories/INDEX.md" "INDEX.md present"
+idx=$(cat "$REPO/docs/stories/INDEX.md")
+assert_contains "$idx" "Status" "INDEX.md has Status column"
+
+begin_test "docs/CAPABILITIES.md present"
+assert_file_exists "$REPO/docs/CAPABILITIES.md" "CAPABILITIES.md present"
+caps=$(cat "$REPO/docs/CAPABILITIES.md")
+assert_contains "$caps" "Registry" "CAPABILITIES.md has Registry section"
+assert_contains "$caps" "verify-traceability" "CAPABILITIES.md references verify-traceability"
+
+begin_test "plan-template.md has 3-lens shipping evidence"
+plan_tmpl=$(cat "$REPO/docs/plans/plan-template.md")
+assert_contains "$plan_tmpl" "Lens 1"          "plan-template has Lens 1 (Gherkin coverage)"
+assert_contains "$plan_tmpl" "Lens 2"          "plan-template has Lens 2 (capability coverage)"
+assert_contains "$plan_tmpl" "Lens 3"          "plan-template has Lens 3 (self-consistency)"
+assert_contains "$plan_tmpl" "verify-traceability" "plan-template references verify-traceability"
+
+begin_test "scripts/verify-traceability.sh present and executable"
+assert_file_exists "$REPO/scripts/verify-traceability.sh" "verify-traceability.sh present"
+out=$("$REPO/scripts/verify-traceability.sh" 2>&1) && vt_rc=0 || vt_rc=$?
+if [[ $vt_rc -eq 0 ]]; then
+    pass "verify-traceability passes on current repo state"
+else
+    fail "verify-traceability failed:"$'\n'"$out"
+fi
+
+begin_test "make verify-traceability target exists in Makefile"
+mk=$(cat "$REPO/Makefile")
+assert_contains "$mk" "verify-traceability:" "Makefile has verify-traceability target"
 
 # ── Cross-file reference stability ───────────────────────────────────────────
 # Every file in the repo that hard-codes a docs/ path must point to a file
