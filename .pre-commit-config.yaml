@@ -1,0 +1,25 @@
+# shepherd pre-push convergence snippet (SH-033).
+#
+# Copy this as `.pre-commit-config.yaml` in your managed repo. Then:
+#   pre-commit install -t pre-push
+#
+# The pre-push stage runs `make check` locally before each push, catching
+# lint + traceability + build regressions in seconds instead of waiting
+# on CI round-trips. `shepherd-bump --verify-prepush` verifies this file
+# is present + wired with a `make check` pre-push hook.
+#
+# If your repo uses husky (Node.js ecosystem — e.g. HRC with eslint/prettier
+# in package.json), ship a `.husky/pre-push` script instead; the verifier
+# accepts either form.
+#
+# Bypass: `git push --no-verify` (document in PR body).
+
+repos:
+  - repo: local
+    hooks:
+      - id: make-check
+        name: make check (pre-push — full local gate)
+        language: system
+        entry: make check
+        pass_filenames: false
+        stages: [pre-push]
