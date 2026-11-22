@@ -146,6 +146,5 @@ if [ condition ]; then ok "thing works"; else fail "thing broken"; fi
 - [ ] New test: skip guard present for missing kernel options
 - [ ] All error paths in lib scripts write `STATUS=FAIL` before `die`
 - [ ] Memory files updated (`memory/test-inventory.md`, `memory/code-quality.md`)
-- [ ] Design doc (`docs/plans/<slug>-plan.md`) complete and accurate; Shipping evidence table filled
-- [ ] `make verify-traceability` passes (if story adds CAP ids to `docs/CAPABILITIES.md`)
+- [ ] Design doc (`docs/plans/<slug>-plan.md`) complete; Shipping evidence table filled; `make verify-traceability` passes if CAP ids added
 - [ ] README.md updated if new `make` targets, variables, or user-visible behaviors were added
