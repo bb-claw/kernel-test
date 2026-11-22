@@ -35,6 +35,7 @@ make ns-full                                   # namespace full: defnsconfig tin
 make extended                                  # perf-build first, then full + ns-full; all phases run even on partial failure; second report.sh pass merges both into one 10-config summary.txt
 make preflight                                 # validate host compiler, cross-compilers, QEMU binaries, disk space; auto-runs at make build
 make lint                                      # Tier 1 CI: shellcheck, inventory, sizes, PR title
+make verify-traceability                       # check story CAP ids ↔ docs/CAPABILITIES.md ↔ test file pointers
 make ci-test                                   # Tier 2 CI: tests/ci/test-*.sh suite
 make ci                                        # full GitHub Actions pipeline locally: lint → programs → ci-test (no i386)
 make dev-test                                  # branch gate: ≤6 min, >70% of 52 decision paths; SEED=N replays, BUDGET=N cap
