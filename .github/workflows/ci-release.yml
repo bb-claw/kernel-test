@@ -1,0 +1,33 @@
+---
+# Dev-cycle contract (SH-014) — tier 3: release promotion.
+# Budget: 15 minutes wall-clock. NO new build may start here.
+# Fast-forward dev -> main; tag; publish images/sigs in parallel.
+#
+# Copy from https://github.com/bboortz/shepherd/blob/main/templates/ci-release.yml
+# Spec: https://github.com/bboortz/shepherd/blob/main/docs/specs/dev-cycle-contract.md
+name: ci-release
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15    # hard budget cap (SH-014).
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: dev       # SH-029: ci-release promotes dev → main; must start on dev
+          fetch-depth: 0
+
+      - name: Configure git for FF-promote (SH-029)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run release-tier promotion (FF dev → main + tag)
+        run: make ci-release

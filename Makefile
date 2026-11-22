@@ -1087,7 +1087,26 @@ release-artifacts: ; @true       # kernel-test has no artifact to promote across
 # Tier bodies — bypass heavy natives (build/test need kernel tree).
 ci-branch: lint programs ci-test     # 5-min PR gate: lint + test-program build + framework tests
 ci-patch:  ci-test                   # post-merge smoke (fast)
-ci-release:
-	@echo "ci-release: n/a — kernel-test produces no release artifact"
+
+# ci-release-promote: FF main to dev + tag from VERSION (SH-029).
+# Must run on `dev`. Mutates working tree; CI only.
+.PHONY: ci-release-promote
+ci-release-promote:
+	@current=$$(git branch --show-current); \
+	 [ "$$current" = "dev" ] || { echo "ci-release-promote must run on 'dev', got '$$current'"; exit 1; }
+	@[ -f VERSION ] || { echo "VERSION file missing — cannot determine tag"; exit 1; }
+	@version=$$(cat VERSION | tr -d '[:space:]'); \
+	 echo "SH-029 promote: dev → main as v$$version"; \
+	 git fetch origin main && \
+	 git checkout main && \
+	 git merge --ff-only origin/dev && \
+	 git tag "v$$version" HEAD && \
+	 git push origin main && \
+	 git push origin "v$$version" && \
+	 git checkout dev
+
+ci-release: ci-release-promote       # FF dev → main + tag (SH-029); kernel-test ships no release artifact
+	@echo "ci-release: kernel-test ships no release artifact; tag is the release marker"
+
 ci-nightly: ci-nightly-body
 ci-nightly-body: smoke               # nightly: tinyconfig + kunitconfig kernel smoke (SH-024 extends)
