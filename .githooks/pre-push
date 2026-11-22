@@ -64,17 +64,17 @@ else
 fi
 
 # ── 4. Design doc (feat/* and fix/* branches) ────────────────────────────────
-# Every feat/ and fix/ branch must have docs/<slug>-plan.md before the first push.
+# Every feat/ and fix/ branch must have docs/plans/<slug>-plan.md before the first push.
 
 BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)
 case "$BRANCH" in
     feat/*|fix/*)
         SLUG="${BRANCH#*/}"
-        PLAN="docs/${SLUG}-plan.md"
+        PLAN="docs/plans/${SLUG}-plan.md"
         if [[ -f "$REPO_ROOT/$PLAN" ]]; then
             ok "design doc: $PLAN"
         else
-            fail "design doc missing: $PLAN  (create from docs/plan-template.md)"
+            fail "design doc missing: $PLAN  (create from docs/plans/plan-template.md)"
         fi
         ;;
     *)

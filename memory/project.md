@@ -79,7 +79,10 @@ kernel-test/
 │   ├── ns/         C binaries for namespace regression tests (ns-uts … ns-time, Makefile)
 │   └── programs/   C helper programs injected into the initramfs (perf-event, arena-test, syscall-tests, snapshot)
 ├── configs/        *.config fragments applied post-config; <profile>-<arch>.config overlays; archive_passed/ + archive_failed/ (committed config archive)
-├── docs/           per-branch design plans (plan-template.md + <slug>-plan.md)
+├── docs/
+│   ├── plans/      per-branch design plans (<slug>-plan.md); template: plan-template.md
+│   ├── specs/      specifications, workflows, reference docs (free-format names)
+│   └── stories/    user stories (KT-NNN-slug.md); template: story-template.md
 ├── memory/         this directory — persistent AI context
 ├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
 ├── build/          gitignored; out-of-tree kernel builds + initramfs

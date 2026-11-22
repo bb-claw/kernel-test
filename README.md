@@ -157,7 +157,10 @@ kernel-test/
 │   ├── commit-msg        # Enforce conventional commit format
 │   └── pre-push          # Full repo sweep; design doc check; memory size check; awk ban
 ├── configs/              # Config fragments + arch overlays; archive_passed/ + archive_failed/
-├── docs/                 # Per-feature design docs (<slug>-plan.md) + workflow guides
+├── docs/
+│   ├── plans/            # Per-branch design plans (<slug>-plan.md); required for feat/* and fix/*
+│   ├── specs/            # Specifications, workflows, reference documents
+│   └── stories/          # User stories (KT-NNN-slug.md)
 ├── memory/               # Persistent AI context (auto-memory for Claude Code)
 ├── reports/              # gitignored; HTML + text reports per run
 └── cache/                # gitignored; Toybox binaries (cache/toybox-*) + local ccache fallback (unused when ~/git/kernel-test-ccache/ exists); do not delete — Toybox binaries require re-running make bootstrap

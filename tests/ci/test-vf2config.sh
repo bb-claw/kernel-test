@@ -13,8 +13,8 @@ BUILD_SH="$REPO/lib/build.sh"
 # ── Design doc: exists ───────────────────────────────────────────────────────
 
 begin_test "vf2config-design-doc"
-assert_file_exists "$REPO/docs/visionfive2-config-plan.md" "docs/visionfive2-config-plan.md present"
-doc=$(cat "$REPO/docs/visionfive2-config-plan.md")
+assert_file_exists "$REPO/docs/plans/visionfive2-config-plan.md" "docs/plans/visionfive2-config-plan.md present"
+doc=$(cat "$REPO/docs/plans/visionfive2-config-plan.md")
 assert_contains "$doc" "vf2config"      "design doc mentions vf2config"
 assert_contains "$doc" "JH7110"         "design doc mentions JH7110 SoC"
 assert_contains "$doc" "DWMAC_STARFIVE" "design doc mentions Ethernet driver"
