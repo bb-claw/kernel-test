@@ -1,0 +1,36 @@
+---
+# Dev-cycle contract (SH-014) — nightly slow lane.
+# Budget: unbounded (target under 2 h). SH-024: tinyconfig + kunitconfig
+# kernel smoke build + QEMU boot. Failures open needs-human issues.
+#
+# Spec: https://github.com/bboortz/shepherd/blob/main/docs/specs/dev-cycle-contract.md
+name: ci-nightly
+
+"on":
+  schedule:
+    - cron: "30 2 * * *"    # 02:30 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120    # soft target; nightly is unbounded by contract.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # SH-024: ccache keyed by kernel ref + config + toolchain. Hot-cache
+      # defconfig rebuilds drop from ~647s to ~99s (Desaulniers 2018, 4-core).
+      - name: Cache ccache (SH-024)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+        with:
+          path: ~/.ccache
+          key: ccache-nightly-${{ runner.os }}-${{ hashFiles('Makefile', 'tests/**') }}
+          restore-keys: |
+            ccache-nightly-${{ runner.os }}-
+
+      - name: Run ci-nightly (tinyconfig + kunitconfig smoke)
+        run: make ci-nightly
