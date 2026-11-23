@@ -1111,4 +1111,4 @@ ci-release: ci-release-promote       # FF dev → main + tag (SH-029); kernel-te
 	@echo "ci-release: kernel-test ships no release artifact; tag is the release marker"
 
 ci-nightly: ci-nightly-body
-ci-nightly-body: smoke               # nightly: tinyconfig + kunitconfig kernel smoke (SH-024 extends)
+ci-nightly-body: lint ci-test        # nightly: framework self-tests only (no qemu / no cross-toolchain needed; see fix for SH-024)
