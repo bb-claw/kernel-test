@@ -191,7 +191,7 @@ endif
 MAKEFLAGS += --no-print-directory
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context shellcheck-staged hook-commit hook-push ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context shellcheck-staged hook-commit hook-push check-docs verify-plan-docs ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -281,10 +281,21 @@ ci-test:
 # See shepherd docs/plan/IDEAS-dev-workflow-contract-v3.md Layer 3 for mapping.
 
 COMMIT_STEPS ?= shellcheck-staged
-PUSH_STEPS   ?= lint ci-test
+PUSH_STEPS   ?= lint ci-test check-docs
 
 hook-commit: $(COMMIT_STEPS)
 hook-push:   $(PUSH_STEPS)
+
+# ── SH-055 — fleet-wide check-docs wrapper ────────────────────────────────────
+# Fleet-uniform entry point: `make check-docs` means the same thing in every
+# managed repo. Kernel-test's body is `verify-plan-docs` — a tiny verifier
+# that mirrors the plan-doc rule in .githooks/pre-push so CI backs up the
+# local hook. Shepherd ref: PR #58, docs/stories/SH-055-check-docs.md.
+
+verify-plan-docs:
+	@bash scripts/verify-plan-docs.sh
+
+check-docs: verify-plan-docs
 
 # shellcheck only the staged *.sh files — no-op when nothing shell is staged.
 # Keeps hook-commit within the ~15 s budget by scoping to the diff.
@@ -1112,7 +1123,7 @@ test-affected:
 release-artifacts: ; @true       # kernel-test has no artifact to promote across tiers
 
 # Tier bodies — bypass heavy natives (build/test need kernel tree).
-ci-branch: lint programs ci-test     # 5-min PR gate: lint + test-program build + framework tests
+ci-branch: lint programs ci-test check-docs  # 5-min PR gate: lint + test-program build + framework tests + plan-doc drift (SH-055)
 ci-patch:  ci-test                   # post-merge smoke (fast)
 
 # ci-release-promote: FF main to dev + tag from VERSION (SH-029).
