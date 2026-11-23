@@ -191,7 +191,7 @@ endif
 MAKEFLAGS += --no-print-directory
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context shellcheck-staged hook-commit hook-push ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -273,6 +273,29 @@ lint-context:
 # 'make test' already targets the kernel VM tests — this target is separate.
 ci-test:
 	$(Q)scripts/ci-run-tests.sh
+
+# ── SH-042 — fleet-wide hook-commit / hook-push tier wrappers ─────────────────
+# Each tier name means the same thing on every fleet repo; step contents stay
+# repo-native (kernel-test's COMMIT_STEPS = shellcheck-staged; PUSH_STEPS =
+# lint + ci-test). Budgets: hook-commit ~15 s, hook-push ~2 min.
+# See shepherd docs/plan/IDEAS-dev-workflow-contract-v3.md Layer 3 for mapping.
+
+COMMIT_STEPS ?= shellcheck-staged
+PUSH_STEPS   ?= lint ci-test
+
+hook-commit: $(COMMIT_STEPS)
+hook-push:   $(PUSH_STEPS)
+
+# shellcheck only the staged *.sh files — no-op when nothing shell is staged.
+# Keeps hook-commit within the ~15 s budget by scoping to the diff.
+shellcheck-staged:
+	@files=$$(git diff --cached --name-only --diff-filter=ACM | grep '\.sh$$' || true); \
+	if [ -n "$$files" ]; then \
+	    echo "[shellcheck-staged] $$files"; \
+	    shellcheck $$files; \
+	else \
+	    echo "[shellcheck-staged] no staged *.sh files — skipping"; \
+	fi
 
 # Mirror the GitHub Actions pipeline locally: lint → programs → ci-test.
 # i386 excluded — gcc-multilib conflicts with aarch64/riscv cross-compilers on Ubuntu.
@@ -874,6 +897,8 @@ Targets:
   verify-traceability  Check story CAP ids ↔ docs/CAPABILITIES.md ↔ test files are all consistent
   lint                 Tier 1 CI checks: shellcheck (bash + POSIX sh), bash -n, memory sizes, test-inventory, design doc, PR title
   ci-test          Tier 2 CI checks: fixture-based harness self-tests (no kernel build, no QEMU)
+  hook-commit      Fleet tier — ~15 s commit-stage gate (SH-042): shellcheck-staged
+  hook-push        Fleet tier — ~2 min push-stage gate (SH-042): lint + ci-test
   ci               Run the full GitHub Actions pipeline locally: lint → programs → ci-test (i386 excluded)
   dev-test         ≤6-min branch verification gate: >70% of 41 decision paths; fixed core + random draw (SEED=N, BUDGET=N)
   hook-dev-test    Toggle dev-test in .githooks/pre-push (per-machine opt-in; run again to remove)
