@@ -24,4 +24,4 @@ owner: bb-claw
 
 dependabot:
   enforce_enabled: true
-  auto_merge: false
+  auto_merge: true   # Wave 4 / SH-040: gated auto-merge via .github/workflows/dependabot-automerge.yml

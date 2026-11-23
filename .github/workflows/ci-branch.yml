@@ -1,10 +1,10 @@
 ---
-name: CI
+# Dev-cycle contract (SH-014) — tier 1: feature-branch / PR gate.
+# Renamed from ci.yml → ci-branch.yml via SH-035 (workflow filename convergence).
+name: ci-branch
 
 "on":
   pull_request:
-    branches:
-      - main
 
 # Cancel in-progress runs on the same PR when a new commit is pushed.
 concurrency:
@@ -15,10 +15,10 @@ jobs:
   ci:
     name: lint → programs → ci-test
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 5    # SH-039: contract budget (median run is 1.7 min per baseline)
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install dependencies
         run: |
@@ -58,7 +58,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Cache Toybox binaries
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: cache/
           key: toybox-${{ steps.toybox.outputs.version }}
