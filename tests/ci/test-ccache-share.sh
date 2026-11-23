@@ -9,6 +9,14 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=tests/ci/lib.sh
 . "$REPO/tests/ci/lib.sh"
 
+# ── Prerequisite: ccache binary ──────────────────────────────────────────────
+# make ccache-status / ccache-init shell out to `ccache`; without it they fail.
+# Mirrors the skip pattern used by test-build-sentinel.sh.
+if ! command -v ccache &>/dev/null; then
+    printf 'skip  test-ccache-share.sh: ccache not installed\n'
+    exit 0
+fi
+
 # ── K1: shared dir present → CCACHE_DIR resolves to shared path ─────────────
 
 begin_test "ccache-auto-detect-shared"

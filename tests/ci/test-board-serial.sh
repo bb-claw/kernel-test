@@ -27,6 +27,9 @@ else
     printf '  skip  socat not installed — skipping board serial replay tests\n'
     printf '        (install: sudo apt-get install socat  or: make bootstrap)\n'
     finish
+    exit $?   # finish returns a status; exit now so the socat-dependent
+              # sections below (run_board_replay, bash-fallback, missing-tty)
+              # don't execute on a runner without socat.
 fi
 
 begin_test "board-serial-capture-backend"
