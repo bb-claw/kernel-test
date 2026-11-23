@@ -135,6 +135,17 @@ STUB
     chmod +x "$bindir/git"
     PATH="$bindir:$PATH"
     export PATH
+    # Ensure `git commit` succeeds even when the runner's git has no identity.
+    # ci-branch configures a global identity before `make ci-test`; ci-patch
+    # runs `actions/checkout` only, so sub-shelled `git commit` calls in tests
+    # (test-init-data-repo.sh, lib/report.sh via test-report.sh, …) fail
+    # without an author/committer. Export per-invocation env to avoid touching
+    # the runner's global config.
+    GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-CI Test}"
+    GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-test@example.com}"
+    GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-CI Test}"
+    GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-test@example.com}"
+    export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 }
 
 # ── Test runner ───────────────────────────────────────────────────────────────
