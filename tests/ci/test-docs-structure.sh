@@ -26,8 +26,8 @@ assert_file_exists "$REPO/docs/plans/plan-template.md" "plan-template.md in docs
 begin_test "docs/specs/spec-template.md present"
 assert_file_exists "$REPO/docs/specs/spec-template.md" "spec-template.md in docs/specs/"
 
-begin_test "docs/stories/story-template.md present"
-assert_file_exists "$REPO/docs/stories/story-template.md" "story-template.md in docs/stories/"
+begin_test "docs/stories/_story-template.md present"
+assert_file_exists "$REPO/docs/stories/_story-template.md" "_story-template.md in docs/stories/"
 
 # ── No plan files remain at docs/ root ───────────────────────────────────────
 
@@ -68,8 +68,8 @@ assert_contains "$lint_content" "docs/plans/*.md" "ci-lint globs docs/plans/"
 
 # ── Story template has KT-NNN format and 9-question sections ─────────────────
 
-begin_test "story-template.md uses KT-NNN format and 9 sections"
-tmpl=$(cat "$REPO/docs/stories/story-template.md")
+begin_test "_story-template.md uses KT-NNN format and 9 sections"
+tmpl=$(cat "$REPO/docs/stories/_story-template.md")
 assert_contains "$tmpl" "KT-NNN"             "story template has KT-NNN prefix"
 assert_contains "$tmpl" "## 9."              "story template has section 9 (capabilities)"
 assert_contains "$tmpl" "Gherkin"            "story template has Gherkin acceptance section"

@@ -191,7 +191,7 @@ endif
 MAKEFLAGS += --no-print-directory
 
 # ── Phony targets ─────────────────────────────────────────────────────────────
-.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context shellcheck-staged hook-commit hook-push check-docs verify-plan-docs ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
+.PHONY: all smoke full extended local ns-smoke ns-full fetch fetch-stable fetch-stable-rc fetch-next build programs initramfs test report monitor diff baseline warnings warnings-baseline install dmesg valgrind clean distclean bootstrap hw-bootstrap hooks info checkout config-archive consolidate-index init-data-repo replay kconfig-check kconfig-build bisect canary-patch verify-patch verify-traceability lint lint-context shellcheck-staged hook-commit hook-push check-docs verify-plan-docs verify-index-status ci ci-test dev-test hook-dev-test bug-hunt ccache-init ccache-status help
 
 # ── File-producing rules (dependency tracking) ────────────────────────────────
 # Make uses these to auto-build missing or stale artifacts before 'test'.
@@ -288,14 +288,18 @@ hook-push:   $(PUSH_STEPS)
 
 # ── SH-055 — fleet-wide check-docs wrapper ────────────────────────────────────
 # Fleet-uniform entry point: `make check-docs` means the same thing in every
-# managed repo. Kernel-test's body is `verify-plan-docs` — a tiny verifier
-# that mirrors the plan-doc rule in .githooks/pre-push so CI backs up the
-# local hook. Shepherd ref: PR #58, docs/stories/SH-055-check-docs.md.
+# managed repo. Kernel-test's body is `verify-plan-docs` + `verify-index-status`
+# — two tiny verifiers that mirror the plan-doc rule in .githooks/pre-push and
+# catch INDEX.md ↔ frontmatter drift respectively. Shepherd refs: PR #58
+# (SH-055 wrapper), PR #59 (SH-056 index-status).
 
 verify-plan-docs:
 	@bash scripts/verify-plan-docs.sh
 
-check-docs: verify-plan-docs
+verify-index-status:
+	@scripts/verify-index-status.sh
+
+check-docs: verify-plan-docs verify-index-status
 
 # shellcheck only the staged *.sh files — no-op when nothing shell is staged.
 # Keeps hook-commit within the ~15 s budget by scoping to the diff.

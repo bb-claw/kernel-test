@@ -1,6 +1,6 @@
 # Stories index
 
-Stories follow the format `KT-NNN-<slug>.md`. See `story-template.md` for the full
+Stories follow the format `KT-NNN-<slug>.md`. See `_story-template.md` for the full
 format and `_9-questions.md` for the clarification checklist.
 
 A story only moves to `ready` once all 9 questions have concrete answers and at least
@@ -17,5 +17,8 @@ one capability id (§9) is named. Plan doc + branch are cut at `ready → in-pro
 
 ## Stories
 
-| ID | Slug | Title | Status | Created | Shipped |
-|----|------|-------|--------|---------|---------|
+Column order matches the shepherd-fleet convention (`| ID | Status | Slug | Title |`)
+so `scripts/verify-index-status.sh` (SH-056) can diff frontmatter ↔ INDEX.
+
+| ID | Status | Slug | Title |
+|----|--------|------|-------|
