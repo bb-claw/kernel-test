@@ -82,7 +82,7 @@ kernel-test/
 ├── docs/
 │   ├── plans/      per-branch design plans (<slug>-plan.md); template: plan-template.md
 │   ├── specs/      specifications, workflows, reference docs (free-format names)
-│   └── stories/    user stories (KT-NNN-slug.md); template: story-template.md
+│   └── stories/    user stories (KT-NNN-slug.md); template: _story-template.md
 ├── memory/         this directory — persistent AI context
 ├── dmesg/          gitignored; raw dmesg captures + analysis files (make dmesg)
 ├── build/          gitignored; out-of-tree kernel builds + initramfs
