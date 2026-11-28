@@ -22,4 +22,4 @@ so `scripts/verify-index-status.sh` (SH-056) can diff frontmatter ↔ INDEX.
 
 | ID | Status | Slug | Title |
 |----|--------|------|-------|
-| KT-001 | in-progress | toybox-revert-0814 | Revert Toybox pin to 0.8.14 (0.8.15 hangs VM tests) |
+| KT-001 | shipped | toybox-revert-0814 | Revert Toybox pin to 0.8.14 (0.8.15 hangs VM tests) |

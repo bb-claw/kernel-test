@@ -2,7 +2,7 @@
 
 **Story**: [`docs/stories/KT-001-toybox-revert-0814.md`](../stories/KT-001-toybox-revert-0814.md)
 **Branch**: `fix/KT-001-toybox-revert-0814`
-**Status**: in-progress  # in-progress → shipped
+**Status**: shipped  # in-progress → shipped (PR #129, merged to main)
 
 ---
 
@@ -113,7 +113,8 @@ semantics change for callers. The `cache/` binary re-syncs automatically.
 
 | Gate | Command | Result |
 |---|---|---|
-| Pin consistent | `make ci-test` (`test-makefile-defaults.sh`) | to fill at push |
-| Lint clean | `make lint` | to fill at push |
-| Boot green | `make all NO_FETCH=1 CONFIGS=tinyconfig ARCHS=x86_64` | to fill at push |
-| Regression fixed | `make all NO_FETCH=1 CONFIGS=kunitconfig ARCHS=arm64` | PASS 52/52 (matrix, 0.8.14 × {7.3.6,7.3.7-rc1}) |
+| Pin consistent | `make ci-test` (`test-makefile-defaults.sh`) | PASS (25/0) |
+| Full local CI | `make ci` (lint → programs → ci-test) | PASS — ci-test 52/52 |
+| Doc checks | `make check-docs` (verify-plan-docs + verify-index-status) | PASS |
+| Binary re-sync | `lib/download-toybox.sh x86_64` | re-downloads 0.8.14 (`836ba9d6`) via stamp mismatch |
+| Regression fixed | `make all NO_FETCH=1 CONFIGS=kunitconfig ARCHS=arm64`, 2×2 × 6 runs | 0.8.14 PASS 6/6, 0.8.15 HANG 6/6 — on both 7.3.6 and 7.3.7-rc1 |
