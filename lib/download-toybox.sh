@@ -7,7 +7,7 @@ set -euo pipefail
 . "$(dirname "$0")/common.sh"
 
 ARCH="${1:?usage: download-toybox.sh <arch>}"
-TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.15}
+TOYBOX_VERSION=${TOYBOX_VERSION:-0.8.14}
 CACHE_DIR=${CACHE_DIR:-cache}
 TOYBOX_BASE_URL="https://www.landley.net/toybox/downloads/binaries/${TOYBOX_VERSION}"
 

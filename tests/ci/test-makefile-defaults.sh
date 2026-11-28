@@ -56,9 +56,9 @@ line=$(grep '^BUILD_ONLY_CONFIGS' "$REPO/Makefile" | head -1)
 assert_contains "$line" "allmodconfig" "allmodconfig in BUILD_ONLY_CONFIGS"
 assert_contains "$line" "randconfig"   "randconfig in BUILD_ONLY_CONFIGS"
 
-begin_test "TOYBOX_VERSION is 0.8.15 in Makefile"
+begin_test "TOYBOX_VERSION is 0.8.14 in Makefile"
 line=$(grep '^TOYBOX_VERSION' "$REPO/Makefile" | head -1)
-assert_contains "$line" "0.8.15" "TOYBOX_VERSION Makefile pin is 0.8.15"
+assert_contains "$line" "0.8.14" "TOYBOX_VERSION Makefile pin is 0.8.14"
 
 begin_test "TOYBOX_VERSION is consistent between Makefile and bootstrap.sh"
 mk_ver=$(grep '^TOYBOX_VERSION' "$REPO/Makefile" | head -1 | sed 's/.*?=[[:space:]]*//')

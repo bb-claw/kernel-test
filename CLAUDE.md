@@ -17,7 +17,7 @@ Bash harness for testing Linux release-candidate kernels: build under multiple c
 - **Entry point**: `Makefile` — all commands via `make <target> [VAR=value]`
 - **Language**: Bash for all harness scripts (`set -euo pipefail`); POSIX sh for VM test scripts
 - **Archs**: x86_64, i386 (KVM); arm64, riscv (TCG — slower, 1 G RAM, `TIMEOUT×2`)
-- **Userland**: Toybox 0.8.15 static binary in cpio initramfs (`TOYBOX_VERSION` pin)
+- **Userland**: Toybox 0.8.14 static binary in cpio initramfs (`TOYBOX_VERSION` pin)
 - **Data**: builds in `build/`, reports in `DATA_REPO/reports/` (default `~/git/kernel-test-data/`)
 
 ---
