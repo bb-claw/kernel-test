@@ -1,7 +1,7 @@
 ---
 id: KT-001
 slug: toybox-revert-0814
-status: in-progress    # draft → ready → in-progress → shipped
+status: shipped        # draft → ready → in-progress → shipped
 created: 2026-11-28
 owner: "@bb-claw"
 branch: "fix/KT-001-toybox-revert-0814"
