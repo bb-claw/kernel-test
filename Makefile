@@ -1139,6 +1139,9 @@ ci-release-promote:
 	@[ -f VERSION ] || { echo "VERSION file missing — cannot determine tag"; exit 1; }
 	@version=$$(cat VERSION | tr -d '[:space:]'); \
 	 echo "SH-029 promote: dev → main as v$$version"; \
+	 if git rev-parse -q --verify "refs/tags/v$$version" >/dev/null; then \
+	   echo "ci-release-promote: tag v$$version already exists — bump VERSION on dev before releasing"; exit 1; \
+	 fi; \
 	 git fetch origin main && \
 	 git checkout main && \
 	 git merge --ff-only origin/dev && \
