@@ -16,7 +16,7 @@ gates:
   rescan_scope: high_critical
   waiting_period_hours: 6
 
-dry_run: true
+dry_run: false
 needs_human_label: needs-human
 security_fix: pr-only
 notify: ntfy
